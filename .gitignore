@@ -1,0 +1,99 @@
+# --- General ---
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+*.swp
+*.swo
+*.log
+*~
+
+# --- IDEs ---
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+/lib/
+/lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments (Python)
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Python Testing & Quality
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+coverage.xml
+*.cover
+*.py,cover
+
+# --- Node.js / Frontend ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Next.js
+.next/
+out/
+
+# Production (Frontend)
+# build/ is handled in Python section but applies here too
+# dist/ is handled in Python section but applies here too
+
+# Bun
+# bun.lockb is binary but usually recommended to commit. 
+# If you prefer not to commit it, uncomment the line below.
+# bun.lockb
+
+# --- Local files ---
+*.local
+
+# --- Configuration / Secrets ---
+*.env
+!.env.example
+
+# --- Claude / AI Assistant ---
+.gemini/
+claude_scratch/
+*-mcp.json
+.gemini-clipboard/
+
+# --- Local Data ---
+backend/visualizer.db
+
+# --- Build Artifacts ---
+backend/static/
+PRD.md

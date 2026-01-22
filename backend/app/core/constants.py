@@ -1,0 +1,6 @@
+"""Display constants for text formatting."""
+
+DEFAULT_PATH_MAX_LEN = 35
+DEFAULT_WORD_MAX_LEN = 30
+PROMPT_SHORT_MAX_LEN = 120
+FIRST_SENTENCE_MAX_LEN = 100

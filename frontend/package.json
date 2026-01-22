@@ -1,0 +1,51 @@
+{
+  "name": "frontend",
+  "version": "0.5.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --ext .ts,.tsx --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@pixi/react": "^8.0.5",
+    "@xstate/react": "^6.0.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^0.562.0",
+    "next": "16.1.2",
+    "pixi.js": "^8.15.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-zoom-pan-pinch": "^3.7.0",
+    "tailwind-merge": "^3.4.0",
+    "xstate": "^5.25.1",
+    "zustand": "^5.0.10"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^20.3.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.2",
+    "prettier": "^3.8.0",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^3.1.0"
+  },
+  "ignoreScripts": [
+    "sharp",
+    "unrs-resolver"
+  ],
+  "trustedDependencies": [
+    "sharp",
+    "unrs-resolver"
+  ]
+}

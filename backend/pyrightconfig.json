@@ -1,0 +1,6 @@
+{
+  "include": ["app"],
+  "pythonVersion": "3.14",
+  "typeCheckingMode": "strict",
+  "useLibraryCodeForTypes": true
+}
