@@ -42,7 +42,8 @@ The application was built with [Next.js](https://nextjs.org/), [PixiJS](https://
 - **Thought/Speech Bubbles**: See agent activities and communications
 
 ### Advanced Features
-- **Multi-Mode Whiteboard**: Click to cycle through 10 display modes (todo list, tool usage pie chart, org chart, stonks, weather, safety board, timeline, news ticker, coffee tracker, heat map)
+- **Multi-Mode Whiteboard**: 11 display modes with keyboard shortcuts (0-9, T, B) - todo list, remote workers, tool usage pie chart, org chart, stonks, weather, safety board, timeline, news ticker, coffee tracker, heat map
+- **Background Task Tracking**: Remote Workers display shows background task status in video-call-style tiles
 - **Context Window Tracking**: Animated trashcan fills with paper as context increases
 - **Compaction Animation**: Boss stomps on trashcan to compact context
 - **City Skyline Window**: Real-time day/night cycle based on local time
@@ -241,7 +242,7 @@ Contributions are welcome! Please ensure that all pull requests:
 
 - [Quick Start Guide](docs/QUICKSTART.md) - Get running in under 5 minutes
 - [Architecture](docs/ARCHITECTURE.md) - System design, data flow, component details
-- [Whiteboard Modes](docs/WHITEBOARD.md) - Multi-mode whiteboard display documentation
+- [Whiteboard Modes](docs/WHITEBOARD.md) - 11 display modes with keyboard shortcuts
 - [Docker Guide](docs/DOCKER.md) - Docker deployment and configuration
 - [AI Summary](docs/AI_SUMMARY.md) - AI-powered summary service documentation
 - [Backend README](backend/README.md) - Backend-specific setup
