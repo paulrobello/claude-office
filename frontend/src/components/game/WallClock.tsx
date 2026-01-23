@@ -70,12 +70,20 @@ export function WallClock(): ReactNode {
     [time],
   );
 
-  // Draw a clickable hit area
-  const drawHitArea = useCallback((g: Graphics) => {
-    g.clear();
-    g.circle(0, 0, 44);
-    g.fill({ color: 0x000000, alpha: 0 }); // Invisible but clickable
-  }, []);
+  // Draw a clickable hit area (sized for the larger of analog/digital)
+  const drawHitArea = useCallback(
+    (g: Graphics) => {
+      g.clear();
+      if (clockType === "analog") {
+        g.circle(0, 0, 44);
+      } else {
+        // Rectangular hit area for digital clock
+        g.roundRect(-44, -28, 88, 56, 6);
+      }
+      g.fill({ color: 0x000000, alpha: 0 }); // Invisible but clickable
+    },
+    [clockType],
+  );
 
   return (
     <pixiContainer
