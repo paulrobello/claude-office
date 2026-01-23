@@ -68,6 +68,15 @@ graph TD
 4. WebSocket manager broadcasts changes to connected clients
 5. Events are persisted to SQLite for replay
 
+### Task System Support
+
+The backend supports two Claude Code task systems:
+
+1. **TodoWrite Tool** (legacy): Tasks are sent via `pre_tool_use` events with `tool_name: "TodoWrite"`
+2. **Task File System** (newer): Tasks are stored in `~/.claude/tasks/{session_id}/*.json`
+
+Both systems are converted to the same `TodoItem` format for frontend display. The task file poller monitors the task directory and automatically syncs changes to the visualization.
+
 ## Prerequisites
 
 | Requirement | Version | Purpose |
@@ -219,6 +228,7 @@ backend/
 │   │   ├── quotes.py          # Loading screen quotes
 │   │   ├── state_machine.py   # Office state management
 │   │   ├── summary_service.py # AI-powered summaries
+│   │   ├── task_file_poller.py # Claude task file monitoring
 │   │   └── transcript_poller.py # Token usage extraction
 │   ├── db/
 │   │   ├── database.py        # SQLAlchemy async setup
@@ -241,6 +251,7 @@ backend/
 │   ├── test_quotes.py         # Quotes module tests
 │   ├── test_state_machine.py  # State machine tests
 │   ├── test_summary_service.py # Summary service tests
+│   ├── test_task_file_poller.py # Task file polling tests
 │   └── test_transcript_poller.py # Transcript polling tests
 ├── pyproject.toml             # Project dependencies
 ├── Makefile                   # Development commands

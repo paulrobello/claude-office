@@ -12,11 +12,12 @@ from app.config import get_settings
 from app.core.jsonl_parser import get_last_assistant_response
 from app.core.state_machine import StateMachine
 from app.core.summary_service import get_summary_service
+from app.core.task_file_poller import get_task_file_poller, init_task_file_poller
 from app.core.transcript_poller import get_transcript_poller, init_transcript_poller
 from app.db.database import AsyncSessionLocal
 from app.db.models import EventRecord, SessionRecord
 from app.models.agents import Agent, AgentState, BossState
-from app.models.common import BubbleContent, BubbleType
+from app.models.common import BubbleContent, BubbleType, TodoItem
 from app.models.events import Event, EventData, EventType
 from app.models.sessions import GameState, HistoryEntry
 
@@ -68,13 +69,33 @@ class EventProcessor:
     def __init__(self) -> None:
         self.sessions: dict[str, StateMachine] = {}
         self._sessions_lock = asyncio.Lock()
-        self._poller_initialized = False
+        self._transcript_poller_initialized = False
+        self._task_poller_initialized = False
 
-    def _ensure_poller(self) -> None:
+    def _ensure_transcript_poller(self) -> None:
         """Initialize the transcript poller if not already done."""
-        if not self._poller_initialized:
+        if not self._transcript_poller_initialized:
             init_transcript_poller(self._handle_polled_event)
-            self._poller_initialized = True
+            self._transcript_poller_initialized = True
+
+    def _ensure_task_file_poller(self) -> None:
+        """Initialize the task file poller if not already done."""
+        if not self._task_poller_initialized:
+            init_task_file_poller(self._handle_task_file_update)
+            self._task_poller_initialized = True
+
+    async def _handle_task_file_update(self, session_id: str, todos: list[TodoItem]) -> None:
+        """Handle task file updates by updating state machine and broadcasting."""
+        sm = self.sessions.get(session_id)
+        if not sm:
+            return
+
+        # Update todos in state machine
+        sm.todos = todos
+        logger.debug(f"Updated todos for session {session_id}: {len(todos)} items")
+
+        # Broadcast updated state to clients
+        await self._broadcast_state(session_id)
 
     async def _handle_polled_event(self, event: Event) -> None:
         """Handle events extracted from polled subagent transcripts."""
@@ -174,6 +195,19 @@ class EventProcessor:
         if len(sm.history) > 500:
             sm.history = sm.history[-500:]
 
+        # Start task file polling on session start
+        if event.event_type == EventType.SESSION_START:
+            self._ensure_task_file_poller()
+            task_poller = get_task_file_poller()
+            if task_poller:
+                await task_poller.start_polling(event.session_id)
+
+        # Stop task file polling on session end
+        if event.event_type == EventType.SESSION_END:
+            task_poller = get_task_file_poller()
+            if task_poller:
+                await task_poller.stop_polling(event.session_id)
+
         if event.event_type == EventType.SUBAGENT_START and event.data and event.data.agent_id:
             agent_id = event.data.agent_id
             if agent_id in sm.agents:
@@ -203,7 +237,7 @@ class EventProcessor:
 
             transcript_path = event.data.agent_transcript_path
             if transcript_path:
-                self._ensure_poller()
+                self._ensure_transcript_poller()
                 poller = get_transcript_poller()
                 if poller:
                     await poller.start_polling(agent_id, event.session_id, transcript_path)
@@ -217,7 +251,7 @@ class EventProcessor:
             native_agent_id = event.data.native_agent_id
 
             if transcript_path and native_agent_id:
-                self._ensure_poller()
+                self._ensure_transcript_poller()
                 poller = get_transcript_poller()
                 if poller:
                     for agent_id in sm.agents:
