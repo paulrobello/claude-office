@@ -17,6 +17,7 @@ Utility scripts for testing and demonstrating the Claude Office Visualizer witho
 The scripts directory contains testing utilities that simulate Claude Code events:
 
 - **Event Simulation**: Send realistic event sequences to exercise frontend features
+- **Background Tasks**: Simulate background task notifications for the Remote Workers display
 - **Pathfinding Debug**: Test agent navigation with single-agent scenarios
 - **Demo Mode**: Showcase the visualizer without active Claude Code sessions
 
@@ -60,6 +61,7 @@ graph TD
     Context --> Compact[Compaction at 80%]
 
     UI --> Todos[Whiteboard Todos]
+    UI --> Remote[Remote Workers]
     UI --> Marquee[Desk Marquees]
     UI --> Bubbles[Speech Bubbles]
 
@@ -77,6 +79,7 @@ graph TD
     style Todos fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
     style Marquee fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
     style Bubbles fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
+    style Remote fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
 ```
 
 ### Simulation Sequence
@@ -88,7 +91,8 @@ graph TD
 5. **Context Building** - Token usage increases toward 80%
 6. **Compaction** - Boss walks to trash can, stomps 5 times
 7. **Agent Departure** - Employees return to elevator
-8. **Session End** - Cleanup
+8. **Background Tasks** - Simulate 4 background task completions (3 success, 1 failure)
+9. **Session End** - Cleanup
 
 ### Agent Names
 
@@ -110,6 +114,19 @@ The simulation uses creative job titles:
 | Start percentage | 20% | Initial context usage |
 | Compaction threshold | 80% | Triggers boss animation |
 | Post-compaction | ~30% | Reduced after stomping |
+
+### Background Task Notifications
+
+The simulation sends 4 background task notifications to populate the Remote Workers whiteboard mode:
+
+| Task ID | Status | Summary |
+|---------|--------|---------|
+| `bg_task_a1b2c3d4` | completed | Linting codebase with ruff |
+| `bg_task_e5f6g7h8` | completed | Running type checks with pyright |
+| `bg_task_i9j0k1l2` | failed | Deploy to production failed |
+| `bg_task_m3n4o5p6` | completed | Generated API documentation |
+
+View these in the whiteboard by pressing `1` or `B` to switch to Remote Workers mode.
 
 ## Single Agent Test
 
