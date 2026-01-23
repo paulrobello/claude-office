@@ -410,7 +410,7 @@ try:
             # Ignore errors to prevent blocking/breaking Claude
             pass
 
-    __version__ = "0.5.0"
+    __version__ = "0.6.0"
 
     def main() -> None:
         # Check for --version before argparse (which requires event_type)
