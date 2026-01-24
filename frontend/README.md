@@ -139,7 +139,8 @@ frontend/src/
 │   │   ├── CityWindow.tsx        # Day/night city skyline
 │   │   ├── EmployeeOfTheMonth.tsx # Wall poster decoration
 │   │   ├── Whiteboard.tsx        # Todo list display
-│   │   ├── WallClock.tsx         # Animated wall clock
+│   │   ├── WallClock.tsx         # Animated wall clock (analog/digital)
+│   │   ├── DigitalClock.tsx      # LED-style digital clock display
 │   │   ├── SafetySign.tsx        # Tool counter display
 │   │   ├── MarqueeText.tsx       # Scrolling text component
 │   │   ├── DeskMarquee.tsx       # Task display above desks
@@ -153,9 +154,11 @@ frontend/src/
 │   │   ├── GitStatusPanel.tsx    # Git status display
 │   │   └── AgentStatus.tsx       # Agent status indicator
 │   └── overlay/                  # Modal components
-│       └── Modal.tsx             # Modal overlay component
+│       ├── Modal.tsx             # Modal overlay component
+│       └── SettingsModal.tsx     # User preferences modal
 ├── stores/
-│   └── gameStore.ts              # Unified Zustand store
+│   ├── gameStore.ts              # Unified Zustand store
+│   └── preferencesStore.ts       # User preferences store
 ├── machines/
 │   ├── agentMachine.ts           # XState agent lifecycle
 │   └── agentMachineService.ts    # Machine spawning/routing
@@ -234,6 +237,17 @@ Use primitive selectors to prevent unnecessary re-renders:
 const contextUtilization = useGameStore(selectContextUtilization);
 const isCompacting = useGameStore(selectIsCompacting);
 ```
+
+### Preferences Store
+
+User preferences are stored in the backend and synced via `preferencesStore.ts`:
+
+| Preference    | Values              | Description               |
+| ------------- | ------------------- | ------------------------- |
+| `clockType`   | `analog`, `digital` | Wall clock display mode   |
+| `clockFormat` | `12h`, `24h`        | Digital clock time format |
+
+Click the wall clock to cycle through modes, or use the Settings modal.
 
 ## Debug Tools
 

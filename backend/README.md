@@ -185,6 +185,19 @@ CLAUDE_PATH_CONTAINER=/claude-data
 | `GET` | `/api/v1/sessions/{id}/replay` | Get replay data for a session |
 | `POST` | `/api/v1/sessions/simulate` | Start background simulation |
 
+### Preferences
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/preferences` | Get all user preferences |
+| `GET` | `/api/v1/preferences/{key}` | Get a single preference |
+| `PUT` | `/api/v1/preferences/{key}` | Set a preference value |
+| `DELETE` | `/api/v1/preferences/{key}` | Delete a preference |
+
+Preferences are stored as key-value pairs and persist across sessions. Current preferences:
+- `clock_type`: `"analog"` or `"digital"`
+- `clock_format`: `"12h"` or `"24h"` (for digital clock)
+
 ### WebSocket
 
 | Path | Description |

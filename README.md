@@ -38,6 +38,10 @@ The application was built with [Next.js](https://nextjs.org/), [PixiJS](https://
 
 ### v0.6.0 (January 2026)
 
+- **User Preferences**: Persistent settings stored in backend database, survives browser refresh
+- **Clock Display Options**: Click the wall clock to cycle between analog, digital 12h, and digital 24h formats
+- **Settings Modal**: New settings button in header to configure preferences
+- **Animated Clouds**: Clouds now drift slowly across the city window sky (top cloud slower than bottom)
 - **Background Task Notifications**: New Remote Workers whiteboard mode (Mode 1) displays background task status in video-call-style tiles showing task ID, status LED, and summary
 - **Keyboard Shortcuts**: Press `0-9` to jump directly to whiteboard modes, `T` for Todo list, `B` for Background tasks
 - **11 Whiteboard Modes**: Added Remote Workers mode, bringing the total to 11 visualization modes
@@ -62,7 +66,9 @@ The application was built with [Next.js](https://nextjs.org/), [PixiJS](https://
 - **Background Task Tracking**: Remote Workers display shows background task status in video-call-style tiles
 - **Context Window Tracking**: Animated trashcan fills with paper as context increases
 - **Compaction Animation**: Boss stomps on trashcan to compact context
-- **City Skyline Window**: Real-time day/night cycle based on local time
+- **City Skyline Window**: Real-time day/night cycle based on local time with animated drifting clouds
+- **Wall Clock**: Click to cycle between analog and digital (12h/24h) display modes
+- **User Preferences**: Settings persist across sessions via backend database
 - **Git Status Panel**: See repository status in real-time
 - **Printer Station**: Printer animates when Claude completes work that produces a report or document
 - **Random Quotes**: Agents display random acceptance/completion quotes when receiving or turning in work
