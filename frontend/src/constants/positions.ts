@@ -12,7 +12,7 @@
 export const EMPLOYEE_OF_MONTH_POSITION = { x: 184, y: 50 };
 
 /** City window position */
-export const CITY_WINDOW_POSITION = { x: 323, y: 30 };
+export const CITY_WINDOW_POSITION = { x: 319, y: 30 };
 
 /** Safety sign position */
 export const SAFETY_SIGN_POSITION = { x: 1120, y: 40 };
