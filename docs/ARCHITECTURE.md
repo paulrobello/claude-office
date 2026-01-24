@@ -17,6 +17,8 @@ System architecture and design documentation for Claude Office Visualizer.
 - [Context Compaction Animation](#context-compaction-animation)
 - [Printer Animation](#printer-animation)
 - [City Skyline Window](#city-skyline-window)
+- [Wall Clock](#wall-clock)
+- [User Preferences](#user-preferences)
 - [PixiJS Rendering](#pixijs-rendering)
 - [Related Documentation](#related-documentation)
 
@@ -142,7 +144,8 @@ graph LR
 | `components/game/SafetySign.tsx` | Tool counter since last compaction |
 | `components/game/PrinterStation.tsx` | Animated printer for report generation |
 | `components/game/Elevator.tsx` | Agent arrival/departure elevator with doors |
-| `components/game/WallClock.tsx` | Real-time analog wall clock |
+| `components/game/WallClock.tsx` | Clickable wall clock (analog/digital modes) |
+| `components/game/DigitalClock.tsx` | LED-style digital clock display |
 | `components/game/DebugOverlays.tsx` | Development debug visualizations |
 | `components/game/LoadingScreen.tsx` | Loading state display |
 | `components/game/ZoomControls.tsx` | Canvas zoom controls |
@@ -150,6 +153,7 @@ graph LR
 | `components/game/GitStatusPanel.tsx` | Git repository status display |
 | `components/game/AgentStatus.tsx` | Agent status indicators |
 | `stores/gameStore.ts` | Unified Zustand store for all game state (includes bubble queue) |
+| `stores/preferencesStore.ts` | User preferences store (clock type, format) |
 | `systems/compactionAnimation.ts` | Boss stomp animation when context compacts |
 | `systems/animationSystem.ts` | Single RAF loop for all movement and timing |
 | `systems/pathfinding.ts` | A* pathfinding with navigation grid |
@@ -381,8 +385,13 @@ The city window shows an animated skyline with real-time day/night cycle based o
 |--------|----------|
 | Night  | Stars, moon arc, lit windows (35% lit probability) |
 | Dawn   | Rising sun, gradient transition (20% lit probability) |
-| Day    | Sun arc, clouds, few lit windows (5% lit probability) |
+| Day    | Sun arc, animated drifting clouds, few lit windows (5% lit probability) |
 | Dusk   | Setting sun, gradient transition (30% lit probability) |
+
+**Animated Clouds:**
+- Two clouds drift slowly across the sky during daytime
+- Top cloud moves slower than bottom cloud (parallax effect)
+- Clouds are clipped to window bounds using PixiJS mask
 
 **Seasonal Variations:**
 
@@ -402,6 +411,35 @@ The city window shows an animated skyline with real-time day/night cycle based o
 - Toggled state persists and accumulates during session
 
 **Debug:** Press `D` then `T` to fast-forward (full 24-hour cycle in ~12 seconds)
+
+## Wall Clock
+
+The wall clock supports multiple display modes:
+
+| Mode | Description |
+|------|-------------|
+| Analog | Traditional clock face with hour, minute, and second hands |
+| Digital 12h | LED-style display with AM/PM indicator |
+| Digital 24h | LED-style display with 24-hour format |
+
+**Interaction:** Click the clock to cycle through modes (analog → digital 12h → digital 24h → analog)
+
+**Persistence:** Clock preferences are stored in the backend database and persist across sessions.
+
+## User Preferences
+
+User preferences are stored in the backend SQLite database as key-value pairs:
+
+| Key | Values | Description |
+|-----|--------|-------------|
+| `clock_type` | `analog`, `digital` | Wall clock display mode |
+| `clock_format` | `12h`, `24h` | Digital clock time format |
+
+**API Endpoints:**
+- `GET /api/v1/preferences` - Get all preferences
+- `PUT /api/v1/preferences/{key}` - Set a preference
+
+**Frontend:** The `preferencesStore.ts` Zustand store manages preference state and syncs with the backend.
 
 ## PixiJS Rendering
 
