@@ -46,21 +46,21 @@ export function DigitalClock({ format }: DigitalClockProps): ReactNode {
     g.clear();
 
     // Outer black casing
-    g.roundRect(-44, -28, 88, 56, 6);
+    g.roundRect(-54, -28, 108, 56, 6);
     g.fill(0x1a1a1a);
     g.stroke({ width: 2, color: 0x333333 });
 
     // Inner display bezel
-    g.roundRect(-40, -24, 80, 48, 4);
+    g.roundRect(-50, -24, 100, 48, 4);
     g.fill(0x0a1a0a);
     g.stroke({ width: 1, color: 0x2d3748 });
 
     // LCD screen background (dark green-black)
-    g.roundRect(-38, -22, 76, 44, 3);
+    g.roundRect(-48, -22, 96, 44, 3);
     g.fill(0x0d1f0d);
 
     // Subtle screen reflection highlight
-    g.roundRect(-36, -20, 72, 2, 1);
+    g.roundRect(-46, -20, 92, 2, 1);
     g.fill({ color: 0x1a3a1a, alpha: 0.5 });
   }, []);
 

@@ -78,7 +78,7 @@ export function WallClock(): ReactNode {
         g.circle(0, 0, 44);
       } else {
         // Rectangular hit area for digital clock
-        g.roundRect(-44, -28, 88, 56, 6);
+        g.roundRect(-54, -28, 108, 56, 6);
       }
       g.fill({ color: 0x000000, alpha: 0 }); // Invisible but clickable
     },
