@@ -223,10 +223,10 @@ export function CityWindow(): ReactNode {
   useEffect(() => {
     const interval = setInterval(() => {
       setCloudOffsets((prev) => ({
-        // Top cloud moves slower (0.075 pixels per frame)
-        top: (prev.top + 0.075) % (INNER_WIDTH + 60),
-        // Bottom cloud moves faster (0.15 pixels per frame)
-        bottom: (prev.bottom + 0.15) % (INNER_WIDTH + 60),
+        // Top cloud moves slower (0.0375 pixels per frame)
+        top: (prev.top + 0.0375) % (INNER_WIDTH + 60),
+        // Bottom cloud moves faster (0.075 pixels per frame)
+        bottom: (prev.bottom + 0.075) % (INNER_WIDTH + 60),
       }));
     }, 50); // ~20 FPS for smooth animation
     return () => clearInterval(interval);
