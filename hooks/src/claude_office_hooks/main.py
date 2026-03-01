@@ -119,7 +119,7 @@ try:
                                 break  # Apply only the first (longest) matching prefix
 
                     return project_name
-            except (ValueError, IndexError):
+            except ValueError, IndexError:
                 pass  # Fall through to fallback
 
         # Fallback: try to get from cwd in raw_data
@@ -222,15 +222,16 @@ try:
             data["tool_input"] = raw_data.get("tool_input")
             data["tool_use_id"] = raw_data.get("tool_use_id")
 
-            # Heuristic: Task tool means a subagent is starting
-            if data["tool_name"] == "Task":
+            # Heuristic: Task or Agent tool means a subagent is starting
+            # Note: Claude Code may send "Task" or "Agent" depending on version
+            if data["tool_name"] in ("Task", "Agent"):
                 payload["event_type"] = "subagent_start"
                 data["agent_id"] = f"subagent_{data.get('tool_use_id', 'unknown')}"
                 tool_input_raw = raw_data.get("tool_input", {})
                 if isinstance(tool_input_raw, dict):
                     # Cast to proper type after isinstance check
                     tool_input = cast(dict[str, Any], tool_input_raw)
-                    # Extract clean fields from Task tool input
+                    # Extract clean fields from Task/Agent tool input
                     description: str = tool_input.get("description", "")
                     prompt: str = tool_input.get("prompt", "")
                     agent_type: str = tool_input.get("subagent_type", "")
@@ -256,10 +257,10 @@ try:
             data["success"] = True  # PostToolUse only fires on success
             data["tool_use_id"] = raw_data.get("tool_use_id")
 
-            # Task tool completions → subagent_stop (for synchronous agents only)
+            # Task/Agent tool completions → subagent_stop (for synchronous agents only)
             # Background agents fire PostToolUse immediately but continue running;
             # we must wait for native SubagentStop for those.
-            if data["tool_name"] == "Task":
+            if data["tool_name"] in ("Task", "Agent"):
                 tool_input_raw = raw_data.get("tool_input", {})
                 is_background = False
                 if isinstance(tool_input_raw, dict):

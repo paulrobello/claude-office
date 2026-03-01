@@ -20,7 +20,7 @@ from app.db.models import EventRecord, SessionRecord
 from app.models.agents import Agent, AgentState, BossState
 from app.models.common import BubbleContent, BubbleType, TodoItem
 from app.models.events import Event, EventData, EventType
-from app.models.sessions import GameState, HistoryEntry
+from app.models.sessions import ConversationEntry, GameState, HistoryEntry
 
 logger = logging.getLogger(__name__)
 
@@ -205,12 +205,32 @@ class EventProcessor:
         sm.transition(event)
 
         agent_id = event.data.agent_id if event.data and event.data.agent_id else "main"
+
+        # Build detail dict from event data fields for frontend inspection
+        detail: dict[str, Any] = {}
+        if event.data:
+            for src, dst in [
+                ("tool_name", "toolName"),
+                ("tool_input", "toolInput"),
+                ("result_summary", "resultSummary"),
+                ("message", "message"),
+                ("thinking", "thinking"),
+                ("error_type", "errorType"),
+                ("task_description", "taskDescription"),
+                ("agent_name", "agentName"),
+                ("prompt", "prompt"),
+            ]:
+                val = getattr(event.data, src, None)
+                if val is not None:
+                    detail[dst] = val
+
         event_dict: HistoryEntry = {
             "id": str(event.timestamp.timestamp()),
             "type": str(event.event_type),
             "agentId": agent_id,
             "summary": self._get_event_summary(event),
             "timestamp": event.timestamp.isoformat(),
+            "detail": detail,
         }
         sm.history.append(event_dict)
         if len(sm.history) > 500:
@@ -246,6 +266,12 @@ class EventProcessor:
 
         if event.event_type == EventType.SUBAGENT_START and event.data and event.data.agent_id:
             agent_id = event.data.agent_id
+            logger.info(
+                f"SUBAGENT_START: agent_id={agent_id} "
+                f"agent_name={event.data.agent_name!r} "
+                f"task_description={str(event.data.task_description or '')[:60]!r} "
+                f"agent_type={event.data.agent_type!r}"
+            )
             if agent_id in sm.agents:
                 await self._enrich_agent_with_summaries(sm.agents[agent_id], event.data)
                 # Update lifespan with enriched short name
@@ -295,6 +321,8 @@ class EventProcessor:
                         agent_id=f"subagent_{native_agent_id}",
                         native_agent_id=native_agent_id,
                         agent_transcript_path=transcript_path,
+                        agent_type=event.data.agent_type,  # Carry over agent_type for naming
+                        agent_name=event.data.agent_type,  # Use agent_type as fallback name
                     )
                     synthetic_start = Event(
                         event_type=EventType.SUBAGENT_START,
@@ -377,11 +405,21 @@ class EventProcessor:
                 f"STOP event: boss_bubble before extract = "
                 f"{sm.boss_bubble.text[:50] if sm.boss_bubble else 'None'}..."
             )
-            await self._extract_and_set_boss_speech(sm, event.data.transcript_path)
+            full_response = await self._extract_and_set_boss_speech(sm, event.data.transcript_path)
             logger.info(
                 f"STOP event: boss_bubble after extract = "
                 f"{sm.boss_bubble.text[:50] if sm.boss_bubble else 'None'}..."
             )
+            # Capture full assistant response in conversation history
+            if full_response:
+                assistant_entry: ConversationEntry = {
+                    "id": str(event.timestamp.timestamp()),
+                    "role": "assistant",
+                    "agentId": agent_id or "main",
+                    "text": full_response,
+                    "timestamp": event.timestamp.isoformat(),
+                }
+                sm.conversation.append(assistant_entry)
             await self._detect_and_set_print_report(sm)
             logger.info(f"STOP event: print_report = {sm.print_report}")
             await self._broadcast_state(event.session_id)
@@ -390,6 +428,42 @@ class EventProcessor:
             summary_service = get_summary_service()
             sm.boss_current_task = await summary_service.summarize_user_prompt(event.data.prompt)
             logger.debug(f"Boss current task set to: {sm.boss_current_task}")
+            # Capture user prompt in conversation history
+            conv_entry: ConversationEntry = {
+                "id": str(event.timestamp.timestamp()),
+                "role": "user",
+                "agentId": agent_id or "main",
+                "text": event.data.prompt,
+                "timestamp": event.timestamp.isoformat(),
+            }
+            sm.conversation.append(conv_entry)
+            await self._broadcast_state(event.session_id)
+
+        if event.event_type == EventType.PRE_TOOL_USE and event.data:
+            ts = event.timestamp.isoformat()
+            aid = agent_id or "main"
+            # Capture thinking block if present
+            if event.data.thinking:
+                thinking_entry: ConversationEntry = {
+                    "id": f"{event.timestamp.timestamp()}_thinking",
+                    "role": "thinking",
+                    "agentId": aid,
+                    "text": event.data.thinking,
+                    "timestamp": ts,
+                }
+                sm.conversation.append(thinking_entry)
+            # Capture the tool call itself
+            if event.data.tool_name:
+                tool_text = self._get_event_summary(event)
+                tool_entry: ConversationEntry = {
+                    "id": f"{event.timestamp.timestamp()}_tool",
+                    "role": "tool",
+                    "agentId": aid,
+                    "text": tool_text,
+                    "timestamp": ts,
+                    "toolName": event.data.tool_name,
+                }
+                sm.conversation.append(tool_entry)
             await self._broadcast_state(event.session_id)
 
     async def _persist_synthetic_event(
@@ -451,6 +525,7 @@ class EventProcessor:
                         "agentId": agent_id,
                         "summary": self._get_event_summary(evt),
                         "timestamp": evt.timestamp.isoformat(),
+                        "detail": {},
                     }
                     sm.history.append(history_entry)
                 except Exception as e:
@@ -563,7 +638,10 @@ class EventProcessor:
         """Generate short agent name and task summary using AI."""
         summary_service = get_summary_service()
 
-        name_source = event_data.agent_name or event_data.task_description or ""
+        # Use agent_type as additional fallback when description is empty
+        name_source = (
+            event_data.agent_name or event_data.task_description or event_data.agent_type or ""
+        )
         task_source = event_data.task_description or event_data.agent_name or ""
 
         if name_source:
@@ -576,17 +654,20 @@ class EventProcessor:
 
     async def _extract_and_set_boss_speech(
         self, sm: StateMachine, transcript_path: str | None
-    ) -> None:
-        """Extract Claude's response from transcript and set boss speech bubble."""
+    ) -> str | None:
+        """Extract Claude's response from transcript and set boss speech bubble.
+
+        Returns the full response text, or None if not available.
+        """
         if not transcript_path:
-            return
+            return None
 
         settings = get_settings()
         translated_path = settings.translate_path(transcript_path)
 
         response = get_last_assistant_response(translated_path)
         if not response:
-            return
+            return None
 
         # Generate a summary of the response
         summary_service = get_summary_service()
@@ -600,6 +681,8 @@ class EventProcessor:
                 persistent=True,
             )
             logger.debug(f"Set boss speech: {summary[:50]}...")
+
+        return response
 
     async def _detect_and_set_print_report(self, sm: StateMachine) -> None:
         """Detect if user's prompt requested a report and set print_report flag."""

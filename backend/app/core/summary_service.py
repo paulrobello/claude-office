@@ -137,6 +137,27 @@ class SummaryService:
 
         desc_lower = description.strip().lower()
 
+        # Handle agent_type values (subagent_type from Agent tool)
+        agent_type_names: dict[str, list[str]] = {
+            "general-purpose": ["The Intern", "Helper Bot", "Agent X", "Minion"],
+            "explore": ["Explorer X", "The Scout", "Data Digger", "Researcher R"],
+            "plan": ["The Planner", "Strategy Sam", "Blueprint Bob", "Road Mapper"],
+            "audit-architecture": ["The Architect", "Refactor Rex", "Code Ninja"],
+            "audit-code-quality": ["The Critic", "QA Queen", "Inspector G"],
+            "audit-security": ["Security Sam", "Guard Dog", "Sec Spec"],
+            "audit-documentation": ["The Scribe", "Doc Brown", "Word Wizard"],
+            "fix-architecture": ["The Architect", "Refactor Rex", "Code Ninja"],
+            "fix-code-quality": ["Bug Squasher", "Mr. Fixit", "The Fixer"],
+            "fix-security": ["Lock Smith", "Guard Dog", "Security Sam"],
+            "fix-documentation": ["Doc Brown", "The Scribe", "Note Taker"],
+            "markdown-docs-writer": ["The Scribe", "Doc Brown", "Word Wizard"],
+            "webgl-shader-expert": ["Pixel Pete", "Shader Sam", "GPU Guru"],
+        }
+        # Check for exact agent_type match
+        for agent_type, names in agent_type_names.items():
+            if desc_lower == agent_type or desc_lower.startswith(agent_type):
+                return random.choice(names)
+
         # Fun name mappings by task category - each has multiple options for variety
         task_names: dict[tuple[str, ...], list[str]] = {
             # QA / Review / Validation
@@ -383,7 +404,7 @@ class SummaryService:
                     cmd_clean = f"{cmd_clean[:37]}..."
                 result = cmd_clean
 
-        elif tool_name == "Task":
+        elif tool_name in ("Task", "Agent"):
             desc = tool_input.get("prompt") or tool_input.get("description", "")
             if desc:
                 result = self._extract_first_sentence(desc, max_len=40)

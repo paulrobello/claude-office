@@ -168,6 +168,27 @@ export interface WhiteboardData {
   fileEdits: Record<string, number>;
 }
 
+export interface EventDetail {
+  toolName?: string;
+  toolInput?: Record<string, unknown>;
+  resultSummary?: string;
+  message?: string;
+  thinking?: string;
+  errorType?: string;
+  taskDescription?: string;
+  agentName?: string;
+  prompt?: string;
+}
+
+export interface ConversationEntry {
+  id: string;
+  role: "user" | "assistant" | "thinking" | "tool";
+  agentId: string;
+  text: string;
+  timestamp: string;
+  toolName?: string;
+}
+
 export interface GameState {
   sessionId: string;
   boss: Boss;
@@ -178,6 +199,7 @@ export interface GameState {
   arrivalQueue?: string[]; // Agent IDs in arrival queue (getting work from boss)
   departureQueue?: string[]; // Agent IDs in departure queue (turning in work to boss)
   whiteboardData?: WhiteboardData; // Data for whiteboard display modes
+  conversation?: ConversationEntry[]; // Conversation history (user prompts + Claude responses)
 }
 
 export type FileStatus = "M" | "A" | "D" | "R" | "C" | "?" | "!";
@@ -216,6 +238,7 @@ export interface WebSocketMessage {
     agentId: string;
     summary: string;
     timestamp: string;
+    detail?: EventDetail;
   };
   gitStatus?: GitStatus;
   session_id?: string;

@@ -24,6 +24,7 @@ from app.models.events import Event, EventData, EventType
 from app.models.sessions import (
     AgentLifespan,
     BackgroundTask,
+    ConversationEntry,
     GameState,
     HistoryEntry,
     NewsItem,
@@ -67,6 +68,10 @@ def _empty_file_edits() -> dict[str, int]:
 
 def _empty_background_tasks() -> list[BackgroundTask]:
     return cast(list[BackgroundTask], [])
+
+
+def _empty_conversation() -> list[ConversationEntry]:
+    return cast(list[ConversationEntry], [])
 
 
 class OfficePhase(Enum):
@@ -117,6 +122,7 @@ class StateMachine:
     coffee_cups: int = 0
     file_edits: dict[str, int] = field(default_factory=_empty_file_edits)
     background_tasks: list[BackgroundTask] = field(default_factory=_empty_background_tasks)
+    conversation: list[ConversationEntry] = field(default_factory=_empty_conversation)
 
     def to_game_state(self, session_id: str) -> GameState:
         """Convert current state to a GameState for frontend consumption."""
@@ -173,6 +179,7 @@ class StateMachine:
             arrival_queue=self.arrival_queue.copy(),
             departure_queue=self.handin_queue.copy(),
             whiteboard_data=whiteboard_data,
+            conversation=self.conversation.copy(),
         )
 
     def remove_agent(self, agent_id: str) -> None:
@@ -326,6 +333,7 @@ class StateMachine:
             "Edit": "edit",
             "Bash": "bash",
             "Task": "task",
+            "Agent": "task",
             "TodoWrite": "todo",
             "WebSearch": "web",
             "WebFetch": "web",
@@ -446,8 +454,8 @@ class StateMachine:
             if tool_name == "TodoWrite":
                 self._parse_todo_write(event)
 
-            if tool_name == "Task":
-                # Spawning a subagent
+            if tool_name in ("Task", "Agent"):
+                # Spawning a subagent (Claude Code may use "Task" or "Agent")
                 self.phase = OfficePhase.DELEGATING
                 self.boss_state = BossState.DELEGATING
                 self.elevator_state = ElevatorState.ARRIVING
@@ -692,7 +700,7 @@ class StateMachine:
                     cmd_clean = cmd_clean[:42] + "..."
                 text = cmd_clean
 
-        elif tool_name == "Task":
+        elif tool_name in ("Task", "Agent"):
             text = "Delegating..."
 
         text = compress_paths_in_text(text)

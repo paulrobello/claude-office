@@ -16,6 +16,8 @@ import type {
   GameState as BackendGameState,
   WhiteboardData,
   WhiteboardMode,
+  EventDetail,
+  ConversationEntry,
 } from "@/types";
 
 // ============================================================================
@@ -117,7 +119,7 @@ export interface BossAnimationState {
 export type EventLogEntry = Omit<
   NonNullable<WebSocketMessage["event"]>,
   "timestamp"
-> & { timestamp: Date };
+> & { timestamp: Date; detail?: EventDetail };
 
 /**
  * Replay frame for event replay.
@@ -143,6 +145,14 @@ interface GameStore {
   updateAgentTarget: (agentId: string, target: Position) => void;
   updateAgentPath: (agentId: string, path: PathState | null) => void;
   updateAgentBackendState: (agentId: string, state: BackendAgentState) => void;
+  updateAgentMeta: (
+    agentId: string,
+    meta: {
+      backendState: BackendAgentState;
+      name: string | null;
+      currentTask: string | null;
+    },
+  ) => void;
   updateAgentQueueInfo: (
     agentId: string,
     queueType: "arrival" | "departure" | null,
@@ -211,6 +221,8 @@ interface GameStore {
   setPrintReport: (printReport: boolean) => void;
   setGitStatus: (status: GitStatus | null) => void;
   addEventLog: (event: NonNullable<WebSocketMessage["event"]>) => void;
+  conversation: ConversationEntry[];
+  setConversation: (conversation: ConversationEntry[]) => void;
 
   // Whiteboard actions
   whiteboardData: WhiteboardData;
@@ -354,6 +366,7 @@ const initialState = {
   todos: [] as TodoItem[],
   gitStatus: null as GitStatus | null,
   eventLog: [] as EventLogEntry[],
+  conversation: [] as ConversationEntry[],
 
   // Whiteboard
   whiteboardData: initialWhiteboardData,
@@ -484,6 +497,21 @@ export const useGameStore = create<GameStore>()(
 
         const newAgents = new Map(state.agents);
         newAgents.set(agentId, { ...agent, backendState });
+        return { agents: newAgents };
+      }),
+
+    updateAgentMeta: (agentId, meta) =>
+      set((state) => {
+        const agent = state.agents.get(agentId);
+        if (!agent) return state;
+
+        const newAgents = new Map(state.agents);
+        newAgents.set(agentId, {
+          ...agent,
+          backendState: meta.backendState,
+          name: meta.name ?? agent.name,
+          currentTask: meta.currentTask ?? agent.currentTask,
+        });
         return { agents: newAgents };
       }),
 
@@ -903,6 +931,8 @@ export const useGameStore = create<GameStore>()(
         };
       }),
 
+    setConversation: (conversation) => set({ conversation }),
+
     // ========================================================================
     // WHITEBOARD ACTIONS
     // ========================================================================
@@ -1031,6 +1061,7 @@ export const useGameStore = create<GameStore>()(
         isReplaying: false, // Important: allow WebSocket to reconnect
         replayEvents: [],
         currentReplayIndex: -1,
+        conversation: [], // Clear conversation for new session
         // Debug settings are preserved (not reset)
       }),
 
@@ -1127,6 +1158,7 @@ export const useGameStore = create<GameStore>()(
           printReport: backendState.office.printReport ?? false,
           todos: backendState.todos,
           whiteboardData,
+          conversation: backendState.conversation ?? [],
         };
       }),
   })),
@@ -1163,3 +1195,4 @@ export const selectToolUsesSinceCompaction = (state: GameStore) =>
 export const selectPrintReport = (state: GameStore) => state.printReport;
 export const selectWhiteboardData = (state: GameStore) => state.whiteboardData;
 export const selectWhiteboardMode = (state: GameStore) => state.whiteboardMode;
+export const selectConversation = (state: GameStore) => state.conversation;

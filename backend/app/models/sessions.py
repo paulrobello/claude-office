@@ -1,11 +1,22 @@
 from datetime import datetime
-from typing import TypedDict, cast
+from typing import NotRequired, TypedDict, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from app.models.agents import Agent, Boss, OfficeState
 from app.models.common import TodoItem
+
+
+class ConversationEntry(TypedDict):
+    """A single turn in the conversation history."""
+
+    id: str
+    role: str  # "user" | "assistant" | "thinking" | "tool"
+    agentId: str
+    text: str
+    timestamp: str
+    toolName: NotRequired[str]  # Only set for "tool" role entries
 
 
 class AgentLifespan(BaseModel):
@@ -96,6 +107,7 @@ class HistoryEntry(TypedDict):
     agentId: str
     summary: str
     timestamp: str
+    detail: dict[str, object]
 
 
 class GameState(BaseModel):
@@ -113,3 +125,6 @@ class GameState(BaseModel):
     arrival_queue: list[str] = Field(default_factory=lambda: cast(list[str], []))
     departure_queue: list[str] = Field(default_factory=lambda: cast(list[str], []))
     whiteboard_data: WhiteboardData = Field(default_factory=WhiteboardData)
+    conversation: list[ConversationEntry] = Field(
+        default_factory=lambda: cast(list[ConversationEntry], [])
+    )
