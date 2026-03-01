@@ -528,6 +528,54 @@ class EventProcessor:
                         "detail": {},
                     }
                     sm.history.append(history_entry)
+
+                    # Rebuild conversation entries from stored event data
+                    if (
+                        evt.event_type == EventType.USER_PROMPT_SUBMIT
+                        and evt.data
+                        and evt.data.prompt
+                    ):
+                        conv_entry: ConversationEntry = {
+                            "id": str(evt.timestamp.timestamp()),
+                            "role": "user",
+                            "agentId": agent_id,
+                            "text": evt.data.prompt,
+                            "timestamp": evt.timestamp.isoformat(),
+                        }
+                        sm.conversation.append(conv_entry)
+                    elif evt.event_type == EventType.PRE_TOOL_USE and evt.data:
+                        if evt.data.thinking:
+                            thinking_entry: ConversationEntry = {
+                                "id": f"{evt.timestamp.timestamp()}_thinking",
+                                "role": "thinking",
+                                "agentId": agent_id,
+                                "text": evt.data.thinking,
+                                "timestamp": evt.timestamp.isoformat(),
+                            }
+                            sm.conversation.append(thinking_entry)
+                        if evt.data.tool_name:
+                            tool_entry: ConversationEntry = {
+                                "id": f"{evt.timestamp.timestamp()}_tool",
+                                "role": "tool",
+                                "agentId": agent_id,
+                                "text": self._get_event_summary(evt),
+                                "timestamp": evt.timestamp.isoformat(),
+                                "toolName": evt.data.tool_name,
+                            }
+                            sm.conversation.append(tool_entry)
+                    elif evt.event_type == EventType.STOP and evt.data and evt.data.transcript_path:
+                        settings = get_settings()
+                        translated_path = settings.translate_path(evt.data.transcript_path)
+                        response = get_last_assistant_response(translated_path)
+                        if response:
+                            assistant_entry: ConversationEntry = {
+                                "id": str(evt.timestamp.timestamp()),
+                                "role": "assistant",
+                                "agentId": agent_id,
+                                "text": response,
+                                "timestamp": evt.timestamp.isoformat(),
+                            }
+                            sm.conversation.append(assistant_entry)
                 except Exception as e:
                     skipped_count += 1
                     logger.warning(

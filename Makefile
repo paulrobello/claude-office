@@ -2,7 +2,7 @@
 	hooks-install hooks-uninstall hooks-reinstall hooks-status hooks-logs hooks-logs-follow hooks-logs-clear \
 	hooks-debug-on hooks-debug-off clean clean-db clean-all \
 	dev-tmux dev-tmux-kill dev-tmux-backend dev-tmux-frontend \
-	build-static \
+	build-static frontend-build-static \
 	docker-build docker-up docker-down docker-logs docker-shell
 
 # Detect package manager: prefer bun if available, otherwise use npm
@@ -28,7 +28,7 @@ frontend:
 	make -C frontend dev
 
 # Build static frontend and copy to backend for serving
-build-static:
+build-static frontend-build-static:
 	make -C frontend build-static
 	@echo "Frontend built and copied to backend/static"
 	@echo "Start backend with 'make backend' to serve at http://localhost:8000"
