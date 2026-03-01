@@ -134,6 +134,23 @@ class EventProcessor:
             return sm.to_game_state(session_id)
         return None
 
+    async def _derive_task_list_id(self, session_id: str) -> str | None:
+        """Derive the task_list_id from the session's project root.
+
+        Checks if ~/.claude/tasks/<project_name>/ exists (named task folder),
+        which happens when CLAUDE_CODE_TASK_LIST_ID is set to the project name.
+        Falls back to None (tasks stored by session UUID).
+        """
+        project_root = await self.get_project_root(session_id)
+        if not project_root:
+            return None
+        project_name = Path(project_root).name
+        tasks_dir = Path.home() / ".claude" / "tasks" / project_name
+        if tasks_dir.exists() and any(tasks_dir.glob("*.json")):
+            logger.debug(f"Derived task_list_id '{project_name}' for session {session_id}")
+            return project_name
+        return None
+
     async def get_project_root(self, session_id: str) -> str | None:
         """Get the cached project_root for a session from the database.
 
@@ -207,6 +224,20 @@ class EventProcessor:
                 task_list_id = event.data.task_list_id if event.data else None
                 await task_poller.start_polling(event.session_id, task_list_id=task_list_id)
 
+        # Auto-start task polling for sessions that missed SESSION_START (e.g. backend restart
+        # mid-session). On any event, if polling is not yet active, start it now.
+        if (
+            event.event_type != EventType.SESSION_START
+            and event.event_type != EventType.SESSION_END
+        ):
+            self._ensure_task_file_poller()
+            task_poller = get_task_file_poller()
+            if task_poller and not await task_poller.is_polling(event.session_id):
+                task_list_id = event.data.task_list_id if event.data else None
+                if not task_list_id:
+                    task_list_id = await self._derive_task_list_id(event.session_id)
+                await task_poller.start_polling(event.session_id, task_list_id=task_list_id)
+
         # Stop task file polling on session end
         if event.event_type == EventType.SESSION_END:
             task_poller = get_task_file_poller()
@@ -256,6 +287,27 @@ class EventProcessor:
             native_agent_id = event.data.native_agent_id
 
             if transcript_path and native_agent_id:
+                # If no agents exist yet (missed SUBAGENT_START, e.g. backend restart),
+                # synthesize one so the agent is visible in the office.
+                already_tracked = any(a.native_id == native_agent_id for a in sm.agents.values())
+                if not already_tracked and not any(a.native_id is None for a in sm.agents.values()):
+                    synthetic_data = EventData(
+                        agent_id=f"subagent_{native_agent_id}",
+                        native_agent_id=native_agent_id,
+                        agent_transcript_path=transcript_path,
+                    )
+                    synthetic_start = Event(
+                        event_type=EventType.SUBAGENT_START,
+                        session_id=event.session_id,
+                        timestamp=event.timestamp,
+                        data=synthetic_data,
+                    )
+                    sm.transition(synthetic_start)
+                    logger.info(
+                        f"Synthesized SUBAGENT_START for native agent {native_agent_id} "
+                        f"(missed due to backend restart)"
+                    )
+
                 self._ensure_transcript_poller()
                 poller = get_transcript_poller()
                 if poller:
