@@ -6,6 +6,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useGameStore, selectConversation } from "@/stores/gameStore";
 import { format } from "date-fns";
 import {
@@ -103,6 +105,86 @@ function UserEntry({ entry }: { entry: ConversationEntry }) {
   );
 }
 
+function MarkdownContent({ text }: { text: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        p: ({ children }) => (
+          <p className="text-slate-200 text-[11px] leading-relaxed mb-1.5 last:mb-0 break-words">
+            {children}
+          </p>
+        ),
+        h1: ({ children }) => (
+          <h1 className="text-slate-100 text-[13px] font-bold mt-2 mb-1 border-b border-slate-700 pb-0.5">
+            {children}
+          </h1>
+        ),
+        h2: ({ children }) => (
+          <h2 className="text-slate-100 text-[12px] font-bold mt-2 mb-1">
+            {children}
+          </h2>
+        ),
+        h3: ({ children }) => (
+          <h3 className="text-slate-200 text-[11px] font-bold mt-1.5 mb-0.5">
+            {children}
+          </h3>
+        ),
+        strong: ({ children }) => (
+          <strong className="text-slate-100 font-bold">{children}</strong>
+        ),
+        em: ({ children }) => (
+          <em className="text-slate-300 italic">{children}</em>
+        ),
+        code: ({ children, className }) => {
+          const isBlock = className?.startsWith("language-");
+          return isBlock ? (
+            <code className="block bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[10px] font-mono text-emerald-300 overflow-x-auto whitespace-pre my-1">
+              {children}
+            </code>
+          ) : (
+            <code className="bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-[10px] font-mono text-emerald-300">
+              {children}
+            </code>
+          );
+        },
+        pre: ({ children }) => (
+          <pre className="my-1 overflow-x-auto">{children}</pre>
+        ),
+        ul: ({ children }) => (
+          <ul className="list-disc list-inside text-[11px] text-slate-200 space-y-0.5 my-1 pl-1">
+            {children}
+          </ul>
+        ),
+        ol: ({ children }) => (
+          <ol className="list-decimal list-inside text-[11px] text-slate-200 space-y-0.5 my-1 pl-1">
+            {children}
+          </ol>
+        ),
+        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+        blockquote: ({ children }) => (
+          <blockquote className="border-l-2 border-slate-600 pl-2 my-1 text-slate-400 italic">
+            {children}
+          </blockquote>
+        ),
+        a: ({ href, children }) => (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-cyan-400 hover:text-cyan-300 underline"
+          >
+            {children}
+          </a>
+        ),
+        hr: () => <hr className="border-slate-700 my-2" />,
+      }}
+    >
+      {text}
+    </ReactMarkdown>
+  );
+}
+
 function AssistantEntry({ entry }: { entry: ConversationEntry }) {
   const [expanded, setExpanded] = useState(false);
   const isLong = entry.text.length > 600;
@@ -121,9 +203,7 @@ function AssistantEntry({ entry }: { entry: ConversationEntry }) {
         )}
       </div>
       <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl rounded-tl-sm px-3 py-2 w-full">
-        <p className="text-slate-200 text-[11px] whitespace-pre-wrap break-words leading-relaxed">
-          {expanded ? entry.text : preview}
-        </p>
+        <MarkdownContent text={expanded ? entry.text : preview} />
         {isLong && (
           <button
             onClick={() => setExpanded(!expanded)}

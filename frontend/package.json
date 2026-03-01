@@ -22,7 +22,9 @@
     "pixi.js": "^8.16.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
     "react-zoom-pan-pinch": "^3.7.0",
+    "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.5.0",
     "xstate": "^5.28.0",
     "zustand": "^5.0.11"
