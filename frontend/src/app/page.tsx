@@ -498,7 +498,7 @@ export default function V2TestPage(): React.ReactNode {
               {!isMobile && "Office Visualizer"}
               {!isMobile && (
                 <span className="text-xs font-mono font-normal px-2 py-0.5 bg-slate-800 rounded text-slate-400 border border-slate-700">
-                  v0.7.0
+                  v0.8.0
                 </span>
               )}
             </h1>

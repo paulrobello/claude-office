@@ -239,6 +239,39 @@ class TestTaskFilePoller:
             assert todo.metadata == {"priority": "high", "custom_field": "value"}
 
     @pytest.mark.asyncio
+    async def test_uses_task_list_id_for_directory(self) -> None:
+        """Test that task_list_id overrides session_id for the task directory."""
+        received_todos: list[tuple[str, list[TodoItem]]] = []
+
+        async def callback(session_id: str, todos: list[TodoItem]) -> None:
+            received_todos.append((session_id, todos))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Tasks stored under task_list_id dir, NOT session_id dir
+            task_list_id = "my-shared-task-list"
+            task_dir = Path(tmpdir) / task_list_id
+            task_dir.mkdir(parents=True)
+
+            task_file = task_dir / "1.json"
+            task_data = {"id": "1", "subject": "Shared task", "status": "pending"}
+            task_file.write_text(json.dumps(task_data), encoding="utf-8")
+
+            poller = TaskFilePoller(callback)
+            # Override _get_task_dir to use tmpdir as base
+            poller._get_task_dir = lambda effective_id: Path(tmpdir) / effective_id  # type: ignore[method-assign]
+
+            await poller.start_polling("session-abc", task_list_id=task_list_id)
+            await asyncio.sleep(0.1)
+            await poller.stop_polling("session-abc")
+
+            # Should have read from task_list_id directory
+            assert len(received_todos) >= 1
+            session_id, todos = received_todos[0]
+            assert session_id == "session-abc"
+            assert len(todos) == 1
+            assert todos[0].content == "Shared task"
+
+    @pytest.mark.asyncio
     async def test_handles_missing_optional_fields(self) -> None:
         """Test that missing optional fields default correctly."""
         received_todos: list[tuple[str, list[TodoItem]]] = []

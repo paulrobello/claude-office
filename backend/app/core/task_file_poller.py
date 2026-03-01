@@ -104,9 +104,17 @@ class TaskFilePoller:
 
         return base_dir / session_id
 
-    async def start_polling(self, session_id: str) -> None:
-        """Start polling task files for a session."""
-        task_dir = self._get_task_dir(session_id)
+    async def start_polling(self, session_id: str, task_list_id: str | None = None) -> None:
+        """Start polling task files for a session.
+
+        Args:
+            session_id: The Claude Code session ID (used for tracking/lookup)
+            task_list_id: Optional override for the task directory name, from the
+                CLAUDE_CODE_TASK_LIST_ID env var. When set, tasks are stored in
+                ~/.claude/tasks/{task_list_id}/ instead of ~/.claude/tasks/{session_id}/
+        """
+        effective_id = task_list_id or session_id
+        task_dir = self._get_task_dir(effective_id)
 
         async with self._lock:
             if session_id in self._sessions:
@@ -124,7 +132,13 @@ class TaskFilePoller:
                 self._poll_loop(session_id), name=f"task_poll_{session_id}"
             )
 
-            logger.info(f"Started task file polling for session {session_id} at {task_dir}")
+            if task_list_id:
+                logger.info(
+                    f"Started task file polling for session {session_id} "
+                    f"using task_list_id '{task_list_id}' at {task_dir}"
+                )
+            else:
+                logger.info(f"Started task file polling for session {session_id} at {task_dir}")
 
     async def is_polling(self, session_id: str) -> bool:
         """Check if polling is active for a session."""

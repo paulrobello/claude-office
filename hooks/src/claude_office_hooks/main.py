@@ -189,6 +189,11 @@ try:
             "transcript_path": transcript_path,  # For Claude response extraction
         }
 
+        # Include task list ID if projects override the default location
+        task_list_id = os.environ.get("CLAUDE_CODE_TASK_LIST_ID")
+        if task_list_id:
+            data["task_list_id"] = task_list_id
+
         payload: dict[str, Any] = {
             "event_type": event_type,
             "session_id": actual_session_id,
@@ -410,7 +415,7 @@ try:
             # Ignore errors to prevent blocking/breaking Claude
             pass
 
-    __version__ = "0.7.0"
+    __version__ = "0.8.0"
 
     def main() -> None:
         # Check for --version before argparse (which requires event_type)

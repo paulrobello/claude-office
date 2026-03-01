@@ -204,7 +204,8 @@ class EventProcessor:
             self._ensure_task_file_poller()
             task_poller = get_task_file_poller()
             if task_poller:
-                await task_poller.start_polling(event.session_id)
+                task_list_id = event.data.task_list_id if event.data else None
+                await task_poller.start_polling(event.session_id, task_list_id=task_list_id)
 
         # Stop task file polling on session end
         if event.event_type == EventType.SESSION_END:

@@ -36,6 +36,10 @@ The application was built with [Next.js](https://nextjs.org/), [PixiJS](https://
 
 ## What's New
 
+### v0.8.0 (February 2026)
+
+- **Task List Discovery Fix**: Projects using `CLAUDE_CODE_TASK_LIST_ID` now have their tasks correctly tracked. The visualizer respects this env var and polls the right task directory.
+
 ### v0.7.0 (February 2026)
 
 - **Auto-Follow New Sessions**: Automatically detects and switches to new Claude Code sessions in the current project (enabled by default, configurable in Settings)
