@@ -442,15 +442,16 @@ class EventProcessor:
             summary_service = get_summary_service()
             sm.boss_current_task = await summary_service.summarize_user_prompt(event.data.prompt)
             logger.debug(f"Boss current task set to: {sm.boss_current_task}")
-            # Capture user prompt in conversation history
-            conv_entry: ConversationEntry = {
-                "id": str(event.timestamp.timestamp()),
-                "role": "user",
-                "agentId": agent_id or "main",
-                "text": event.data.prompt,
-                "timestamp": event.timestamp.isoformat(),
-            }
-            sm.conversation.append(conv_entry)
+            # Capture user prompt in conversation history (skip task-notification messages)
+            if "<task-notification>" not in event.data.prompt:
+                conv_entry: ConversationEntry = {
+                    "id": str(event.timestamp.timestamp()),
+                    "role": "user",
+                    "agentId": agent_id or "main",
+                    "text": event.data.prompt,
+                    "timestamp": event.timestamp.isoformat(),
+                }
+                sm.conversation.append(conv_entry)
             await self._broadcast_state(event.session_id)
 
         if event.event_type == EventType.PRE_TOOL_USE and event.data:
@@ -548,6 +549,7 @@ class EventProcessor:
                         evt.event_type == EventType.USER_PROMPT_SUBMIT
                         and evt.data
                         and evt.data.prompt
+                        and "<task-notification>" not in evt.data.prompt
                     ):
                         conv_entry: ConversationEntry = {
                             "id": str(evt.timestamp.timestamp()),
