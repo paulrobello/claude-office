@@ -83,6 +83,59 @@ def get_last_assistant_response(jsonl_path: str | Path) -> str | None:
     return last_text
 
 
+def get_first_user_prompt(jsonl_path: str | Path) -> str | None:
+    """Extract the first user task prompt from a JSONL transcript file.
+
+    Subagent transcripts begin with the task prompt as a user message.
+    Skips messages whose content consists entirely of tool results.
+
+    Args:
+        jsonl_path: Path to the JSONL transcript file.
+
+    Returns:
+        The first user text prompt, or None if not found or file doesn't exist.
+    """
+    path = Path(jsonl_path)
+    if not path.exists():
+        logger.debug(f"Transcript file not found: {jsonl_path}")
+        return None
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+
+                try:
+                    record: TranscriptRecord = json.loads(line)
+
+                    if record.get("type") != "user":
+                        continue
+
+                    message = record.get("message", {})
+                    if message.get("role") != "user":
+                        continue
+
+                    content_list = message.get("content", [])
+                    # Collect text blocks, skipping tool_result-only messages
+                    texts = [
+                        c.get("text", "")
+                        for c in content_list
+                        if c.get("type") == "text" and c.get("text")
+                    ]
+                    if texts:
+                        return "\n".join(texts)
+
+                except json.JSONDecodeError:
+                    continue
+
+    except OSError as e:
+        logger.warning(f"Error reading transcript file {jsonl_path}: {e}")
+
+    return None
+
+
 def get_session_messages(
     jsonl_path: str | Path,
 ) -> list[dict[str, str]]:

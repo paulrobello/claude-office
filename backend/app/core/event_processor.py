@@ -9,7 +9,7 @@ from sqlalchemy import delete, select
 
 from app.api.websocket import manager
 from app.config import get_settings
-from app.core.jsonl_parser import get_last_assistant_response
+from app.core.jsonl_parser import get_first_user_prompt, get_last_assistant_response
 from app.core.state_machine import StateMachine
 from app.core.summary_service import get_summary_service
 from app.core.task_file_poller import get_task_file_poller, init_task_file_poller
@@ -341,10 +341,14 @@ class EventProcessor:
                 if poller:
                     for agent_id in sm.agents:
                         agent = sm.agents[agent_id]
-                        # Store native_id for agents that don't have it yet
+                        # Store native_id for agents that don't have it yet and enrich
+                        # task/name from the transcript (covers ghost + synthetic agents).
                         if agent.native_id is None:
                             agent.native_id = native_agent_id
                             logger.info(f"Linked agent {agent_id} to native ID {native_agent_id}")
+                            await self._enrich_agent_from_transcript(
+                                agent, transcript_path, event.data.agent_type
+                            )
                         if not await poller.is_polling(agent_id):
                             logger.info(
                                 f"Starting transcript polling for {agent_id} "
@@ -352,6 +356,16 @@ class EventProcessor:
                             )
                             await poller.start_polling(agent_id, event.session_id, transcript_path)
                             break
+
+                # Also enrich the freshly synthesized agent (native_id already set
+                # by the state machine transition above, so the loop above won't
+                # catch it via the native_id is None guard).
+                synth_id = f"subagent_{native_agent_id}"
+                synth_agent = sm.agents.get(synth_id)
+                if synth_agent and not synth_agent.current_task:
+                    await self._enrich_agent_from_transcript(
+                        synth_agent, transcript_path, event.data.agent_type
+                    )
 
         if event.event_type == EventType.AGENT_UPDATE and event.data and event.data.agent_id:
             agent_id = event.data.agent_id
@@ -699,6 +713,38 @@ class EventProcessor:
             agent.current_task = await summary_service.summarize_agent_task(task_source)
 
         logger.debug(f"Enriched agent {agent.id}: name='{agent.name}', task='{agent.current_task}'")
+
+    async def _enrich_agent_from_transcript(
+        self, agent: Agent, transcript_path: str, agent_type: str | None = None
+    ) -> None:
+        """Read the first user prompt from a transcript and enrich the agent's task/name.
+
+        Used for agents that were created without task details (ghost/synthetic agents
+        spawned after a backend restart or missed SUBAGENT_START).
+
+        Args:
+            agent: The agent to enrich.
+            transcript_path: Path to the agent's JSONL transcript file.
+            agent_type: Optional agent type used as a name fallback.
+        """
+        settings = get_settings()
+        translated_path = settings.translate_path(transcript_path)
+        task_text = get_first_user_prompt(translated_path)
+        if not task_text:
+            logger.debug(f"No user prompt found in transcript for agent {agent.id}")
+            return
+
+        synthetic_data = EventData(
+            agent_id=agent.id,
+            agent_type=agent_type,
+            agent_name=agent_type,
+            task_description=task_text,
+        )
+        await self._enrich_agent_with_summaries(agent, synthetic_data)
+        logger.info(
+            f"Enriched agent {agent.id} from transcript: "
+            f"name='{agent.name}', task='{agent.current_task}'"
+        )
 
     async def _extract_and_set_boss_speech(
         self, sm: StateMachine, transcript_path: str | None
