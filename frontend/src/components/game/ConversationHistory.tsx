@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useGameStore, selectConversation } from "@/stores/gameStore";
@@ -16,6 +16,8 @@ import {
   Brain,
   ChevronDown,
   ChevronRight,
+  Maximize2,
+  X,
 } from "lucide-react";
 import type { ConversationEntry } from "@/types";
 
@@ -228,10 +230,40 @@ function AssistantEntry({ entry }: { entry: ConversationEntry }) {
   );
 }
 
+function ConversationEntries({
+  visible,
+  bottomRef,
+}: {
+  visible: ConversationEntry[];
+  bottomRef?: React.RefObject<HTMLDivElement | null>;
+}) {
+  return (
+    <>
+      {visible.map((entry) => {
+        switch (entry.role) {
+          case "user":
+            return <UserEntry key={entry.id} entry={entry} />;
+          case "assistant":
+            return <AssistantEntry key={entry.id} entry={entry} />;
+          case "thinking":
+            return <ThinkingEntry key={entry.id} entry={entry} />;
+          case "tool":
+            return <ToolEntry key={entry.id} entry={entry} />;
+          default:
+            return null;
+        }
+      })}
+      {bottomRef && <div ref={bottomRef} />}
+    </>
+  );
+}
+
 export function ConversationHistory() {
   const conversation = useGameStore(selectConversation);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const modalBottomRef = useRef<HTMLDivElement>(null);
   const [showTools, setShowTools] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const toolCount = conversation.filter((e) => e.role === "tool").length;
   const messageCount = conversation.filter(
@@ -246,55 +278,106 @@ export function ConversationHistory() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [visible.length]);
 
-  return (
-    <div className="flex flex-col h-full bg-slate-950 border border-slate-800 rounded-lg overflow-hidden font-mono text-xs">
-      <div className="bg-slate-900 px-3 py-2 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-2 text-slate-300 font-bold uppercase tracking-wider">
-          <MessageSquare size={14} className="text-cyan-500" />
-          Conversation
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-slate-500">
-            {messageCount} msgs
-          </span>
+  useEffect(() => {
+    if (expanded) {
+      modalBottomRef.current?.scrollIntoView({ behavior: "instant" });
+    }
+  }, [expanded, visible.length]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!expanded) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setExpanded(false);
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [expanded]);
+
+  const header = (onExpand?: () => void) => (
+    <div className="bg-slate-900 px-3 py-2 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
+      <div className="flex items-center gap-2 text-slate-300 font-bold uppercase tracking-wider">
+        <MessageSquare size={14} className="text-cyan-500" />
+        Conversation
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-slate-500">{messageCount} msgs</span>
+        <button
+          onClick={() => setShowTools(!showTools)}
+          className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+            showTools
+              ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
+              : "bg-slate-800 border-slate-700 text-slate-500 hover:text-slate-300"
+          }`}
+          title={showTools ? "Hide tool calls" : "Show tool calls"}
+        >
+          <Wrench size={9} />
+          {toolCount}
+        </button>
+        {onExpand ? (
           <button
-            onClick={() => setShowTools(!showTools)}
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors ${
-              showTools
-                ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
-                : "bg-slate-800 border-slate-700 text-slate-500 hover:text-slate-300"
-            }`}
-            title={showTools ? "Hide tool calls" : "Show tool calls"}
+            onClick={onExpand}
+            className="p-0.5 rounded text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+            title="Expand conversation"
           >
-            <Wrench size={9} />
-            {toolCount}
+            <Maximize2 size={12} />
           </button>
+        ) : (
+          <button
+            onClick={() => setExpanded(false)}
+            className="p-0.5 rounded text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+            title="Close"
+          >
+            <X size={12} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Inline panel */}
+      <div className="flex flex-col h-full bg-slate-950 border border-slate-800 rounded-lg overflow-hidden font-mono text-xs">
+        {header(() => setExpanded(true))}
+        <div className="flex-grow overflow-y-auto p-3 space-y-2">
+          {conversation.length === 0 ? (
+            <div className="text-slate-600 italic p-4 text-center">
+              No conversation yet. Start a Claude Code session.
+            </div>
+          ) : (
+            <ConversationEntries visible={visible} bottomRef={bottomRef} />
+          )}
         </div>
       </div>
 
-      <div className="flex-grow overflow-y-auto p-3 space-y-2">
-        {conversation.length === 0 ? (
-          <div className="text-slate-600 italic p-4 text-center">
-            No conversation yet. Start a Claude Code session.
+      {/* Expanded modal */}
+      {expanded && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm"
+          onClick={() => setExpanded(false)}
+        >
+          <div
+            className="flex flex-col bg-slate-950 border border-slate-700 rounded-xl shadow-2xl font-mono text-xs overflow-hidden"
+            style={{ width: "min(900px, 90vw)", height: "85vh" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {header()}
+            <div className="flex-grow overflow-y-auto p-4 space-y-2">
+              {conversation.length === 0 ? (
+                <div className="text-slate-600 italic p-4 text-center">
+                  No conversation yet. Start a Claude Code session.
+                </div>
+              ) : (
+                <ConversationEntries
+                  visible={visible}
+                  bottomRef={modalBottomRef}
+                />
+              )}
+            </div>
           </div>
-        ) : (
-          visible.map((entry) => {
-            switch (entry.role) {
-              case "user":
-                return <UserEntry key={entry.id} entry={entry} />;
-              case "assistant":
-                return <AssistantEntry key={entry.id} entry={entry} />;
-              case "thinking":
-                return <ThinkingEntry key={entry.id} entry={entry} />;
-              case "tool":
-                return <ToolEntry key={entry.id} entry={entry} />;
-              default:
-                return null;
-            }
-          })
-        )}
-        <div ref={bottomRef} />
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }
