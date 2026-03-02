@@ -2,6 +2,25 @@
 
 All notable changes to Claude Office Visualizer are documented here.
 
+## [0.9.0] - 2026-03-01
+
+### Added
+- **Conversation History Tab**: New chat-style panel showing the full exchange — user prompts, Claude responses (with markdown rendering), thinking blocks, and tool calls. Toggle tool calls on/off with the wrench button; message count shown in the header.
+- **Expand Conversation Modal**: Maximize button opens the conversation in a large overlay (900px wide, 85vh) for comfortable reading. Closes on Escape, outside click, or the X button.
+- **Event Detail Modal**: Click any event in the event log to inspect its full detail payload.
+- **Markdown Rendering**: Assistant responses in the conversation tab render full GitHub-flavoured markdown — headings, bold, italic, inline/block code, lists, blockquotes, links, and horizontal rules.
+
+### Fixed
+- **Conversation restore on reconnect**: Connecting to an already in-progress session now rebuilds the full conversation history (user prompts, tool calls, thinking blocks, and assistant responses) from stored events rather than showing an empty tab.
+- **Agent desk marquee missing**: Subagent desk signs now always display when the agent is at their desk; falls back to agent name when the task summary is not yet available.
+- **"Resumed mid-session" task**: During session restore the backend now reads each subagent's JSONL transcript to extract the actual first user prompt, then uses the AI summary service to generate a proper task description and agent name — replacing the generic placeholder.
+- **Arrival queue status stuck**: `AgentStatus` panel no longer shows "In arrival queue" for agents that have already reached their desk; queue metadata is cleared as soon as the agent leaves the queue.
+- **Office scene cropping on sidebar toggle**: Closing the left sidebar no longer crops the office canvas; a `ResizeObserver` resets the zoom/pan transform when the container changes size.
+- **`<task-notification>` messages hidden**: Internal task-notification payloads no longer appear as conversation entries.
+
+### Changed
+- Added `frontend-build-static` as a root-level Makefile alias for the existing `build-static` target.
+
 ## [0.8.0] - 2026-02-28
 
 ### Fixed
