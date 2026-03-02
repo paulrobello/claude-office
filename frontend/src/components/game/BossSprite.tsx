@@ -12,6 +12,9 @@ import { useTick } from "@pixi/react";
 import { Graphics, TextStyle, Texture } from "pixi.js";
 import type { BossState, BubbleContent, Position } from "@/types";
 import { MarqueeText } from "./MarqueeText";
+import { ICON_MAP } from "./shared/iconMap";
+import { drawBubble, drawIconBadge } from "./shared/drawBubble";
+import { drawRightArm, drawLeftArm } from "./shared/drawArm";
 
 // ============================================================================
 // TYPES
@@ -42,14 +45,6 @@ export interface BossSpriteProps {
 const BOSS_WIDTH = 48; // 1.5 blocks × 32px
 const BOSS_HEIGHT = 80; // 2.5 blocks × 32px
 const STROKE_WIDTH = 4;
-
-// Map icon names to emojis for speech bubbles
-const ICON_MAP: Record<string, string> = {
-  clipboard: "📋",
-  check: "✅",
-  "thumbs-up": "👍",
-  "file-text": "📄",
-};
 
 // State colors for the boss (kept for reference, not currently used)
 const _STATE_COLORS: Record<BossState, number> = {
@@ -86,90 +81,6 @@ function drawBossBody(g: Graphics, _state: BossState): void {
   g.stroke({ width: STROKE_WIDTH, color: 0xffffff });
 }
 
-function drawRightArm(g: Graphics, animOffset: number = 0): void {
-  g.clear();
-
-  // Arm dimensions
-  const armWidth = 4;
-
-  // Start point: right edge of body at mid-height
-  const startX = (BOSS_WIDTH - STROKE_WIDTH) / 2; // 22
-  const startY = 0;
-
-  // Control point 1: curves outward to the right
-  const cp1X = startX + 20;
-  const cp1Y = startY + 10 + animOffset * 0.5;
-
-  // Control point 2: starts curving back inward
-  const cp2X = startX + 15;
-  const cp2Y = 28 + animOffset * 0.7;
-
-  // End point: near the keyboard (keyboard is at y=32 relative to body)
-  const endX = 12;
-  const endY = 32 + animOffset;
-
-  // Draw the arm as a thick curved line
-  g.moveTo(startX, startY);
-  g.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
-  g.stroke({ width: armWidth, color: 0xffffff, cap: "round" });
-
-  // Hand - small oval (agent-style) at end of arm
-  const handWidth = 10;
-  const handHeight = 14;
-  const handRadius = handWidth / 2;
-  g.roundRect(
-    endX - handWidth / 2,
-    endY - handHeight / 2,
-    handWidth,
-    handHeight,
-    handRadius,
-  );
-  g.fill(0x1f2937); // Same dark gray as boss body
-  g.stroke({ width: 2, color: 0xffffff });
-}
-
-function drawLeftArm(g: Graphics, animOffset: number = 0): void {
-  g.clear();
-
-  // Arm dimensions
-  const armWidth = 4;
-
-  // Start point: left edge of body at mid-height (mirrored)
-  const startX = -(BOSS_WIDTH - STROKE_WIDTH) / 2; // -22
-  const startY = 0;
-
-  // Control point 1: curves outward to the left (mirrored)
-  const cp1X = startX - 20;
-  const cp1Y = startY + 10 + animOffset * 0.5;
-
-  // Control point 2: starts curving back inward (mirrored)
-  const cp2X = startX - 15;
-  const cp2Y = 28 + animOffset * 0.7;
-
-  // End point: near the keyboard (mirrored)
-  const endX = -12;
-  const endY = 32 + animOffset;
-
-  // Draw the arm as a thick curved line
-  g.moveTo(startX, startY);
-  g.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
-  g.stroke({ width: armWidth, color: 0xffffff, cap: "round" });
-
-  // Hand - small oval (agent-style) at end of arm
-  const handWidth = 10;
-  const handHeight = 14;
-  const handRadius = handWidth / 2;
-  g.roundRect(
-    endX - handWidth / 2,
-    endY - handHeight / 2,
-    handWidth,
-    handHeight,
-    handRadius,
-  );
-  g.fill(0x1f2937); // Same dark gray as boss body
-  g.stroke({ width: 2, color: 0xffffff });
-}
-
 function drawFallbackChair(g: Graphics): void {
   g.clear();
   g.circle(0, 15, 25);
@@ -184,63 +95,6 @@ function drawFallbackDesk(g: Graphics): void {
   g.stroke({ width: 4, color: 0x3d2a1e });
 }
 
-function drawBubble(
-  g: Graphics,
-  width: number,
-  height: number,
-  type: "thought" | "speech" = "thought",
-): void {
-  g.clear();
-
-  const halfW = width / 2;
-  const radius = type === "thought" ? 20 : 12;
-  const shadowOff = 2;
-  const shadowAlpha = 0.2;
-
-  // Shadow pass
-  if (type === "thought") {
-    g.circle(-10 + shadowOff, 6 + shadowOff, 4);
-    g.fill({ color: 0x000000, alpha: shadowAlpha });
-    g.circle(-20 + shadowOff, 14 + shadowOff, 2);
-    g.fill({ color: 0x000000, alpha: shadowAlpha });
-  } else {
-    g.moveTo(-15 + shadowOff, 0 + shadowOff);
-    g.lineTo(-20 + shadowOff, 12 + shadowOff);
-    g.lineTo(-5 + shadowOff, 0 + shadowOff);
-    g.closePath();
-    g.fill({ color: 0x000000, alpha: shadowAlpha });
-  }
-  g.roundRect(-halfW + shadowOff, -height + shadowOff, width, height, radius);
-  g.fill({ color: 0x000000, alpha: shadowAlpha });
-
-  // Main bubble
-  g.roundRect(-halfW, -height, width, height, radius);
-  g.fill(0xffffff);
-  g.stroke({ width: 1.5, color: 0x000000 });
-
-  // Tail (drawn after bubble)
-  if (type === "thought") {
-    g.circle(-10, 6, 4);
-    g.fill(0xffffff);
-    g.stroke({ width: 1.5, color: 0x000000 });
-    g.circle(-20, 14, 2);
-    g.fill(0xffffff);
-    g.stroke({ width: 1, color: 0x000000 });
-  } else {
-    // Speech tail - fill extends into bubble to cover the stroke
-    g.moveTo(-15, -2);
-    g.lineTo(-20, 12);
-    g.lineTo(-5, -2);
-    g.closePath();
-    g.fill(0xffffff);
-    // Stroke only the outer V edges
-    g.moveTo(-15, 0);
-    g.lineTo(-20, 12);
-    g.lineTo(-5, 0);
-    g.stroke({ width: 1.5, color: 0x000000 });
-  }
-}
-
 // ============================================================================
 // BUBBLE COMPONENT
 // ============================================================================
@@ -248,18 +102,6 @@ function drawBubble(
 interface BubbleProps {
   content: BubbleContent;
   yOffset: number;
-}
-
-// Draw circular badge background for icon
-function drawIconBadge(g: Graphics, radius: number): void {
-  g.clear();
-  // Shadow
-  g.circle(1, 1, radius);
-  g.fill({ color: 0x000000, alpha: 0.2 });
-  // White background
-  g.circle(0, 0, radius);
-  g.fill(0xffffff);
-  g.stroke({ width: 1.5, color: 0x000000 });
 }
 
 function Bubble({ content, yOffset }: BubbleProps): ReactNode {
@@ -386,15 +228,28 @@ function BossSpriteComponent({
     [state],
   );
 
+  // Boss arm params: body half-width 22px, shoulder at y=0, keyboard at y=32
+  const bossArmParams = useMemo(
+    () => ({
+      bodyHalfWidth: (BOSS_WIDTH - STROKE_WIDTH) / 2,
+      startY: 0,
+      endY: 32,
+      handColor: 0x1f2937,
+    }),
+    [],
+  );
+
   // Arm draw callbacks need to be recreated when animation changes
   const drawRightArmCallback = useCallback(
-    (g: Graphics) => drawRightArm(g, rightArmOffset),
-    [rightArmOffset],
+    (g: Graphics) =>
+      drawRightArm(g, { ...bossArmParams, animOffset: rightArmOffset }),
+    [bossArmParams, rightArmOffset],
   );
 
   const drawLeftArmCallback = useCallback(
-    (g: Graphics) => drawLeftArm(g, leftArmOffset),
-    [leftArmOffset],
+    (g: Graphics) =>
+      drawLeftArm(g, { ...bossArmParams, animOffset: leftArmOffset }),
+    [bossArmParams, leftArmOffset],
   );
 
   const bubbleOffset = -80;

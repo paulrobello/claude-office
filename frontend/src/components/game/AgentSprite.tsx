@@ -13,6 +13,9 @@ import { Graphics, TextStyle, Texture } from "pixi.js";
 import type { Position, BubbleContent } from "@/types";
 import type { AgentPhase } from "@/stores/gameStore";
 import { isInElevatorZone } from "@/systems/queuePositions";
+import { ICON_MAP } from "./shared/iconMap";
+import { drawBubble, drawIconBadge } from "./shared/drawBubble";
+import { drawRightArm, drawLeftArm } from "./shared/drawArm";
 
 // ============================================================================
 // TYPES
@@ -41,14 +44,6 @@ const AGENT_WIDTH = 48; // 1.5 blocks × 32px (matches boss)
 const AGENT_HEIGHT = 80; // 2.5 blocks × 32px (matches boss)
 const STROKE_WIDTH = 4;
 
-// Map icon names to emojis for speech bubbles
-const ICON_MAP: Record<string, string> = {
-  clipboard: "📋",
-  check: "✅",
-  "thumbs-up": "👍",
-  "file-text": "📄",
-};
-
 // ============================================================================
 // DRAWING FUNCTIONS
 // ============================================================================
@@ -76,141 +71,6 @@ function drawAgent(g: Graphics, color: string): void {
   g.stroke({ width: STROKE_WIDTH, color: 0xffffff });
 }
 
-function drawRightArm(g: Graphics, animOffset: number = 0): void {
-  g.clear();
-
-  const armWidth = 4;
-
-  // Agent body goes from y=-54 to y=+22, mid-height at y=-16
-  const startX = (AGENT_WIDTH - STROKE_WIDTH) / 2; // 22
-  const startY = -16;
-
-  // Control points curve outward then back
-  const cp1X = startX + 20;
-  const cp1Y = startY + 10 + animOffset * 0.5;
-
-  const cp2X = startX + 15;
-  const cp2Y = 12 + animOffset * 0.7;
-
-  // End point near keyboard area
-  const endX = 12;
-  const endY = 16 + animOffset;
-
-  g.moveTo(startX, startY);
-  g.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
-  g.stroke({ width: armWidth, color: 0xffffff, cap: "round" });
-
-  // Hand - small oval at end of arm
-  const handWidth = 10;
-  const handHeight = 14;
-  const handRadius = handWidth / 2;
-  g.roundRect(
-    endX - handWidth / 2,
-    endY - handHeight / 2,
-    handWidth,
-    handHeight,
-    handRadius,
-  );
-  g.fill(0x1f2937);
-  g.stroke({ width: 2, color: 0xffffff });
-}
-
-function drawLeftArm(g: Graphics, animOffset: number = 0): void {
-  g.clear();
-
-  const armWidth = 4;
-
-  // Mirrored start point
-  const startX = -(AGENT_WIDTH - STROKE_WIDTH) / 2; // -22
-  const startY = -16;
-
-  // Mirrored control points
-  const cp1X = startX - 20;
-  const cp1Y = startY + 10 + animOffset * 0.5;
-
-  const cp2X = startX - 15;
-  const cp2Y = 12 + animOffset * 0.7;
-
-  // Mirrored end point
-  const endX = -12;
-  const endY = 16 + animOffset;
-
-  g.moveTo(startX, startY);
-  g.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
-  g.stroke({ width: armWidth, color: 0xffffff, cap: "round" });
-
-  // Hand
-  const handWidth = 10;
-  const handHeight = 14;
-  const handRadius = handWidth / 2;
-  g.roundRect(
-    endX - handWidth / 2,
-    endY - handHeight / 2,
-    handWidth,
-    handHeight,
-    handRadius,
-  );
-  g.fill(0x1f2937);
-  g.stroke({ width: 2, color: 0xffffff });
-}
-
-function drawBubble(
-  g: Graphics,
-  width: number,
-  height: number,
-  type: "thought" | "speech" = "thought",
-): void {
-  g.clear();
-
-  const halfW = width / 2;
-  const radius = type === "thought" ? 20 : 12;
-  const shadowOff = 2;
-  const shadowAlpha = 0.2;
-
-  // Shadow pass
-  if (type === "thought") {
-    g.circle(-10 + shadowOff, 6 + shadowOff, 4);
-    g.fill({ color: 0x000000, alpha: shadowAlpha });
-    g.circle(-20 + shadowOff, 14 + shadowOff, 2);
-    g.fill({ color: 0x000000, alpha: shadowAlpha });
-  } else {
-    g.moveTo(-15 + shadowOff, 0 + shadowOff);
-    g.lineTo(-20 + shadowOff, 12 + shadowOff);
-    g.lineTo(-5 + shadowOff, 0 + shadowOff);
-    g.closePath();
-    g.fill({ color: 0x000000, alpha: shadowAlpha });
-  }
-  g.roundRect(-halfW + shadowOff, -height + shadowOff, width, height, radius);
-  g.fill({ color: 0x000000, alpha: shadowAlpha });
-
-  // Main bubble
-  g.roundRect(-halfW, -height, width, height, radius);
-  g.fill(0xffffff);
-  g.stroke({ width: 1.5, color: 0x000000 });
-
-  // Tail (drawn after bubble)
-  if (type === "thought") {
-    g.circle(-10, 6, 4);
-    g.fill(0xffffff);
-    g.stroke({ width: 1.5, color: 0x000000 });
-    g.circle(-20, 14, 2);
-    g.fill(0xffffff);
-    g.stroke({ width: 1, color: 0x000000 });
-  } else {
-    // Speech tail - fill extends into bubble to cover the stroke
-    g.moveTo(-15, -2);
-    g.lineTo(-20, 12);
-    g.lineTo(-5, -2);
-    g.closePath();
-    g.fill(0xffffff);
-    // Stroke only the outer V edges
-    g.moveTo(-15, 0);
-    g.lineTo(-20, 12);
-    g.lineTo(-5, 0);
-    g.stroke({ width: 1.5, color: 0x000000 });
-  }
-}
-
 // ============================================================================
 // BUBBLE COMPONENT
 // ============================================================================
@@ -218,18 +78,6 @@ function drawBubble(
 interface BubbleProps {
   content: BubbleContent;
   yOffset: number;
-}
-
-// Draw circular badge background for icon
-function drawIconBadge(g: Graphics, radius: number): void {
-  g.clear();
-  // Shadow
-  g.circle(1, 1, radius);
-  g.fill({ color: 0x000000, alpha: 0.2 });
-  // White background
-  g.circle(0, 0, radius);
-  g.fill(0xffffff);
-  g.stroke({ width: 1.5, color: 0x000000 });
 }
 
 function Bubble({ content, yOffset }: BubbleProps): ReactNode {
@@ -407,15 +255,28 @@ function AgentArmsComponent({ position, isTyping }: AgentArmsProps): ReactNode {
     ? Math.sin(typingTime * 8 + Math.PI * 0.7) * 2
     : 0;
 
+  // Agent arm params: body half-width 22px, shoulder at y=-16, keyboard at y=16
+  const agentArmParams = useMemo(
+    () => ({
+      bodyHalfWidth: (AGENT_WIDTH - STROKE_WIDTH) / 2,
+      startY: -16,
+      endY: 16,
+      handColor: 0x1f2937,
+    }),
+    [],
+  );
+
   // Arm draw callbacks
   const drawRightArmCallback = useCallback(
-    (g: Graphics) => drawRightArm(g, rightArmOffset),
-    [rightArmOffset],
+    (g: Graphics) =>
+      drawRightArm(g, { ...agentArmParams, animOffset: rightArmOffset }),
+    [agentArmParams, rightArmOffset],
   );
 
   const drawLeftArmCallback = useCallback(
-    (g: Graphics) => drawLeftArm(g, leftArmOffset),
-    [leftArmOffset],
+    (g: Graphics) =>
+      drawLeftArm(g, { ...agentArmParams, animOffset: leftArmOffset }),
+    [agentArmParams, leftArmOffset],
   );
 
   return (

@@ -12,7 +12,7 @@
  */
 
 import { useState } from "react";
-import { PreviewPanel, BuilderPanel } from "./components";
+import { PreviewPanel, BuilderPanel } from "@/components/debug/sprite-debug";
 
 // ============================================================================
 // TAB TYPES

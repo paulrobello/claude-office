@@ -5,6 +5,13 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+__all__ = [
+    "FileStatus",
+    "ChangedFile",
+    "Commit",
+    "GitStatus",
+]
+
 
 class FileStatus(StrEnum):
     """Git file status codes."""

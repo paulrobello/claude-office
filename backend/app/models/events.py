@@ -6,6 +6,12 @@ from pydantic import BaseModel, Field
 
 from app.models.common import BubbleContent, SpeechContent
 
+__all__ = [
+    "EventType",
+    "EventData",
+    "Event",
+]
+
 
 class EventType(StrEnum):
     """Types of events sent from Claude Code hooks."""
