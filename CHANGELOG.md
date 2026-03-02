@@ -2,6 +2,37 @@
 
 All notable changes to Claude Office Visualizer are documented here.
 
+## [Unreleased] - Refactor
+
+### Changed
+
+- **Whiteboard split**: `Whiteboard.tsx` (1558 lines) extracted into 11 focused mode components (`TodoListMode`, `RemoteWorkersMode`, `ToolPizzaMode`, `OrgChartMode`, `StonksMode`, `WeatherMode`, `SafetyBoardMode`, `TimelineMode`, `NewsTickerMode`, `CoffeeMode`, `HeatMapMode`) under `components/game/whiteboard/` with a `WhiteboardModeRegistry` for mode switching. Main component reduced to 241 lines.
+- **EventProcessor split**: `event_processor.py` (911 lines) extracted into `handlers/session_handler.py`, `handlers/agent_handler.py`, `handlers/tool_handler.py`, `handlers/conversation_handler.py`, and `broadcast_service.py`. Main class now a pure router (~390 lines).
+- **page.tsx split**: `page.tsx` (1045 lines) extracted into layout components (`SessionSidebar`, `MobileDrawer`, `HeaderControls`, `StatusToast`, `MobileAgentActivity`, `RightSidebar`) and custom hooks (`useSessions`, `useSessionSwitch`). Main page reduced to 382 lines.
+- **WhiteboardTracker extracted**: Whiteboard data tracking logic split out of `state_machine.py` into `backend/app/core/whiteboard_tracker.py`.
+- **agentMachine split**: `agentMachine.ts` (751 lines) split into `agentMachineCommon.ts` (shared types/guards/actions), `agentArrivalMachine.ts`, and `agentDepartureMachine.ts`.
+- **agentMachineService split**: `agentMachineService.ts` (714 lines) split into `queueManager.ts` (queue reservations) and `positionHelpers.ts` (desk/elevator position helpers).
+- **CityWindow split**: `CityWindow.tsx` (703 lines) split into `city/skyRenderer.ts`, `city/buildingRenderer.ts`, and `city/timeUtils.ts`. Component reduced to 298 lines.
+- **Hooks split**: `hooks/main.py` (523 lines) split into `config.py`, `debug_logger.py`, and `event_mapper.py`. Main entry point reduced to 155 lines.
+- **Simulation split**: `scripts/simulate_events.py` (694 lines) split into a `scripts/scenarios/` package with `basic.py`, `complex.py`, and `edge_cases.py` scenarios. Entry point accepts a scenario name argument.
+- **Shared drawing utilities**: Duplicated bubble/arm drawing code extracted from `BossSprite.tsx` and `AgentSprite.tsx` into `components/game/shared/drawBubble.ts`, `drawArm.ts`, and `iconMap.ts`.
+- **Frontend types generated**: Hand-written `types/agents.ts`, `events.ts`, `office.ts`, `whiteboard.ts` replaced by `types/generated.ts` auto-generated from Pydantic backend models via `scripts/gen_types.py` + `json-schema-to-typescript`. Run `make gen-types` to regenerate after model changes.
+- **Backend model `__all__` exports**: All backend model files (`common.py`, `agents.py`, `events.py`, `sessions.py`, `git.py`) now declare `__all__` for cleaner imports. New `models/ui.py` re-exports UI-focused types.
+- **Backend logging module**: Added `backend/app/core/logging.py` with `get_logger()`, `log_event()`, and `log_error()` helpers for consistent structured logging across backend modules.
+- **Sprite debug tools**: `app/sprite-debug/` tooling copied to `components/debug/sprite-debug/` for better separation of dev tools from app routes.
+
+### Added
+
+- `make gen-types` target: regenerates `frontend/src/types/generated.ts` from Pydantic models.
+- Pre-commit hook: automatically reruns `gen-types` when any file in `backend/app/models/` changes.
+- `.github/workflows/type-drift.yml`: CI job that fails if `generated.ts` is out of sync with the Pydantic models.
+
+### Fixed
+
+- `TodoListMode.tsx` used `todo.activeForm` (camelCase) but `TodoItem` has no `alias_generator`, so the backend sends `active_form`. Fixed to match actual wire format.
+
+---
+
 ## [0.9.0] - 2026-03-01
 
 ### Added
