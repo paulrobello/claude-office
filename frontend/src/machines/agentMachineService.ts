@@ -533,6 +533,9 @@ class AgentMachineService {
       store.dequeueDeparture();
     }
 
+    // Clear the dequeued agent's queue info so it no longer shows in queue UI
+    store.updateAgentQueueInfo(agentId, null, -1);
+
     // Update remaining queue members
     if (queueType) {
       this.updateQueueIndices(queueType);

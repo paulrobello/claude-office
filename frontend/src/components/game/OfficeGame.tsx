@@ -168,8 +168,9 @@ export function OfficeGame(): ReactNode {
   const deskTasks = useMemo(() => {
     const tasks = new Map<number, string>();
     for (const agent of agents.values()) {
-      if (agent.desk && agent.phase === "idle" && agent.currentTask) {
-        tasks.set(agent.desk, agent.currentTask);
+      if (agent.desk && agent.phase === "idle") {
+        const label = agent.currentTask ?? agent.name ?? "";
+        if (label) tasks.set(agent.desk, label);
       }
     }
     return tasks;

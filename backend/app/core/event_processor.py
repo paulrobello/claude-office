@@ -592,6 +592,29 @@ class EventProcessor:
                                 "timestamp": evt.timestamp.isoformat(),
                             }
                             sm.conversation.append(assistant_entry)
+                    elif (
+                        evt.event_type == EventType.SUBAGENT_INFO
+                        and evt.data
+                        and evt.data.agent_transcript_path
+                    ):
+                        # Enrich ghost agents from transcript during restore.
+                        # The live path calls _enrich_agent_from_transcript in the
+                        # SUBAGENT_INFO handler, but sm.transition() is a no-op for
+                        # SUBAGENT_INFO so we must do it here.
+                        native_agent_id = evt.data.native_agent_id
+                        transcript_path = evt.data.agent_transcript_path
+                        for agent in sm.agents.values():
+                            if agent.native_id == native_agent_id or agent.native_id is None:
+                                if native_agent_id and agent.native_id is None:
+                                    agent.native_id = native_agent_id
+                                if (
+                                    not agent.current_task
+                                    or agent.current_task == "Resumed mid-session"
+                                ):
+                                    await self._enrich_agent_from_transcript(
+                                        agent, transcript_path, evt.data.agent_type
+                                    )
+                                break
                 except Exception as e:
                     skipped_count += 1
                     logger.warning(
