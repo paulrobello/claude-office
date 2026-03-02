@@ -1,3 +1,13 @@
+"""EventProcessor: routes incoming hook events to focused handler modules.
+
+This module is intentionally kept thin.  All substantive logic lives in the
+sub-modules under ``app.core.handlers``.
+
+Public surface (unchanged from before the refactor):
+- ``EventProcessor`` class with the same methods and singleton ``event_processor``
+- ``derive_git_root`` utility function
+"""
+
 import asyncio
 import contextlib
 import logging
@@ -7,18 +17,30 @@ from typing import Any
 
 from sqlalchemy import delete, select
 
-from app.api.websocket import manager
 from app.config import get_settings
-from app.core.jsonl_parser import get_first_user_prompt, get_last_assistant_response
+from app.core.broadcast_service import broadcast_error, broadcast_event, broadcast_state
+from app.core.handlers import (
+    enrich_agent_from_transcript,
+    ensure_task_poller_running,
+    handle_agent_update,
+    handle_pre_tool_use,
+    handle_session_end,
+    handle_session_start,
+    handle_stop,
+    handle_subagent_info,
+    handle_subagent_start,
+    handle_subagent_stop,
+    handle_user_prompt_submit,
+)
+from app.core.jsonl_parser import get_last_assistant_response
 from app.core.state_machine import StateMachine
-from app.core.summary_service import get_summary_service
-from app.core.task_file_poller import get_task_file_poller, init_task_file_poller
+from app.core.task_file_poller import init_task_file_poller
 from app.core.task_persistence import load_tasks, save_tasks
-from app.core.transcript_poller import get_transcript_poller, init_transcript_poller
+from app.core.transcript_poller import init_transcript_poller
 from app.db.database import AsyncSessionLocal
 from app.db.models import EventRecord, SessionRecord
-from app.models.agents import Agent, AgentState, BossState
-from app.models.common import BubbleContent, BubbleType, TodoItem
+from app.models.agents import AgentState
+from app.models.common import TodoItem
 from app.models.events import Event, EventData, EventType
 from app.models.sessions import ConversationEntry, GameState, HistoryEntry
 
@@ -43,18 +65,14 @@ def derive_git_root(working_dir: str) -> str | None:
     try:
         path = Path(working_dir).resolve()
 
-        # Walk up looking for .git
         for parent in [path, *path.parents]:
             git_dir = parent / ".git"
             if git_dir.exists():
                 return str(parent)
 
-            # Stop at filesystem root
             if parent == parent.parent:
                 break
 
-        # No .git found - the working_dir might still be valid,
-        # just not a git repo. Return it as-is.
         if path.exists() and path.is_dir():
             return str(path)
 
@@ -65,7 +83,16 @@ def derive_git_root(working_dir: str) -> str | None:
 
 
 class EventProcessor:
-    """Processes Claude Code hook events and manages session state."""
+    """Routes Claude Code hook events to focused handler modules.
+
+    Maintains the in-memory session registry (``StateMachine`` per session)
+    and orchestrates:
+    - DB persistence
+    - History entry building
+    - Task-file and transcript poller lifecycle
+    - Delegation to typed handler functions
+    - WebSocket broadcasting
+    """
 
     def __init__(self) -> None:
         self.sessions: dict[str, StateMachine] = {}
@@ -73,33 +100,37 @@ class EventProcessor:
         self._transcript_poller_initialized = False
         self._task_poller_initialized = False
 
+    # ------------------------------------------------------------------
+    # Poller lifecycle helpers
+    # ------------------------------------------------------------------
+
     def _ensure_transcript_poller(self) -> None:
-        """Initialize the transcript poller if not already done."""
+        """Initialise the transcript poller if not already done."""
         if not self._transcript_poller_initialized:
             init_transcript_poller(self._handle_polled_event)
             self._transcript_poller_initialized = True
 
     def _ensure_task_file_poller(self) -> None:
-        """Initialize the task file poller if not already done."""
+        """Initialise the task file poller if not already done."""
         if not self._task_poller_initialized:
             init_task_file_poller(self._handle_task_file_update)
             self._task_poller_initialized = True
 
+    # ------------------------------------------------------------------
+    # Callbacks for pollers
+    # ------------------------------------------------------------------
+
     async def _handle_task_file_update(self, session_id: str, todos: list[TodoItem]) -> None:
-        """Handle task file updates by updating state machine, persisting, and broadcasting."""
+        """Handle task-file updates: update SM, persist to DB, broadcast."""
         sm = self.sessions.get(session_id)
         if not sm:
             return
 
-        # Update todos in state machine
         sm.todos = todos
         logger.debug(f"Updated todos for session {session_id}: {len(todos)} items")
 
-        # Persist tasks to database (survives file system cleanup)
         await save_tasks(session_id, todos)
-
-        # Broadcast updated state to clients
-        await self._broadcast_state(session_id)
+        await broadcast_state(session_id, sm)
 
     async def _handle_polled_event(self, event: Event) -> None:
         """Handle events extracted from polled subagent transcripts."""
@@ -107,11 +138,14 @@ class EventProcessor:
             f"Polled event: {event.event_type} agent={event.data.agent_id} "
             f"tool={event.data.tool_name}"
         )
-        # Process through the normal event pipeline
         await self._process_event_internal(event)
 
+    # ------------------------------------------------------------------
+    # Session management
+    # ------------------------------------------------------------------
+
     async def remove_session(self, session_id: str) -> None:
-        """Remove a session's in-memory state and locks.
+        """Remove a session's in-memory state.
 
         Args:
             session_id: Identifier for the session to purge.
@@ -125,30 +159,13 @@ class EventProcessor:
             self.sessions.clear()
 
     async def get_current_state(self, session_id: str) -> GameState | None:
-        """Retrieve current game state for a session if it exists."""
+        """Retrieve current game state for a session, restoring from DB if needed."""
         if session_id not in self.sessions:
             await self._restore_session(session_id)
 
         sm = self.sessions.get(session_id)
         if sm:
             return sm.to_game_state(session_id)
-        return None
-
-    async def _derive_task_list_id(self, session_id: str) -> str | None:
-        """Derive the task_list_id from the session's project root.
-
-        Checks if ~/.claude/tasks/<project_name>/ exists (named task folder),
-        which happens when CLAUDE_CODE_TASK_LIST_ID is set to the project name.
-        Falls back to None (tasks stored by session UUID).
-        """
-        project_root = await self.get_project_root(session_id)
-        if not project_root:
-            return None
-        project_name = Path(project_root).name
-        tasks_dir = Path.home() / ".claude" / "tasks" / project_name
-        if tasks_dir.exists() and any(tasks_dir.glob("*.json")):
-            logger.debug(f"Derived task_list_id '{project_name}' for session {session_id}")
-            return project_name
         return None
 
     async def get_project_root(self, session_id: str) -> str | None:
@@ -167,6 +184,10 @@ class EventProcessor:
             row = result.scalar_one_or_none()
             return row
 
+    # ------------------------------------------------------------------
+    # Public event ingestion
+    # ------------------------------------------------------------------
+
     async def process_event(self, event: Event) -> None:
         """Process an incoming event and update session state."""
         logger.info(
@@ -179,19 +200,19 @@ class EventProcessor:
             await self._process_event_internal(event)
         except Exception as e:
             logger.exception(f"Error processing event {event.event_type}: {e}")
-            # Broadcast error to clients so they know something went wrong
             with contextlib.suppress(Exception):
-                await manager.broadcast(
-                    {
-                        "type": "error",
-                        "message": f"Error processing {event.event_type}: {e!s}",
-                        "timestamp": event.timestamp.isoformat(),
-                    },
+                await broadcast_error(
                     event.session_id,
+                    f"Error processing {event.event_type}: {e!s}",
+                    event.timestamp.isoformat(),
                 )
 
+    # ------------------------------------------------------------------
+    # Internal routing
+    # ------------------------------------------------------------------
+
     async def _process_event_internal(self, event: Event) -> None:
-        """Process event, update state, and broadcast to clients."""
+        """Persist, update state machine, build history entry, delegate to handlers."""
         await self._persist_event(event)
 
         if event.session_id not in self.sessions:
@@ -206,7 +227,7 @@ class EventProcessor:
 
         agent_id = event.data.agent_id if event.data and event.data.agent_id else "main"
 
-        # Build detail dict from event data fields for frontend inspection
+        # Build detail dict from event data fields for frontend inspection.
         detail: dict[str, Any] = {}
         if event.data:
             for src, dst in [
@@ -236,255 +257,89 @@ class EventProcessor:
         if len(sm.history) > 500:
             sm.history = sm.history[-500:]
 
-        # Start task file polling on session start
+        # ------------------------------------------------------------------
+        # SESSION_START – start task-file polling
+        # ------------------------------------------------------------------
         if event.event_type == EventType.SESSION_START:
-            self._ensure_task_file_poller()
-            task_poller = get_task_file_poller()
-            if task_poller:
-                task_list_id = event.data.task_list_id if event.data else None
-                await task_poller.start_polling(event.session_id, task_list_id=task_list_id)
+            await handle_session_start(sm, event, self._ensure_task_file_poller)
 
-        # Auto-start task polling for sessions that missed SESSION_START (e.g. backend restart
-        # mid-session). On any event, if polling is not yet active, start it now.
-        if (
-            event.event_type != EventType.SESSION_START
-            and event.event_type != EventType.SESSION_END
-        ):
-            self._ensure_task_file_poller()
-            task_poller = get_task_file_poller()
-            if task_poller and not await task_poller.is_polling(event.session_id):
-                task_list_id = event.data.task_list_id if event.data else None
-                if not task_list_id:
-                    task_list_id = await self._derive_task_list_id(event.session_id)
-                await task_poller.start_polling(event.session_id, task_list_id=task_list_id)
-
-        # Stop task file polling on session end
-        if event.event_type == EventType.SESSION_END:
-            task_poller = get_task_file_poller()
-            if task_poller:
-                await task_poller.stop_polling(event.session_id)
-
-        if event.event_type == EventType.SUBAGENT_START and event.data and event.data.agent_id:
-            agent_id = event.data.agent_id
-            logger.info(
-                f"SUBAGENT_START: agent_id={agent_id} "
-                f"agent_name={event.data.agent_name!r} "
-                f"task_description={str(event.data.task_description or '')[:60]!r} "
-                f"agent_type={event.data.agent_type!r}"
-            )
-            if agent_id in sm.agents:
-                await self._enrich_agent_with_summaries(sm.agents[agent_id], event.data)
-                # Update lifespan with enriched short name
-                enriched_name = sm.agents[agent_id].name
-                if enriched_name:
-                    for lifespan in sm.agent_lifespans:
-                        if lifespan.agent_id == agent_id:
-                            lifespan.agent_name = enriched_name
-                            break
-
-        await self._broadcast_state(event.session_id)
-
-        await manager.broadcast(
-            {
-                "type": "event",
-                "timestamp": event.timestamp.isoformat(),
-                "event": event_dict,
-            },
-            event.session_id,
+        # ------------------------------------------------------------------
+        # Auto-start task polling for missed SESSION_START (backend restart)
+        # ------------------------------------------------------------------
+        await ensure_task_poller_running(
+            sm,
+            event,
+            self._ensure_task_file_poller,
+            self._derive_task_list_id,
         )
 
-        if event.event_type == EventType.SUBAGENT_START and event.data and event.data.agent_id:
-            agent_id = event.data.agent_id
-            sm.boss_state = BossState.DELEGATING
+        # ------------------------------------------------------------------
+        # SESSION_END – stop task-file polling
+        # ------------------------------------------------------------------
+        if event.event_type == EventType.SESSION_END:
+            await handle_session_end(sm, event)
 
-            transcript_path = event.data.agent_transcript_path
-            if transcript_path:
-                self._ensure_transcript_poller()
-                poller = get_transcript_poller()
-                if poller:
-                    await poller.start_polling(agent_id, event.session_id, transcript_path)
+        # ------------------------------------------------------------------
+        # Default state broadcast + history event notification
+        # ------------------------------------------------------------------
+        await broadcast_state(event.session_id, sm)
+        await broadcast_event(event.session_id, event_dict)
 
-            await self._update_agent_state(event.session_id, agent_id, AgentState.WALKING_TO_DESK)
-            sm.boss_state = BossState.IDLE
-            await self._broadcast_state(event.session_id)
-
-        if event.event_type == EventType.SUBAGENT_INFO and event.data:
-            transcript_path = event.data.agent_transcript_path
-            native_agent_id = event.data.native_agent_id
-
-            if transcript_path and native_agent_id:
-                # If no agents exist yet (missed SUBAGENT_START, e.g. backend restart),
-                # synthesize one so the agent is visible in the office.
-                already_tracked = any(a.native_id == native_agent_id for a in sm.agents.values())
-                if not already_tracked and not any(a.native_id is None for a in sm.agents.values()):
-                    synthetic_data = EventData(
-                        agent_id=f"subagent_{native_agent_id}",
-                        native_agent_id=native_agent_id,
-                        agent_transcript_path=transcript_path,
-                        agent_type=event.data.agent_type,  # Carry over agent_type for naming
-                        agent_name=event.data.agent_type,  # Use agent_type as fallback name
-                    )
-                    synthetic_start = Event(
-                        event_type=EventType.SUBAGENT_START,
-                        session_id=event.session_id,
-                        timestamp=event.timestamp,
-                        data=synthetic_data,
-                    )
-                    sm.transition(synthetic_start)
-                    logger.info(
-                        f"Synthesized SUBAGENT_START for native agent {native_agent_id} "
-                        f"(missed due to backend restart)"
-                    )
-
-                self._ensure_transcript_poller()
-                poller = get_transcript_poller()
-                if poller:
-                    for agent_id in sm.agents:
-                        agent = sm.agents[agent_id]
-                        # Store native_id for agents that don't have it yet and enrich
-                        # task/name from the transcript (covers ghost + synthetic agents).
-                        if agent.native_id is None:
-                            agent.native_id = native_agent_id
-                            logger.info(f"Linked agent {agent_id} to native ID {native_agent_id}")
-                            await self._enrich_agent_from_transcript(
-                                agent, transcript_path, event.data.agent_type
-                            )
-                        if not await poller.is_polling(agent_id):
-                            logger.info(
-                                f"Starting transcript polling for {agent_id} "
-                                f"(native: {native_agent_id}) at {transcript_path}"
-                            )
-                            await poller.start_polling(agent_id, event.session_id, transcript_path)
-                            break
-
-                # Also enrich the freshly synthesized agent (native_id already set
-                # by the state machine transition above, so the loop above won't
-                # catch it via the native_id is None guard).
-                synth_id = f"subagent_{native_agent_id}"
-                synth_agent = sm.agents.get(synth_id)
-                if synth_agent and not synth_agent.current_task:
-                    await self._enrich_agent_from_transcript(
-                        synth_agent, transcript_path, event.data.agent_type
-                    )
-
-        if event.event_type == EventType.AGENT_UPDATE and event.data and event.data.agent_id:
-            agent_id = event.data.agent_id
-            if agent_id in sm.agents and event.data.bubble_content:
-                sm.agents[agent_id].bubble = event.data.bubble_content
-                logger.debug(
-                    f"Updated agent {agent_id} bubble: {event.data.bubble_content.text[:50]}..."
-                )
-                await self._broadcast_state(event.session_id)
-
-        if event.event_type == EventType.SUBAGENT_STOP and event.data:
-            agent_id = event.data.agent_id
-            native_agent_id = event.data.native_agent_id
-
-            # Try to find the agent by agent_id first, then by native_id
-            if agent_id and agent_id in sm.agents:
-                resolved_agent_id = agent_id
-            elif native_agent_id:
-                # Look up by native_id
-                resolved_agent_id = None
-                for aid, agent in sm.agents.items():
-                    if agent.native_id == native_agent_id:
-                        resolved_agent_id = aid
-                        logger.info(f"Resolved native agent {native_agent_id} to {aid}")
-                        break
-                if not resolved_agent_id:
-                    logger.warning(
-                        f"SUBAGENT_STOP for unknown native agent {native_agent_id}, skipping"
-                    )
-                    return
-            else:
-                logger.warning("SUBAGENT_STOP with no agent_id or native_agent_id, skipping")
-                return
-
-            poller = get_transcript_poller()
-            if poller:
-                await poller.stop_polling(resolved_agent_id)
-
-            await self._extract_and_set_agent_speech(
-                sm, resolved_agent_id, event.data.agent_transcript_path
+        # ------------------------------------------------------------------
+        # SUBAGENT_START
+        # ------------------------------------------------------------------
+        if event.event_type == EventType.SUBAGENT_START:
+            await handle_subagent_start(
+                sm,
+                event,
+                self._ensure_transcript_poller,
+                self._update_agent_state,
             )
 
-            await self._broadcast_state(event.session_id)
+        # ------------------------------------------------------------------
+        # SUBAGENT_INFO
+        # ------------------------------------------------------------------
+        if event.event_type == EventType.SUBAGENT_INFO:
+            await handle_subagent_info(sm, event, self._ensure_transcript_poller)
 
-            sm.remove_agent(resolved_agent_id)
-            await self._persist_synthetic_event(event.session_id, EventType.CLEANUP, event.data)
-            await self._broadcast_state(event.session_id)
+        # ------------------------------------------------------------------
+        # AGENT_UPDATE
+        # ------------------------------------------------------------------
+        if event.event_type == EventType.AGENT_UPDATE:
+            await handle_agent_update(sm, event)
 
-        if event.event_type == EventType.STOP and event.data:
-            logger.info(
-                f"STOP event: boss_bubble before extract = "
-                f"{sm.boss_bubble.text[:50] if sm.boss_bubble else 'None'}..."
-            )
-            full_response = await self._extract_and_set_boss_speech(sm, event.data.transcript_path)
-            logger.info(
-                f"STOP event: boss_bubble after extract = "
-                f"{sm.boss_bubble.text[:50] if sm.boss_bubble else 'None'}..."
-            )
-            # Capture full assistant response in conversation history
-            if full_response:
-                assistant_entry: ConversationEntry = {
-                    "id": str(event.timestamp.timestamp()),
-                    "role": "assistant",
-                    "agentId": agent_id or "main",
-                    "text": full_response,
-                    "timestamp": event.timestamp.isoformat(),
-                }
-                sm.conversation.append(assistant_entry)
-            await self._detect_and_set_print_report(sm)
-            logger.info(f"STOP event: print_report = {sm.print_report}")
-            await self._broadcast_state(event.session_id)
+        # ------------------------------------------------------------------
+        # SUBAGENT_STOP
+        # ------------------------------------------------------------------
+        if event.event_type == EventType.SUBAGENT_STOP:
+            await handle_subagent_stop(sm, event, self._persist_synthetic_event)
 
-        if event.event_type == EventType.USER_PROMPT_SUBMIT and event.data and event.data.prompt:
-            summary_service = get_summary_service()
-            sm.boss_current_task = await summary_service.summarize_user_prompt(event.data.prompt)
-            logger.debug(f"Boss current task set to: {sm.boss_current_task}")
-            # Capture user prompt in conversation history (skip task-notification messages)
-            if "<task-notification>" not in event.data.prompt:
-                conv_entry: ConversationEntry = {
-                    "id": str(event.timestamp.timestamp()),
-                    "role": "user",
-                    "agentId": agent_id or "main",
-                    "text": event.data.prompt,
-                    "timestamp": event.timestamp.isoformat(),
-                }
-                sm.conversation.append(conv_entry)
-            await self._broadcast_state(event.session_id)
+        # ------------------------------------------------------------------
+        # STOP
+        # ------------------------------------------------------------------
+        if event.event_type == EventType.STOP:
+            await handle_stop(sm, event, agent_id)
 
-        if event.event_type == EventType.PRE_TOOL_USE and event.data:
-            ts = event.timestamp.isoformat()
-            aid = agent_id or "main"
-            # Capture thinking block if present
-            if event.data.thinking:
-                thinking_entry: ConversationEntry = {
-                    "id": f"{event.timestamp.timestamp()}_thinking",
-                    "role": "thinking",
-                    "agentId": aid,
-                    "text": event.data.thinking,
-                    "timestamp": ts,
-                }
-                sm.conversation.append(thinking_entry)
-            # Capture the tool call itself
-            if event.data.tool_name:
-                tool_text = self._get_event_summary(event)
-                tool_entry: ConversationEntry = {
-                    "id": f"{event.timestamp.timestamp()}_tool",
-                    "role": "tool",
-                    "agentId": aid,
-                    "text": tool_text,
-                    "timestamp": ts,
-                    "toolName": event.data.tool_name,
-                }
-                sm.conversation.append(tool_entry)
-            await self._broadcast_state(event.session_id)
+        # ------------------------------------------------------------------
+        # USER_PROMPT_SUBMIT
+        # ------------------------------------------------------------------
+        if event.event_type == EventType.USER_PROMPT_SUBMIT:
+            await handle_user_prompt_submit(sm, event, agent_id)
+
+        # ------------------------------------------------------------------
+        # PRE_TOOL_USE
+        # ------------------------------------------------------------------
+        if event.event_type == EventType.PRE_TOOL_USE:
+            await handle_pre_tool_use(sm, event, agent_id, self._get_event_summary(event))
+
+    # ------------------------------------------------------------------
+    # DB helpers
+    # ------------------------------------------------------------------
 
     async def _persist_synthetic_event(
         self, session_id: str, event_type: EventType, data: EventData | dict[str, Any] | None
     ) -> None:
-        """Helper to save intermediate lifecycle states to DB for perfect replay."""
+        """Save an intermediate lifecycle state to the DB for perfect replay."""
         payload: dict[str, Any]
         if data is None:
             payload = {}
@@ -503,9 +358,8 @@ class EventProcessor:
             await db.commit()
 
     async def _restore_session(self, session_id: str) -> None:
-        """Attempt to reconstruct a StateMachine from DB events."""
+        """Reconstruct a StateMachine from DB events."""
         async with AsyncSessionLocal() as db:
-            # Get all events for this session, sorted by time
             result = await db.execute(
                 select(EventRecord)
                 .where(EventRecord.session_id == session_id)
@@ -522,17 +376,14 @@ class EventProcessor:
             skipped_count = 0
             for rec in events:
                 try:
-                    # Convert DB record back to Pydantic Event
                     evt = Event(
                         event_type=EventType(rec.event_type),
                         session_id=rec.session_id,
                         timestamp=rec.timestamp,
                         data=EventData.model_validate(rec.data) if rec.data else EventData(),
                     )
-                    # Replay the transition to restore state
                     sm.transition(evt)
 
-                    # Add to history for UI sync
                     agent_id = evt.data.agent_id if evt.data and evt.data.agent_id else "main"
                     history_entry: HistoryEntry = {
                         "id": str(evt.timestamp.timestamp()),
@@ -544,7 +395,7 @@ class EventProcessor:
                     }
                     sm.history.append(history_entry)
 
-                    # Rebuild conversation entries from stored event data
+                    # Rebuild conversation from stored events.
                     if (
                         evt.event_type == EventType.USER_PROMPT_SUBMIT
                         and evt.data
@@ -597,10 +448,6 @@ class EventProcessor:
                         and evt.data
                         and evt.data.agent_transcript_path
                     ):
-                        # Enrich ghost agents from transcript during restore.
-                        # The live path calls _enrich_agent_from_transcript in the
-                        # SUBAGENT_INFO handler, but sm.transition() is a no-op for
-                        # SUBAGENT_INFO so we must do it here.
                         native_agent_id = evt.data.native_agent_id
                         transcript_path = evt.data.agent_transcript_path
                         for agent in sm.agents.values():
@@ -611,7 +458,7 @@ class EventProcessor:
                                     not agent.current_task
                                     or agent.current_task == "Resumed mid-session"
                                 ):
-                                    await self._enrich_agent_from_transcript(
+                                    await enrich_agent_from_transcript(
                                         agent, transcript_path, evt.data.agent_type
                                     )
                                 break
@@ -625,11 +472,9 @@ class EventProcessor:
             if skipped_count > 0:
                 logger.warning(f"Skipped {skipped_count} malformed events during restoration")
 
-            # Keep only last 500
             if len(sm.history) > 500:
                 sm.history = sm.history[-500:]
 
-            # Load persisted tasks from database
             sm.todos = await load_tasks(session_id)
             logger.debug(f"Restored {len(sm.todos)} tasks for session {session_id}")
 
@@ -691,6 +536,10 @@ class EventProcessor:
             db.add(event_rec)
             await db.commit()
 
+    # ------------------------------------------------------------------
+    # State update helpers
+    # ------------------------------------------------------------------
+
     async def _update_agent_state(self, session_id: str, agent_id: str, state: AgentState) -> None:
         """Update an agent's state and broadcast to clients."""
         sm = self.sessions.get(session_id)
@@ -703,150 +552,37 @@ class EventProcessor:
                 AgentState.WAITING,
             ]:
                 sm.agents[agent_id].bubble = None
-            await self._broadcast_state(session_id)
+            await broadcast_state(session_id, sm)
 
-    async def _broadcast_state(self, session_id: str) -> None:
-        """Helper to broadcast current state to all session clients."""
-        sm = self.sessions.get(session_id)
-        if not sm:
-            return
-
-        game_state = sm.to_game_state(session_id)
-        await manager.broadcast(
-            {
-                "type": "state_update",
-                "timestamp": game_state.last_updated.isoformat(),
-                "state": game_state.model_dump(mode="json", by_alias=True),
-            },
-            session_id,
-        )
-
-    async def _enrich_agent_with_summaries(self, agent: Agent, event_data: EventData) -> None:
-        """Generate short agent name and task summary using AI."""
-        summary_service = get_summary_service()
-
-        # Use agent_type as additional fallback when description is empty
-        name_source = (
-            event_data.agent_name or event_data.task_description or event_data.agent_type or ""
-        )
-        task_source = event_data.task_description or event_data.agent_name or ""
-
-        if name_source:
-            agent.name = await summary_service.generate_agent_name(name_source)
-
-        if task_source:
-            agent.current_task = await summary_service.summarize_agent_task(task_source)
-
-        logger.debug(f"Enriched agent {agent.id}: name='{agent.name}', task='{agent.current_task}'")
-
-    async def _enrich_agent_from_transcript(
-        self, agent: Agent, transcript_path: str, agent_type: str | None = None
-    ) -> None:
-        """Read the first user prompt from a transcript and enrich the agent's task/name.
-
-        Used for agents that were created without task details (ghost/synthetic agents
-        spawned after a backend restart or missed SUBAGENT_START).
+    async def _derive_task_list_id(self, session_id: str) -> str | None:
+        """Derive the task_list_id from the session's project root.
 
         Args:
-            agent: The agent to enrich.
-            transcript_path: Path to the agent's JSONL transcript file.
-            agent_type: Optional agent type used as a name fallback.
-        """
-        settings = get_settings()
-        translated_path = settings.translate_path(transcript_path)
-        task_text = get_first_user_prompt(translated_path)
-        if not task_text:
-            logger.debug(f"No user prompt found in transcript for agent {agent.id}")
-            return
+            session_id: The session identifier.
 
-        synthetic_data = EventData(
-            agent_id=agent.id,
-            agent_type=agent_type,
-            agent_name=agent_type,
-            task_description=task_text,
-        )
-        await self._enrich_agent_with_summaries(agent, synthetic_data)
-        logger.info(
-            f"Enriched agent {agent.id} from transcript: "
-            f"name='{agent.name}', task='{agent.current_task}'"
+        Returns:
+            Named task folder identifier, or None.
+        """
+        from app.core.handlers.session_handler import (
+            derive_task_list_id_from_root,
         )
 
-    async def _extract_and_set_boss_speech(
-        self, sm: StateMachine, transcript_path: str | None
-    ) -> str | None:
-        """Extract Claude's response from transcript and set boss speech bubble.
+        project_root = await self.get_project_root(session_id)
+        result = derive_task_list_id_from_root(project_root)
+        if result:
+            logger.debug(f"Derived task_list_id '{result}' for session {session_id}")
+        return result
 
-        Returns the full response text, or None if not available.
-        """
-        if not transcript_path:
-            return None
-
-        settings = get_settings()
-        translated_path = settings.translate_path(transcript_path)
-
-        response = get_last_assistant_response(translated_path)
-        if not response:
-            return None
-
-        # Generate a summary of the response
-        summary_service = get_summary_service()
-        summary = await summary_service.summarize_response(response)
-
-        if summary:
-            sm.boss_bubble = BubbleContent(
-                type=BubbleType.SPEECH,
-                text=summary,
-                icon="💬",
-                persistent=True,
-            )
-            logger.debug(f"Set boss speech: {summary[:50]}...")
-
-        return response
-
-    async def _detect_and_set_print_report(self, sm: StateMachine) -> None:
-        """Detect if user's prompt requested a report and set print_report flag."""
-        if not sm.last_user_prompt:
-            return
-
-        summary_service = get_summary_service()
-        sm.print_report = await summary_service.detect_report_request(sm.last_user_prompt)
-        if sm.print_report:
-            logger.debug(f"Report request detected in prompt: {sm.last_user_prompt[:50]}...")
-
-    async def _extract_and_set_agent_speech(
-        self, sm: StateMachine, agent_id: str, transcript_path: str | None
-    ) -> None:
-        """Extract agent's response from transcript and set agent speech bubble."""
-        if not transcript_path:
-            return
-
-        if agent_id not in sm.agents:
-            return
-
-        settings = get_settings()
-        translated_path = settings.translate_path(transcript_path)
-
-        response = get_last_assistant_response(translated_path)
-        if not response:
-            return
-
-        summary_service = get_summary_service()
-        summary = await summary_service.summarize_response(response)
-
-        if summary:
-            sm.agents[agent_id].bubble = BubbleContent(
-                type=BubbleType.SPEECH,
-                text=summary,
-                icon="✅",
-            )
-            logger.debug(f"Set agent {agent_id} completion summary: {summary[:50]}...")
+    # ------------------------------------------------------------------
+    # Event summary (used by replay endpoint and history building)
+    # ------------------------------------------------------------------
 
     def get_event_summary(self, event: Event) -> str:
         """Public wrapper for generating event summaries."""
         return self._get_event_summary(event)
 
     def _get_event_summary(self, event: Event) -> str:
-        """Generate a human readable summary for the event log."""
+        """Generate a human-readable summary for the event log."""
         if not event.data:
             return f"{event.event_type} event received"
 

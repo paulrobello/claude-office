@@ -2,13 +2,16 @@
  * Claude Office Visualizer - Main Page
  *
  * Uses the unified Zustand store, XState machines, and OfficeGame component.
+ * Layout and logic are delegated to extracted components and custom hooks.
  */
 
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useWebSocketEvents } from "@/hooks/useWebSocketEvents";
+import { useSessions } from "@/hooks/useSessions";
+import { useSessionSwitch } from "@/hooks/useSessionSwitch";
 import {
   useGameStore,
   selectIsConnected,
@@ -17,35 +20,24 @@ import {
   selectBoss,
 } from "@/stores/gameStore";
 import { useShallow } from "zustand/react/shallow";
+import { Menu, X } from "lucide-react";
+import { SessionSidebar } from "@/components/layout/SessionSidebar";
+import { MobileDrawer } from "@/components/layout/MobileDrawer";
+import { MobileAgentActivity } from "@/components/layout/MobileAgentActivity";
+import { RightSidebar } from "@/components/layout/RightSidebar";
+import { HeaderControls } from "@/components/layout/HeaderControls";
 import {
-  Activity,
-  Play,
-  RefreshCw,
-  Bug,
-  Trash2,
-  History,
-  Radio,
-  PlayCircle,
-  HelpCircle,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Menu,
-  X,
-  Users,
-  Settings,
-} from "lucide-react";
-import { GitStatusPanel } from "@/components/game/GitStatusPanel";
-import { EventLog } from "@/components/game/EventLog";
-import { AgentStatus } from "@/components/game/AgentStatus";
-import { ConversationHistory } from "@/components/game/ConversationHistory";
-import { agentMachineService } from "@/machines/agentMachineService";
-import { formatDistanceToNow } from "date-fns";
+  StatusToast,
+  type StatusMessage,
+} from "@/components/layout/StatusToast";
 import Modal from "@/components/overlay/Modal";
 import SettingsModal from "@/components/overlay/SettingsModal";
-import {
-  usePreferencesStore,
-  selectAutoFollowNewSessions,
-} from "@/stores/preferencesStore";
+import { usePreferencesStore } from "@/stores/preferencesStore";
+import type { Session } from "@/hooks/useSessions";
+
+// ============================================================================
+// DYNAMIC IMPORT
+// ============================================================================
 
 const OfficeGame = dynamic(
   () =>
@@ -62,84 +54,34 @@ const OfficeGame = dynamic(
   },
 );
 
-interface Session {
-  id: string;
-  projectName: string | null;
-  projectRoot: string | null; // Git project root path
-  createdAt: string;
-  updatedAt: string;
-  status: string;
-  eventCount: number;
-}
+// ============================================================================
+// PAGE COMPONENT
+// ============================================================================
 
 export default function V2TestPage(): React.ReactNode {
-  const [sessionId, setSessionId] = useState("sim_session_123");
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [sessionsLoading, setSessionsLoading] = useState(true);
+  // ------------------------------------------------------------------
+  // UI-only state
+  // ------------------------------------------------------------------
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [sessionPendingDelete, setSessionPendingDelete] =
-    useState<Session | null>(null);
-  const [statusMessage, setStatusMessage] = useState<{
-    text: string;
-    type: "info" | "error" | "success";
-  } | null>(null);
-  const [aiSummaryEnabled, setAiSummaryEnabled] = useState<boolean | null>(
+  const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
     null,
   );
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"events" | "conversation">(
-    "events",
+  const [aiSummaryEnabled, setAiSummaryEnabled] = useState<boolean | null>(
+    null,
   );
 
-  // Connect to WebSocket with new hook
-  useWebSocketEvents({ sessionId });
+  // Session pending delete drives the delete-confirmation modal
+  const [sessionPendingDelete, setSessionPendingDelete] =
+    useState<Session | null>(null);
 
-  // Fetch server status (AI summary enabled)
-  useEffect(() => {
-    fetch("http://localhost:8000/api/v1/status")
-      .then((res) => res.json())
-      .then((data) => setAiSummaryEnabled(data.aiSummaryEnabled))
-      .catch(() => setAiSummaryEnabled(false));
-  }, []);
-
-  // Store selectors
-  const isConnected = useGameStore(selectIsConnected);
-  const debugMode = useGameStore(selectDebugMode);
-  const agents = useGameStore(useShallow(selectAgents));
-  const boss = useGameStore(selectBoss);
-  const loadPersistedDebugSettings = useGameStore(
-    (state) => state.loadPersistedDebugSettings,
-  );
-  const loadPreferences = usePreferencesStore((s) => s.loadPreferences);
-  const autoFollowNewSessions = usePreferencesStore(
-    selectAutoFollowNewSessions,
-  );
-
-  // Track known session IDs for auto-follow detection
-  const knownSessionIds = useRef<Set<string>>(new Set());
-
-  // Detect mobile breakpoint (< 768px)
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-  // Load persisted debug settings on mount (after hydration to avoid mismatch)
-  useEffect(() => {
-    loadPersistedDebugSettings();
-  }, [loadPersistedDebugSettings]);
-
-  // Load user preferences from backend on mount
-  useEffect(() => {
-    loadPreferences();
-  }, [loadPreferences]);
-
+  // ------------------------------------------------------------------
+  // Status toast helper (stable reference via useCallback)
+  // ------------------------------------------------------------------
   const showStatus = useCallback(
     (text: string, type: "info" | "error" | "success" = "info") => {
       setStatusMessage({ text, type });
@@ -148,228 +90,93 @@ export default function V2TestPage(): React.ReactNode {
     [],
   );
 
-  // Fetch sessions list
-  const fetchSessions = useCallback(async (): Promise<
-    typeof sessions | null
-  > => {
-    setSessionsLoading(true);
-    try {
-      const res = await fetch("http://localhost:8000/api/v1/sessions");
-      if (res.ok) {
-        const data = await res.json();
-        setSessions(data);
-        return data;
-      }
-    } catch {
-      // Silently fail
-    } finally {
-      setSessionsLoading(false);
-    }
-    return null;
+  // ------------------------------------------------------------------
+  // Session management hooks
+  // ------------------------------------------------------------------
+  const { sessions, sessionsLoading, sessionId, setSessionId, fetchSessions } =
+    useSessions(showStatus);
+
+  const {
+    handleSessionSelect,
+    handleDeleteSession,
+    handleClearDB,
+    handleSimulate,
+    handleReset,
+  } = useSessionSwitch({ sessionId, setSessionId, fetchSessions, showStatus });
+
+  // ------------------------------------------------------------------
+  // Store subscriptions
+  // ------------------------------------------------------------------
+  const isConnected = useGameStore(selectIsConnected);
+  const debugMode = useGameStore(selectDebugMode);
+  const agents = useGameStore(useShallow(selectAgents));
+  const boss = useGameStore(selectBoss);
+  const loadPersistedDebugSettings = useGameStore(
+    (state) => state.loadPersistedDebugSettings,
+  );
+  const loadPreferences = usePreferencesStore((s) => s.loadPreferences);
+
+  // ------------------------------------------------------------------
+  // WebSocket connection — reconnects when sessionId changes
+  // ------------------------------------------------------------------
+  useWebSocketEvents({ sessionId });
+
+  // ------------------------------------------------------------------
+  // One-time initialization effects
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    fetch("http://localhost:8000/api/v1/status")
+      .then((res) => res.json())
+      .then((data: { aiSummaryEnabled: boolean }) =>
+        setAiSummaryEnabled(data.aiSummaryEnabled),
+      )
+      .catch(() => setAiSummaryEnabled(false));
   }, []);
 
-  // Fetch sessions on mount and periodically
   useEffect(() => {
-    fetchSessions();
-    const interval = setInterval(fetchSessions, 5000);
-    return () => clearInterval(interval);
-  }, [fetchSessions]);
+    loadPersistedDebugSettings();
+  }, [loadPersistedDebugSettings]);
 
-  // Listen for session deletion events from WebSocket
   useEffect(() => {
-    const handleSessionDeleted = async (e: Event) => {
-      const customEvent = e as CustomEvent<{ sessionId: string }>;
-      const deletedSessionId = customEvent.detail.sessionId;
+    loadPreferences();
+  }, [loadPreferences]);
 
-      // Refetch sessions to update the list
-      const updatedSessions = await fetchSessions();
-
-      // If the deleted session is the one we're viewing, switch to another
-      if (deletedSessionId === sessionId) {
-        if (updatedSessions && updatedSessions.length > 0) {
-          const newSession =
-            updatedSessions.find((s) => s.status === "active") ||
-            updatedSessions[0];
-          if (newSession) {
-            setSessionId(newSession.id);
-            showStatus(
-              `Session deleted. Switched to ${newSession.projectName || newSession.id.slice(0, 8)}`,
-              "info",
-            );
-          }
-        } else {
-          showStatus("Session deleted. No other sessions available.", "info");
-        }
-      }
-    };
-    window.addEventListener("session-deleted", handleSessionDeleted);
-    return () =>
-      window.removeEventListener("session-deleted", handleSessionDeleted);
-  }, [fetchSessions, sessionId, showStatus]);
-
-  // Auto-select most recent active session on initial mount only
-  const hasAutoSelected = useRef(false);
+  // ------------------------------------------------------------------
+  // Mobile breakpoint detection
+  // ------------------------------------------------------------------
   useEffect(() => {
-    // Only auto-select once on initial load, not when user manually selects sim session
-    if (
-      !hasAutoSelected.current &&
-      sessions.length > 0 &&
-      sessionId === "sim_session_123"
-    ) {
-      hasAutoSelected.current = true;
-      // Find an active session, or fall back to the first one
-      const activeSession =
-        sessions.find((s) => s.status === "active") || sessions[0];
-      if (activeSession) {
-        setSessionId(activeSession.id);
-        showStatus(
-          `Connected to ${activeSession.projectName || activeSession.id.slice(0, 8)}`,
-          "info",
-        );
-      }
-    }
-  }, [sessions, sessionId, showStatus]);
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
-  // Auto-follow new sessions in the current project
-  useEffect(() => {
-    if (!autoFollowNewSessions || sessions.length === 0) return;
-
-    // Get current session's project root
-    const currentSession = sessions.find((s) => s.id === sessionId);
-    const currentProjectRoot = currentSession?.projectRoot;
-
-    // Find new sessions that weren't in our known set
-    const newSessions = sessions.filter(
-      (s) => !knownSessionIds.current.has(s.id),
-    );
-
-    // Update known sessions set
-    knownSessionIds.current = new Set(sessions.map((s) => s.id));
-
-    // If no new sessions or no current project context, skip
-    if (newSessions.length === 0 || !currentProjectRoot) return;
-
-    // Find a new active session in the same project
-    const newSessionInProject = newSessions.find(
-      (s) => s.projectRoot === currentProjectRoot && s.status === "active",
-    );
-
-    if (newSessionInProject && newSessionInProject.id !== sessionId) {
-      // Reset state machines and store for session switch
-      agentMachineService.reset();
-      useGameStore.getState().resetForSessionSwitch();
-
-      setSessionId(newSessionInProject.id);
-      showStatus(
-        `Auto-followed new session: ${newSessionInProject.projectName || newSessionInProject.id.slice(0, 8)}`,
-        "info",
-      );
-    }
-  }, [sessions, sessionId, autoFollowNewSessions, showStatus]);
-
-  // Handle session selection
-  const handleSessionSelect = async (id: string) => {
-    if (id === sessionId) {
-      return;
-    }
-
-    // Reset state machines and store for session switch
-    // Use resetForSessionSwitch (not resetForReplay) to keep isReplaying=false
-    // so WebSocket will reconnect to the new session
-    agentMachineService.reset();
-    useGameStore.getState().resetForSessionSwitch();
-
-    setSessionId(id);
-    showStatus(`Switched to session ${id.slice(0, 8)}...`, "info");
-  };
-
-  // Handle Clear DB
-  const handleClearDB = async () => {
-    setIsClearModalOpen(false);
-
-    try {
-      showStatus("Clearing database...", "info");
-      const res = await fetch("http://localhost:8000/api/v1/sessions", {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        agentMachineService.reset();
-        useGameStore.getState().resetForSessionSwitch();
-        setSessionId("sim_session_123");
-        await fetchSessions();
-        showStatus("Database cleared.", "success");
-      } else {
-        showStatus("Failed to clear database.", "error");
-      }
-    } catch (e) {
-      console.error(e);
-      showStatus("Error connecting to backend.", "error");
-    }
-  };
-
-  // Handle delete single session
-  const handleDeleteSession = async () => {
-    if (!sessionPendingDelete) return;
-    const id = sessionPendingDelete.id;
-    setSessionPendingDelete(null);
-
-    try {
-      showStatus(`Deleting session ${id.slice(0, 8)}...`, "info");
-      const res = await fetch(`http://localhost:8000/api/v1/sessions/${id}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        // If deleting current session, reset UI
-        if (id === sessionId) {
-          agentMachineService.reset();
-          useGameStore.getState().resetForSessionSwitch();
-          setSessionId("sim_session_123");
-        }
-        await fetchSessions();
-        showStatus(`Session deleted.`, "success");
-      } else {
-        showStatus(`Failed to delete session.`, "error");
-      }
-    } catch (e) {
-      console.error(e);
-      showStatus("Error connecting to backend.", "error");
-    }
-  };
-
-  // Note: Don't reset on mount - it clears agents detected by WebSocket
-  // Only reset manually via the RESET button
-
-  const handleSimulate = async () => {
-    try {
-      showStatus("Triggering simulation...", "info");
-      const res = await fetch(
-        "http://localhost:8000/api/v1/sessions/simulate",
-        { method: "POST" },
-      );
-      if (res.ok) {
-        showStatus("Simulation started!", "success");
-      } else {
-        showStatus("Failed to trigger simulation.", "error");
-      }
-    } catch (e) {
-      console.error(e);
-      showStatus("Error connecting to backend.", "error");
-    }
-  };
-
-  const handleReset = () => {
-    agentMachineService.reset();
-    useGameStore.getState().resetForSessionSwitch();
-    showStatus("Store reset.", "info");
-  };
-
-  const handleToggleDebug = () => {
+  // ------------------------------------------------------------------
+  // Derived handlers
+  // ------------------------------------------------------------------
+  const handleToggleDebug = () =>
     useGameStore.getState().setDebugMode(!debugMode);
+
+  const handleConfirmClearDB = async () => {
+    setIsClearModalOpen(false);
+    await handleClearDB();
   };
 
+  const handleConfirmDeleteSession = async () => {
+    if (!sessionPendingDelete) return;
+    const pending = sessionPendingDelete;
+    setSessionPendingDelete(null);
+    await handleDeleteSession(pending);
+  };
+
+  // ------------------------------------------------------------------
+  // Render
+  // ------------------------------------------------------------------
   return (
     <main className="flex h-screen flex-col bg-neutral-950 p-2 overflow-hidden relative">
-      {/* Clear DB Modal */}
+      {/* ----------------------------------------------------------------
+          Modals
+      ---------------------------------------------------------------- */}
       <Modal
         isOpen={isClearModalOpen}
         onClose={() => setIsClearModalOpen(false)}
@@ -383,7 +190,7 @@ export default function V2TestPage(): React.ReactNode {
               Cancel
             </button>
             <button
-              onClick={handleClearDB}
+              onClick={handleConfirmClearDB}
               className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-sm font-bold rounded-lg transition-colors shadow-lg shadow-rose-900/20"
             >
               Wipe All Data
@@ -398,7 +205,6 @@ export default function V2TestPage(): React.ReactNode {
         </p>
       </Modal>
 
-      {/* Help Modal */}
       <Modal
         isOpen={isHelpModalOpen}
         onClose={() => setIsHelpModalOpen(false)}
@@ -440,13 +246,11 @@ export default function V2TestPage(): React.ReactNode {
         </div>
       </Modal>
 
-      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
       />
 
-      {/* Delete Session Confirmation Modal */}
       <Modal
         isOpen={sessionPendingDelete !== null}
         onClose={() => setSessionPendingDelete(null)}
@@ -460,7 +264,7 @@ export default function V2TestPage(): React.ReactNode {
               Cancel
             </button>
             <button
-              onClick={handleDeleteSession}
+              onClick={handleConfirmDeleteSession}
               className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-sm font-bold rounded-lg transition-colors shadow-lg shadow-rose-900/20"
             >
               Delete
@@ -477,15 +281,16 @@ export default function V2TestPage(): React.ReactNode {
           ?
         </p>
         <p className="text-slate-400 text-sm mt-2">
-          This will permanently remove {sessionPendingDelete?.eventCount || 0}{" "}
+          This will permanently remove {sessionPendingDelete?.eventCount ?? 0}{" "}
           events. This action cannot be undone.
         </p>
       </Modal>
 
-      {/* Header */}
+      {/* ----------------------------------------------------------------
+          Header
+      ---------------------------------------------------------------- */}
       <header className="flex justify-between items-center mb-2 px-1 relative h-12">
         <div className="flex items-center gap-3">
-          {/* Hamburger menu button - mobile only */}
           {isMobile && (
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -494,128 +299,40 @@ export default function V2TestPage(): React.ReactNode {
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           )}
-          <div className="flex flex-col">
-            <h1
-              className={`font-bold text-white tracking-tight flex items-center gap-2 ${isMobile ? "text-lg" : "text-2xl"}`}
-            >
-              <span className="text-orange-500">Claude</span>{" "}
-              {!isMobile && "Office Visualizer"}
-              {!isMobile && (
-                <span className="text-xs font-mono font-normal px-2 py-0.5 bg-slate-800 rounded text-slate-400 border border-slate-700">
-                  v0.8.0
-                </span>
-              )}
-            </h1>
-          </div>
-        </div>
-
-        {/* Status Toast */}
-        <div className="absolute left-1/3 -translate-x-1/2 flex items-center pointer-events-none">
-          {statusMessage && (
-            <div
-              className={`px-4 py-1.5 rounded-full border shadow-lg flex items-center gap-3 text-[11px] font-bold tracking-wide uppercase whitespace-nowrap animate-in slide-in-from-top-2 duration-300
-                ${
-                  statusMessage.type === "success"
-                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                    : statusMessage.type === "error"
-                      ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
-                      : "bg-blue-500/10 border-blue-500/20 text-blue-400"
-                }`}
-            >
-              <Activity
-                size={12}
-                className={statusMessage.type === "info" ? "animate-pulse" : ""}
-              />
-              {statusMessage.text}
-            </div>
-          )}
-        </div>
-
-        {/* Controls - Desktop only */}
-        {!isMobile && (
-          <div className="flex gap-4 items-center">
-            <button
-              onClick={handleSimulate}
-              className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 rounded text-xs font-bold transition-colors"
-            >
-              <Play size={14} fill="currentColor" />
-              SIMULATE
-            </button>
-
-            <button
-              onClick={handleReset}
-              className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded text-xs font-bold transition-colors"
-            >
-              <RefreshCw size={14} />
-              RESET
-            </button>
-
-            <button
-              onClick={() => setIsClearModalOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 rounded text-xs font-bold transition-colors"
-            >
-              <Trash2 size={14} />
-              CLEAR DB
-            </button>
-
-            <button
-              onClick={handleToggleDebug}
-              className={`flex items-center gap-2 px-3 py-1.5 border rounded text-xs font-bold transition-colors ${
-                debugMode
-                  ? "bg-green-500/20 text-green-400 border-green-500/30"
-                  : "bg-slate-500/10 text-slate-400 border-slate-500/30 hover:bg-slate-500/20"
-              }`}
-            >
-              <Bug size={14} />
-              DEBUG {debugMode ? "ON" : "OFF"}
-            </button>
-
-            <button
-              onClick={() => setIsSettingsModalOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 border border-slate-500/30 rounded text-xs font-bold transition-colors"
-            >
-              <Settings size={14} />
-              SETTINGS
-            </button>
-
-            <button
-              onClick={() => setIsHelpModalOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 border border-slate-500/30 rounded text-xs font-bold transition-colors"
-            >
-              <HelpCircle size={14} />
-              HELP
-            </button>
-
-            <div className="flex flex-col items-end border-l border-slate-800 pl-4">
-              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest leading-none mb-1">
-                Status
+          <h1
+            className={`font-bold text-white tracking-tight flex items-center gap-2 ${
+              isMobile ? "text-lg" : "text-2xl"
+            }`}
+          >
+            <span className="text-orange-500">Claude</span>{" "}
+            {!isMobile && "Office Visualizer"}
+            {!isMobile && (
+              <span className="text-xs font-mono font-normal px-2 py-0.5 bg-slate-800 rounded text-slate-400 border border-slate-700">
+                v0.8.0
               </span>
-              <div className="flex items-center gap-3">
-                <div
-                  className={`flex items-center gap-1.5 font-mono text-xs ${
-                    isConnected ? "text-emerald-400" : "text-rose-500"
-                  }`}
-                >
-                  <Activity
-                    size={12}
-                    className={isConnected ? "animate-pulse" : ""}
-                  />
-                  {isConnected ? "CONNECTED" : "DISCONNECTED"}
-                </div>
-                <div
-                  className={`flex items-center gap-1.5 font-mono text-xs ${
-                    aiSummaryEnabled ? "text-violet-400" : "text-slate-500"
-                  }`}
-                >
-                  <span className="text-[10px]">AI</span>
-                  {aiSummaryEnabled ? "ON" : "OFF"}
-                </div>
-              </div>
-            </div>
-          </div>
+            )}
+          </h1>
+        </div>
+
+        {/* Centered status toast */}
+        <div className="absolute left-1/3 -translate-x-1/2 flex items-center pointer-events-none">
+          <StatusToast message={statusMessage} />
+        </div>
+
+        {!isMobile && (
+          <HeaderControls
+            isConnected={isConnected}
+            debugMode={debugMode}
+            aiSummaryEnabled={aiSummaryEnabled}
+            onSimulate={handleSimulate}
+            onReset={handleReset}
+            onClearDB={() => setIsClearModalOpen(true)}
+            onToggleDebug={handleToggleDebug}
+            onOpenSettings={() => setIsSettingsModalOpen(true)}
+            onOpenHelp={() => setIsHelpModalOpen(true)}
+          />
         )}
 
-        {/* Mobile status indicator */}
         {isMobile && (
           <div className="flex items-center gap-2">
             <div
@@ -630,414 +347,53 @@ export default function V2TestPage(): React.ReactNode {
         )}
       </header>
 
-      {/* Mobile Slide-out Menu */}
-      {isMobile && mobileMenuOpen && (
-        <div className="fixed inset-0 z-50">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-          {/* Drawer */}
-          <div className="absolute left-0 top-0 bottom-0 w-80 bg-slate-900 border-r border-slate-800 overflow-y-auto animate-in slide-in-from-left duration-300">
-            <div className="p-4">
-              {/* Drawer Header */}
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-white">Menu</h2>
-                <button
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="p-2 hover:bg-slate-800 rounded-lg text-slate-400"
-                >
-                  <X size={20} />
-                </button>
-              </div>
+      {/* ----------------------------------------------------------------
+          Mobile Drawer
+      ---------------------------------------------------------------- */}
+      <MobileDrawer
+        isOpen={isMobile && mobileMenuOpen}
+        sessions={sessions}
+        sessionsLoading={sessionsLoading}
+        sessionId={sessionId}
+        onClose={() => setMobileMenuOpen(false)}
+        onSessionSelect={handleSessionSelect}
+        onSimulate={handleSimulate}
+        onReset={handleReset}
+        onClearDB={() => {
+          setIsClearModalOpen(true);
+          setMobileMenuOpen(false);
+        }}
+      />
 
-              {/* Mobile Controls */}
-              <div className="flex flex-col gap-2 mb-6">
-                <button
-                  onClick={() => {
-                    handleSimulate();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 rounded text-sm font-bold transition-colors"
-                >
-                  <Play size={16} fill="currentColor" />
-                  SIMULATE
-                </button>
-                <button
-                  onClick={() => {
-                    handleReset();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded text-sm font-bold transition-colors"
-                >
-                  <RefreshCw size={16} />
-                  RESET
-                </button>
-                <button
-                  onClick={() => {
-                    setIsClearModalOpen(true);
-                    setMobileMenuOpen(false);
-                  }}
-                  className="flex items-center gap-2 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 rounded text-sm font-bold transition-colors"
-                >
-                  <Trash2 size={16} />
-                  CLEAR DB
-                </button>
-              </div>
-
-              {/* Sessions Panel */}
-              <div className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <History size={14} className="text-purple-500" />
-                  <span className="text-slate-300 font-bold uppercase tracking-wider text-xs">
-                    Sessions
-                  </span>
-                  <span className="text-slate-600 text-xs">
-                    ({sessions.length})
-                  </span>
-                </div>
-                <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
-                  {sessionsLoading && sessions.length === 0 ? (
-                    <div className="p-4 text-center text-slate-600 text-xs italic">
-                      Loading sessions...
-                    </div>
-                  ) : sessions.length === 0 ? (
-                    <div className="p-4 text-center text-slate-600 text-xs italic">
-                      No sessions found
-                    </div>
-                  ) : (
-                    sessions.map((session) => {
-                      const isActive = session.id === sessionId;
-                      const isLive = session.status === "active";
-                      return (
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          key={session.id}
-                          className={`px-3 py-2.5 rounded-md cursor-pointer transition-colors ${
-                            isActive
-                              ? "bg-purple-500/20 border-l-2 border-purple-500"
-                              : "hover:bg-slate-800/50"
-                          }`}
-                          onClick={() => {
-                            handleSessionSelect(session.id);
-                            setMobileMenuOpen(false);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              handleSessionSelect(session.id);
-                              setMobileMenuOpen(false);
-                            }
-                          }}
-                        >
-                          <div className="flex items-center gap-2 mb-1">
-                            {isLive ? (
-                              <Radio
-                                size={10}
-                                className="text-emerald-400 animate-pulse"
-                              />
-                            ) : (
-                              <PlayCircle
-                                size={10}
-                                className="text-slate-500"
-                              />
-                            )}
-                            <span
-                              className={`text-xs font-bold truncate ${isActive ? "text-purple-300" : "text-slate-300"}`}
-                            >
-                              {session.projectName || "Unknown Project"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-[10px] text-slate-500">
-                            <span>{session.eventCount} events</span>
-                            <span>
-                              {formatDistanceToNow(
-                                new Date(session.updatedAt),
-                                { addSuffix: true },
-                              )}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* Git Status Panel */}
-              <div className="mb-6">
-                <GitStatusPanel />
-              </div>
-
-              {/* Event Log */}
-              <div>
-                <EventLog />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Main Content */}
+      {/* ----------------------------------------------------------------
+          Main Content
+      ---------------------------------------------------------------- */}
       {isMobile ? (
-        /* Mobile Layout - Stacked */
         <div className="flex-grow flex flex-col gap-1.5 overflow-hidden min-h-0">
-          {/* Office Canvas - ~60% height */}
           <div className="flex-[3] border border-slate-800 rounded-lg shadow-2xl bg-slate-900 overflow-hidden relative min-h-0">
             <OfficeGame />
           </div>
-
-          {/* Agent Activity Panel - ~40% height */}
-          <div className="flex-[2] bg-slate-950 border border-slate-800 rounded-lg overflow-hidden min-h-0">
-            <div className="bg-slate-900 px-3 py-2 border-b border-slate-800 flex items-center gap-2">
-              <Users size={14} className="text-blue-500" />
-              <span className="text-slate-300 font-bold uppercase tracking-wider text-xs">
-                Agent Activity
-              </span>
-              <span className="text-slate-600 text-xs">({agents.size})</span>
-            </div>
-            <div className="overflow-y-auto h-[calc(100%-36px)] p-2">
-              {/* Boss Status */}
-              <div className="mb-3 p-2 bg-slate-900/50 rounded-lg border border-amber-500/30">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span className="text-amber-400 font-bold text-xs">BOSS</span>
-                  <span className="text-slate-500 text-[10px] font-mono ml-auto">
-                    {boss.backendState}
-                  </span>
-                </div>
-                {boss.currentTask && (
-                  <p className="text-slate-400 text-[11px] truncate">
-                    {boss.currentTask}
-                  </p>
-                )}
-                {boss.bubble.content && (
-                  <p className="text-blue-400 text-[11px] mt-1 truncate italic">
-                    &quot;{boss.bubble.content.text}&quot;
-                  </p>
-                )}
-              </div>
-
-              {/* Agent List */}
-              {agents.size === 0 ? (
-                <div className="text-center text-slate-600 text-xs italic py-4">
-                  No active agents
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {Array.from(agents.values()).map((agent) => (
-                    <div
-                      key={agent.id}
-                      className="p-2 bg-slate-900/50 rounded-lg border border-slate-800"
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <div
-                          className="w-2 h-2 rounded-full"
-                          style={{
-                            backgroundColor: agent.color,
-                          }}
-                        />
-                        <span className="text-slate-300 font-bold text-xs">
-                          {agent.name}
-                        </span>
-                        <span className="text-slate-600 text-[10px] font-mono ml-auto">
-                          {agent.phase}
-                        </span>
-                      </div>
-                      {agent.currentTask && (
-                        <p className="text-slate-400 text-[11px] truncate">
-                          {agent.currentTask}
-                        </p>
-                      )}
-                      {agent.bubble.content && (
-                        <p className="text-emerald-400 text-[11px] mt-1 truncate italic">
-                          &quot;{agent.bubble.content.text}&quot;
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <MobileAgentActivity agents={agents} boss={boss} />
         </div>
       ) : (
-        /* Desktop Layout - 3 Panel */
         <div className="flex-grow flex gap-2 overflow-hidden min-h-0">
-          {/* Left Sidebar - Sessions & Git Status */}
-          <aside
-            className={`flex flex-col gap-1.5 flex-shrink-0 overflow-hidden transition-all duration-300 ${
-              leftSidebarCollapsed ? "w-10" : "w-72"
-            }`}
-          >
-            {/* Collapse Toggle */}
-            <button
-              onClick={() => setLeftSidebarCollapsed(!leftSidebarCollapsed)}
-              className="flex items-center justify-center p-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
-              title={
-                leftSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
-              }
-            >
-              {leftSidebarCollapsed ? (
-                <PanelLeftOpen size={16} />
-              ) : (
-                <PanelLeftClose size={16} />
-              )}
-            </button>
+          <SessionSidebar
+            sessions={sessions}
+            sessionsLoading={sessionsLoading}
+            sessionId={sessionId}
+            isCollapsed={leftSidebarCollapsed}
+            onToggleCollapsed={() =>
+              setLeftSidebarCollapsed(!leftSidebarCollapsed)
+            }
+            onSessionSelect={handleSessionSelect}
+            onDeleteSession={setSessionPendingDelete}
+          />
 
-            {!leftSidebarCollapsed && (
-              <>
-                {/* Session Browser */}
-                <div className="bg-slate-950 border border-slate-800 rounded-lg overflow-hidden flex-shrink-0 max-h-[40%]">
-                  <div className="bg-slate-900 px-3 py-2 border-b border-slate-800 flex items-center gap-2">
-                    <History size={14} className="text-purple-500" />
-                    <span className="text-slate-300 font-bold uppercase tracking-wider text-xs">
-                      Sessions
-                    </span>
-                    <span className="text-slate-600 text-xs">
-                      ({sessions.length})
-                    </span>
-                  </div>
-                  <div className="overflow-y-auto max-h-72 p-2">
-                    {sessionsLoading && sessions.length === 0 ? (
-                      <div className="p-4 text-center text-slate-600 text-xs italic">
-                        Loading sessions...
-                      </div>
-                    ) : sessions.length === 0 ? (
-                      <div className="p-4 text-center text-slate-600 text-xs italic">
-                        No sessions found
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-2">
-                        {sessions.map((session) => {
-                          const isActive = session.id === sessionId;
-                          const isLive = session.status === "active";
-                          return (
-                            <div
-                              role="button"
-                              tabIndex={0}
-                              key={session.id}
-                              className={`group relative w-full px-3 py-2.5 text-left transition-colors cursor-pointer rounded-md ${
-                                isActive
-                                  ? "bg-purple-500/20 border-l-2 border-purple-500"
-                                  : "hover:bg-slate-800/50"
-                              }`}
-                              onClick={() => handleSessionSelect(session.id)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.preventDefault();
-                                  handleSessionSelect(session.id);
-                                }
-                              }}
-                            >
-                              <div className="flex items-center gap-2 mb-1">
-                                {isLive ? (
-                                  <Radio
-                                    size={10}
-                                    className="text-emerald-400 animate-pulse flex-shrink-0"
-                                  />
-                                ) : (
-                                  <PlayCircle
-                                    size={10}
-                                    className="text-slate-500 flex-shrink-0"
-                                  />
-                                )}
-                                <span
-                                  className={`text-xs font-bold truncate flex-1 ${isActive ? "text-purple-300" : "text-slate-300"}`}
-                                >
-                                  {session.projectName || "Unknown Project"}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSessionPendingDelete(session);
-                                  }}
-                                  className="p-1 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                  aria-label={`Delete session ${session.id}`}
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              </div>
-                              <div className="text-[10px] text-slate-500 font-mono truncate mb-1">
-                                {session.id}
-                              </div>
-                              <div className="flex justify-between text-[10px] text-slate-500">
-                                <span>{session.eventCount} events</span>
-                                <span>
-                                  {formatDistanceToNow(
-                                    new Date(session.updatedAt),
-                                    {
-                                      addSuffix: true,
-                                    },
-                                  )}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Git Status Panel */}
-                <div className="flex-grow min-h-0">
-                  <GitStatusPanel />
-                </div>
-              </>
-            )}
-          </aside>
-
-          {/* Game Canvas */}
           <div className="flex-grow border border-slate-800 rounded-lg shadow-2xl bg-slate-900 overflow-hidden relative">
             <OfficeGame />
           </div>
 
-          {/* Right Sidebar - Debug Panel */}
-          <aside className="w-80 flex flex-col gap-2 flex-shrink-0 overflow-hidden">
-            {/* Agent Status - 40% of available height */}
-            <div className="min-h-0" style={{ flex: "2 1 0" }}>
-              <AgentStatus />
-            </div>
-
-            {/* Events/Conversation tab panel - 60% of available height */}
-            <div className="min-h-0 flex flex-col" style={{ flex: "3 1 0" }}>
-              {/* Tab header */}
-              <div className="flex border-b border-slate-700 bg-slate-900 rounded-t-lg flex-shrink-0">
-                <button
-                  onClick={() => setActiveTab("events")}
-                  className={`flex-1 px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors rounded-tl-lg ${
-                    activeTab === "events"
-                      ? "text-orange-400 border-b-2 border-orange-500 bg-slate-950/50"
-                      : "text-slate-500 hover:text-slate-300"
-                  }`}
-                >
-                  Events
-                </button>
-                <button
-                  onClick={() => setActiveTab("conversation")}
-                  className={`flex-1 px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors rounded-tr-lg ${
-                    activeTab === "conversation"
-                      ? "text-cyan-400 border-b-2 border-cyan-500 bg-slate-950/50"
-                      : "text-slate-500 hover:text-slate-300"
-                  }`}
-                >
-                  Conversation
-                </button>
-              </div>
-              {/* Tab content */}
-              <div className="flex-grow min-h-0">
-                {activeTab === "events" ? (
-                  <EventLog />
-                ) : (
-                  <ConversationHistory />
-                )}
-              </div>
-            </div>
-          </aside>
+          <RightSidebar />
         </div>
       )}
     </main>
