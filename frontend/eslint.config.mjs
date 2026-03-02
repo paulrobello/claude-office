@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Auto-generated files — do not lint
+    "src/types/generated.ts",
   ]),
   // Allow underscore-prefixed unused variables (common pattern for ignored parameters)
   {

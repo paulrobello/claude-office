@@ -21,24 +21,29 @@ interface WeatherCondition {
 }
 
 function getWeatherCondition(data: WhiteboardData): WeatherCondition {
-  const totalOps = data.recentSuccessCount + data.recentErrorCount;
-  const successRate = totalOps > 0 ? data.recentSuccessCount / totalOps : 1;
+  const recentSuccessCount = data.recentSuccessCount ?? 0;
+  const recentErrorCount = data.recentErrorCount ?? 0;
+  const activityLevel = data.activityLevel ?? 0;
+  const totalOps = recentSuccessCount + recentErrorCount;
+  const successRate = totalOps > 0 ? recentSuccessCount / totalOps : 1;
 
-  if (data.recentErrorCount > 5) {
+  if (recentErrorCount > 5) {
     return { icon: "⛈️", label: "STORMY", color: "#7c3aed" };
   }
   if (successRate < 0.7) {
     return { icon: "🌧️", label: "RAINY", color: "#3b82f6" };
   }
-  if (data.activityLevel < 0.3) {
+  if (activityLevel < 0.3) {
     return { icon: "⛅", label: "CLOUDY", color: "#6b7280" };
   }
   return { icon: "☀️", label: "SUNNY", color: "#f59e0b" };
 }
 
 export function WeatherMode({ data }: WeatherModeProps): ReactNode {
-  const totalOps = data.recentSuccessCount + data.recentErrorCount;
-  const successRate = totalOps > 0 ? data.recentSuccessCount / totalOps : 1;
+  const recentSuccessCount = data.recentSuccessCount ?? 0;
+  const recentErrorCount = data.recentErrorCount ?? 0;
+  const totalOps = recentSuccessCount + recentErrorCount;
+  const successRate = totalOps > 0 ? recentSuccessCount / totalOps : 1;
   const weather = getWeatherCondition(data);
 
   return (
@@ -80,7 +85,7 @@ export function WeatherMode({ data }: WeatherModeProps): ReactNode {
           resolution={2}
         />
         <pixiText
-          text={`Errors: ${data.recentErrorCount}`}
+          text={`Errors: ${recentErrorCount}`}
           y={16}
           style={{
             fontFamily: '"Courier New", monospace',
@@ -90,7 +95,7 @@ export function WeatherMode({ data }: WeatherModeProps): ReactNode {
           resolution={2}
         />
         <pixiText
-          text={`Activity: ${(data.activityLevel * 100).toFixed(0)}%`}
+          text={`Activity: ${((data.activityLevel ?? 0) * 100).toFixed(0)}%`}
           y={32}
           style={{
             fontFamily: '"Courier New", monospace',

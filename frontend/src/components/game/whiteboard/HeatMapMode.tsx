@@ -25,7 +25,7 @@ function getHeatColor(count: number, maxEdits: number): number {
 }
 
 export function HeatMapMode({ data }: HeatMapModeProps): ReactNode {
-  const entries = Object.entries(data.fileEdits)
+  const entries = Object.entries(data.fileEdits ?? {})
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
 

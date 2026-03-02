@@ -1,0 +1,45 @@
+name: Type Drift Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/models/**'
+      - 'frontend/src/types/generated.ts'
+      - 'scripts/gen_types.py'
+  pull_request:
+    paths:
+      - 'backend/app/models/**'
+      - 'frontend/src/types/generated.ts'
+      - 'scripts/gen_types.py'
+
+jobs:
+  check-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.14"
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install backend deps
+        run: cd backend && uv sync
+
+      - name: Install frontend deps
+        run: cd frontend && bun install
+
+      - name: Regenerate types
+        run: make gen-types
+
+      - name: Check for drift
+        run: |
+          if ! git diff --exit-code frontend/src/types/generated.ts; then
+            echo "Type drift detected! Backend Pydantic models changed but generated.ts was not regenerated."
+            echo "Run 'make gen-types' locally and commit the updated generated.ts."
+            exit 1
+          fi
+          echo "No type drift detected."

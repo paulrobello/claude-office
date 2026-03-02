@@ -26,7 +26,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 export function NewsTickerMode({ data }: NewsTickerModeProps): ReactNode {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  const newsItems = data.newsItems.slice(0, 10);
+  const newsItems = (data.newsItems ?? []).slice(0, 10);
 
   // Cycle through news items
   useEffect(() => {

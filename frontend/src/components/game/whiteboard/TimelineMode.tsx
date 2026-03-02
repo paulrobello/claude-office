@@ -17,10 +17,10 @@ export interface TimelineModeProps {
 }
 
 export function TimelineMode({ data }: TimelineModeProps): ReactNode {
-  const lifespans = data.agentLifespans.slice(-5); // Show last 5
+  const lifespans = (data.agentLifespans ?? []).slice(-5); // Show last 5
 
   // Get coffee break timestamps from news items
-  const coffeeBreaks = data.newsItems
+  const coffeeBreaks = (data.newsItems ?? [])
     .filter((n) => n.category === "coffee")
     .map((n) => new Date(n.timestamp).getTime());
 

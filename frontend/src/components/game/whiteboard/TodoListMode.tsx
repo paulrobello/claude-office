@@ -111,8 +111,8 @@ export function TodoListMode({ todos }: TodoListModeProps): ReactNode {
           />
           <pixiText
             text={
-              todo.status === "in_progress" && todo.activeForm
-                ? todo.activeForm.slice(0, 42)
+              todo.status === "in_progress" && todo.active_form
+                ? todo.active_form.slice(0, 42)
                 : todo.content.slice(0, 42)
             }
             x={32}

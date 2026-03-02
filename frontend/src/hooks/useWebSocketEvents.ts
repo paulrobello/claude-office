@@ -236,10 +236,10 @@ export function useWebSocketEvents({
 
       // Update office state
       store.setSessionId(state.sessionId);
-      store.setDeskCount(state.office.deskCount);
+      store.setDeskCount(state.office.deskCount ?? 8);
       // NOTE: elevatorState is NOT synced from backend - it's controlled by
       // the frontend's agent state machine for smooth animations
-      store.setPhoneState(state.office.phoneState);
+      store.setPhoneState(state.office.phoneState ?? "idle");
 
       // Sync queue state from backend (only on initial connection for mid-session joins)
       // After initial sync, frontend manages queue state based on agent state machine events
@@ -265,7 +265,7 @@ export function useWebSocketEvents({
       ) {
         store.setToolUsesSinceCompaction(state.office.toolUsesSinceCompaction);
       }
-      store.setTodos(state.todos);
+      store.setTodos(state.todos ?? []);
       // Sync print report flag (triggers printer animation)
       store.setPrintReport(state.office.printReport ?? false);
       // Sync whiteboard data for multi-mode display

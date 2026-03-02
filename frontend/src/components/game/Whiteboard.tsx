@@ -206,7 +206,7 @@ export function Whiteboard({ todos }: WhiteboardProps): ReactNode {
       case 1:
         return <RemoteWorkersMode data={whiteboardData} />;
       case 2:
-        return <ToolPizzaMode toolUsage={whiteboardData.toolUsage} />;
+        return <ToolPizzaMode toolUsage={whiteboardData.toolUsage ?? {}} />;
       case 3:
         return <OrgChartMode agents={agentList} bossTask={bossTask} />;
       case 4:

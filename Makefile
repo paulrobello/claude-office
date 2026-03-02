@@ -1,4 +1,4 @@
-.PHONY: install install-all dev backend frontend simulate checkall lint fmt test typecheck \
+.PHONY: install install-all dev backend frontend simulate checkall lint fmt test typecheck gen-types \
 	hooks-install hooks-uninstall hooks-reinstall hooks-status hooks-logs hooks-logs-follow hooks-logs-clear \
 	hooks-debug-on hooks-debug-off clean clean-db clean-all \
 	dev-tmux dev-tmux-kill dev-tmux-backend dev-tmux-frontend \
@@ -58,6 +58,9 @@ typecheck:
 checkall:
 	make -C backend checkall
 	make -C frontend checkall
+
+gen-types:
+	cd backend && uv run python ../scripts/gen_types.py
 
 # Hook management targets
 hooks-install:

@@ -28,13 +28,15 @@ function formatTimeSinceIncident(lastIncidentTime: string | null): string {
 }
 
 export function SafetyBoardMode({ data }: SafetyBoardModeProps): ReactNode {
-  const daysSinceIncident = formatTimeSinceIncident(data.lastIncidentTime);
+  const daysSinceIncident = formatTimeSinceIncident(
+    data.lastIncidentTime ?? null,
+  );
 
   return (
     <pixiContainer>
       {/* Big number */}
       <pixiText
-        text={String(data.consecutiveSuccesses)}
+        text={String(data.consecutiveSuccesses ?? 0)}
         x={165}
         y={40}
         anchor={0.5}

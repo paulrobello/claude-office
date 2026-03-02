@@ -1,44 +1,120 @@
 /**
- * Types barrel — re-exports all domain type files for backward compatibility.
+ * Types barrel — re-exports backend-derived types from generated.ts and
+ * defines purely-frontend types inline.
  *
  * Consumers can continue to import from "@/types" without changes.
- * New code should prefer importing from the specific domain file:
- *   - "@/types/agents"    — Agent, Boss, BubbleContent, Position, GameState, ...
- *   - "@/types/events"    — EventType, WebSocketMessage, EventDetail
- *   - "@/types/office"    — OfficeState, ElevatorState, PhoneState, GitStatus, ...
- *   - "@/types/whiteboard" — WhiteboardData, AgentLifespan, NewsItem, ...
+ *
+ * DO NOT hand-edit types that originate from backend Pydantic models.
+ * Run `make gen-types` to regenerate generated.ts from the backend models.
  */
 
+// ============================================================================
+// GENERATED TYPES — re-exported from ./generated (do not edit)
+// ============================================================================
+
 export type {
-  BubbleType,
-  BubbleContent,
-  Position,
-  AgentState,
+  // Agents
   Agent,
-  BossState,
+  AgentState,
   Boss,
-  ConversationEntry,
+  BossState,
+  // Common
+  BubbleContent,
+  BubbleType,
+  SpeechContent,
   TodoStatus,
   TodoItem,
-  GameState,
-} from "./agents";
-
-export type { EventType, EventDetail, WebSocketMessage } from "./events";
-
-export type {
+  // Office state
+  OfficeState,
   ElevatorState,
   PhoneState,
-  OfficeState,
-  FileStatus,
-  ChangedFile,
-  GitCommit,
-  GitStatus,
-} from "./office";
-
-export type {
-  WhiteboardMode,
-  BackgroundTask,
+  // Sessions / whiteboard
   AgentLifespan,
+  BackgroundTask,
+  FileEdit,
   NewsItem,
   WhiteboardData,
-} from "./whiteboard";
+  GameState,
+  Session,
+  ConversationEntry,
+  HistoryEntry,
+  // Git
+  FileStatus,
+  ChangedFile,
+  GitStatus,
+  // Events (backend models)
+  EventType,
+  EventData,
+  Event,
+} from "./generated";
+
+// Re-export Commit with the legacy GitCommit alias for backward compatibility
+export type { Commit, Commit as GitCommit } from "./generated";
+
+// ============================================================================
+// FRONTEND-ONLY TYPES — not derived from backend models
+// ============================================================================
+
+/**
+ * 2D position with typed x/y coordinates.
+ * The backend uses dict[str, int] (no named model), so this stays frontend-only.
+ * The index signature makes this compatible with the generated Position type
+ * (which is { [k: string]: number } from dict[str, int]).
+ */
+export interface Position {
+  x: number;
+  y: number;
+  [k: string]: number;
+}
+
+/**
+ * Whiteboard display mode index (0–10).
+ * Pure frontend concept — the backend has no equivalent.
+ */
+export type WhiteboardMode =
+  | 0 // Todo List — hotkey T
+  | 1 // Remote Workers (background tasks) — hotkey B
+  | 2 // Tool Pizza
+  | 3 // Org Chart
+  | 4 // Stonks
+  | 5 // Weather
+  | 6 // Safety Board
+  | 7 // Timeline
+  | 8 // News Ticker
+  | 9 // Coffee
+  | 10; // Heat Map
+
+/**
+ * Shape of the optional event detail payload carried in WebSocket events.
+ * Derived from the frontend event-log rendering requirements.
+ */
+export interface EventDetail {
+  toolName?: string;
+  toolInput?: Record<string, unknown>;
+  resultSummary?: string;
+  message?: string;
+  thinking?: string;
+  errorType?: string;
+  taskDescription?: string;
+  agentName?: string;
+  prompt?: string;
+}
+
+/**
+ * WebSocket message types sent from the backend over the /ws endpoint.
+ */
+export interface WebSocketMessage {
+  type: "state_update" | "event" | "reload" | "git_status" | "session_deleted";
+  timestamp: string;
+  state?: import("./generated").GameState;
+  event?: {
+    id: string;
+    type: import("./generated").EventType;
+    agentId: string;
+    summary: string;
+    timestamp: string;
+    detail?: EventDetail;
+  };
+  gitStatus?: import("./generated").GitStatus;
+  session_id?: string;
+}

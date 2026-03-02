@@ -33,30 +33,35 @@ export function StonksMode({ data }: StonksModeProps): ReactNode {
     return Math.max(1, base * 10 + noise).toFixed(2);
   };
 
+  const taskCompletedCount = data.taskCompletedCount ?? 0;
+  const bugFixedCount = data.bugFixedCount ?? 0;
+  const coffeeBreakCount = data.coffeeBreakCount ?? 0;
+  const codeWrittenCount = data.codeWrittenCount ?? 0;
+
   const stocks = [
     {
       symbol: "$TASK",
-      value: data.taskCompletedCount,
-      price: fluctuate(data.taskCompletedCount || 1, 1),
-      up: data.taskCompletedCount > 0,
+      value: taskCompletedCount,
+      price: fluctuate(taskCompletedCount || 1, 1),
+      up: taskCompletedCount > 0,
     },
     {
       symbol: "$BUG",
-      value: data.bugFixedCount,
-      price: fluctuate(data.bugFixedCount || 1, 2),
-      up: data.bugFixedCount > 0,
+      value: bugFixedCount,
+      price: fluctuate(bugFixedCount || 1, 2),
+      up: bugFixedCount > 0,
     },
     {
       symbol: "$CAFE",
-      value: data.coffeeBreakCount,
-      price: fluctuate(data.coffeeBreakCount || 1, 3),
-      up: data.coffeeBreakCount > 0,
+      value: coffeeBreakCount,
+      price: fluctuate(coffeeBreakCount || 1, 3),
+      up: coffeeBreakCount > 0,
     },
     {
       symbol: "$CODE",
-      value: data.codeWrittenCount,
-      price: fluctuate(data.codeWrittenCount || 1, 4),
-      up: data.codeWrittenCount > 0,
+      value: codeWrittenCount,
+      price: fluctuate(codeWrittenCount || 1, 4),
+      up: codeWrittenCount > 0,
     },
   ];
 

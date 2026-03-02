@@ -81,7 +81,9 @@ export function GitStatusPanel() {
     );
   }
 
-  const stagedCount = gitStatus.changed_files.filter((f) => f.staged).length;
+  const changedFiles = gitStatus.changed_files ?? [];
+  const commits = gitStatus.commits ?? [];
+  const stagedCount = changedFiles.filter((f) => f.staged).length;
 
   return (
     <div className="flex flex-col h-full bg-slate-950 border border-slate-800 rounded-lg overflow-hidden font-mono text-xs">
@@ -92,13 +94,13 @@ export function GitStatusPanel() {
           Git Status
         </div>
         <div className="flex items-center gap-2 text-[10px]">
-          {gitStatus.ahead > 0 && (
+          {(gitStatus.ahead ?? 0) > 0 && (
             <span className="flex items-center gap-0.5 text-emerald-400">
               <ArrowUp size={10} />
               {gitStatus.ahead}
             </span>
           )}
-          {gitStatus.behind > 0 && (
+          {(gitStatus.behind ?? 0) > 0 && (
             <span className="flex items-center gap-0.5 text-amber-400">
               <ArrowDown size={10} />
               {gitStatus.behind}
@@ -113,7 +115,7 @@ export function GitStatusPanel() {
       </div>
 
       {/* Changed Files Section */}
-      {gitStatus.changed_files.length > 0 && (
+      {changedFiles.length > 0 && (
         <div className="flex-shrink-0 max-h-32 flex flex-col border-b border-slate-800">
           <div className="px-3 py-1.5 bg-slate-900/50 flex items-center gap-2 text-slate-400 flex-shrink-0">
             <FileEdit size={12} />
@@ -121,7 +123,7 @@ export function GitStatusPanel() {
               Changed Files
             </span>
             <span className="text-slate-600 text-[10px]">
-              ({gitStatus.changed_files.length})
+              ({changedFiles.length})
             </span>
             {stagedCount > 0 && (
               <span className="text-emerald-400 text-[10px]">
@@ -131,7 +133,7 @@ export function GitStatusPanel() {
           </div>
           <div className="flex-grow overflow-y-auto px-3 py-2">
             <div className="flex flex-wrap gap-1">
-              {gitStatus.changed_files.map((file) => {
+              {changedFiles.map((file) => {
                 const normalizedPath = file.path.replace(/[\\/]+$/, "");
                 const parts = normalizedPath.split(/[\\/]/);
                 const filename = parts.pop() || normalizedPath || file.path;
@@ -161,20 +163,18 @@ export function GitStatusPanel() {
         <span className="font-bold uppercase tracking-wider text-[10px]">
           Recent Commits
         </span>
-        <span className="text-slate-600 text-[10px]">
-          ({gitStatus.commits.length})
-        </span>
+        <span className="text-slate-600 text-[10px]">({commits.length})</span>
       </div>
 
       {/* Commits List (Scrollable) */}
       <div className="flex-grow overflow-y-auto">
-        {gitStatus.commits.length === 0 ? (
+        {commits.length === 0 ? (
           <div className="text-slate-600 italic p-4 text-center">
             No commits found
           </div>
         ) : (
           <div className="divide-y divide-slate-800/50">
-            {gitStatus.commits.map((commit) => (
+            {commits.map((commit) => (
               <div
                 key={commit.hash}
                 className="px-3 py-2 hover:bg-slate-900/50 transition-colors group"

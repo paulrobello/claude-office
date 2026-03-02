@@ -22,6 +22,16 @@ repos:
 
 - repo: local
   hooks:
+    - id: gen-types
+      name: Regenerate TypeScript types from Pydantic models
+      entry: make
+      language: system
+      pass_filenames: false
+      args: [gen-types]
+      files: 'backend/app/models/.*\.py$'
+
+- repo: local
+  hooks:
     - id: pyright
       name: pyright
       entry: make

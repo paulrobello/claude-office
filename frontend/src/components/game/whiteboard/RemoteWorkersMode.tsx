@@ -29,7 +29,8 @@ function getStatusColor(status: string): number {
 }
 
 export function RemoteWorkersMode({ data }: RemoteWorkersModeProps): ReactNode {
-  const tasks = data.backgroundTasks.slice(0, 6);
+  const backgroundTasks = data.backgroundTasks ?? [];
+  const tasks = backgroundTasks.slice(0, 6);
 
   const drawVideoGrid = useCallback((g: Graphics) => {
     g.clear();
@@ -152,9 +153,9 @@ export function RemoteWorkersMode({ data }: RemoteWorkersModeProps): ReactNode {
       })}
 
       {/* Overflow indicator */}
-      {data.backgroundTasks.length > 6 && (
+      {backgroundTasks.length > 6 && (
         <pixiText
-          text={`+${data.backgroundTasks.length - 6} more`}
+          text={`+${backgroundTasks.length - 6} more`}
           x={165}
           y={115}
           anchor={0.5}

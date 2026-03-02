@@ -1,4 +1,4 @@
-.PHONY: dev build build-static start lint typecheck test format checkall
+.PHONY: dev build build-static start lint typecheck test format checkall gen-types
 
 BACKEND_STATIC_DIR := ../backend/static
 
@@ -36,3 +36,6 @@ fmt:
 checkall: fmt lint typecheck build
 	# Run tests after linting and formatting to ensure coverage
 	$(PKG_MGR) run test
+
+gen-types:
+	cd .. && make gen-types

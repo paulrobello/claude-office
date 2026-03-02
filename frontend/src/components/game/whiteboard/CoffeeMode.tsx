@@ -17,7 +17,7 @@ export interface CoffeeModeProps {
 const MAX_DISPLAY = 15;
 
 export function CoffeeMode({ data }: CoffeeModeProps): ReactNode {
-  const cups = data.coffeeCups;
+  const cups = data.coffeeCups ?? 0;
   const displayCups = Math.min(cups, MAX_DISPLAY);
 
   return (
