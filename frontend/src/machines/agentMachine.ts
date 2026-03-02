@@ -1,5 +1,5 @@
 /**
- * Agent State Machine
+ * Agent State Machine — Composition Root
  *
  * Defines the lifecycle of an agent from spawn to removal.
  * Uses XState v5 for explicit state management.
@@ -12,105 +12,30 @@
  *   idle → departing → in_departure_queue → walking_to_ready → conversing
  *        → walking_to_boss → at_boss → walking_to_elevator → in_elevator
  *        → waiting_for_door_close → elevator_closing → removed
+ *
+ * Implementation is split across:
+ *   - agentMachineCommon.ts  — shared types, actions, guards, delays
+ *   - agentArrivalMachine.ts — arrival sub-machine states
+ *   - agentDepartureMachine.ts — departure sub-machine states
  */
 
 import { setup, assign, type ActorRefFrom } from "xstate";
-import type { Position } from "@/types";
 import {
-  getRandomWorkAcceptanceQuote,
-  getRandomWorkCompletionQuote,
-} from "@/constants/quotes";
+  buildSharedActions,
+  sharedGuards,
+  sharedDelays,
+  defaultAgentContext,
+  type AgentMachineActions,
+  type AgentMachineContext,
+  type AgentMachineEvent,
+} from "./agentMachineCommon";
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
-export interface AgentMachineContext {
-  agentId: string;
-  agentName: string | null;
-  desk: number | null;
-  queueType: "arrival" | "departure" | null;
-  queueIndex: number;
-  currentPosition: Position;
-  targetPosition: Position;
-  conversationStep: number;
-}
-
-export type AgentMachineEvent =
-  | {
-      type: "SPAWN";
-      agentId: string;
-      name: string | null;
-      desk: number | null;
-      position: Position;
-    }
-  | {
-      type: "SPAWN_AT_DESK";
-      agentId: string;
-      name: string | null;
-      desk: number | null;
-      position: Position;
-    }
-  | {
-      type: "SPAWN_IN_ARRIVAL_QUEUE";
-      agentId: string;
-      name: string | null;
-      desk: number | null;
-      position: Position;
-      queueIndex: number;
-    }
-  | {
-      type: "SPAWN_IN_DEPARTURE_QUEUE";
-      agentId: string;
-      name: string | null;
-      desk: number | null;
-      position: Position;
-      queueIndex: number;
-    }
-  | { type: "REMOVE" }
-  | { type: "ARRIVED_AT_QUEUE" }
-  | { type: "QUEUE_POSITION_CHANGED"; newIndex: number }
-  | { type: "BOSS_AVAILABLE" }
-  | { type: "ARRIVED_AT_READY" }
-  | { type: "BUBBLE_DISPLAYED" }
-  | { type: "CONVERSATION_COMPLETE" }
-  | { type: "ARRIVED_AT_BOSS" }
-  | { type: "BOSS_TIMEOUT" }
-  | { type: "ARRIVED_AT_DESK" }
-  | { type: "ARRIVED_AT_ELEVATOR" }
-  | { type: "ELEVATOR_TIMEOUT" }
-  | { type: "ELEVATOR_DOOR_CLOSING" };
-
-// ============================================================================
-// ACTIONS (externalized for testability)
-// ============================================================================
-
-/**
- * External action handlers that the machine will call.
- * These are injected when spawning the machine.
- */
-export interface AgentMachineActions {
-  onStartWalking: (
-    agentId: string,
-    target: Position,
-    movementType: string,
-  ) => void;
-  onQueueJoined: (
-    agentId: string,
-    queueType: "arrival" | "departure",
-    index: number,
-  ) => void;
-  onQueueLeft: (agentId: string) => void;
-  onPhaseChanged: (agentId: string, phase: string) => void;
-  onShowBossBubble: (text: string, icon?: string) => void;
-  onShowAgentBubble: (agentId: string, text: string, icon?: string) => void;
-  onClearBossBubble: () => void;
-  onClearAgentBubble: (agentId: string) => void;
-  onSetBossInUse: (by: "arrival" | "departure" | null) => void;
-  onOpenElevator: () => void;
-  onCloseElevator: () => void;
-  onAgentRemoved: (agentId: string) => void;
-}
+// Re-export all public types so existing consumers keep working without changes.
+export type {
+  AgentMachineContext,
+  AgentMachineEvent,
+  AgentMachineActions,
+} from "./agentMachineCommon";
 
 // ============================================================================
 // MACHINE DEFINITION
@@ -123,235 +48,9 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
       events: {} as AgentMachineEvent,
     },
     actions: {
-      // Phase notifications
-      notifyPhaseChange: ({ context }, params: { phase: string }) => {
-        actions.onPhaseChanged(context.agentId, params.phase);
-      },
-
-      // Walking actions
-      startWalkingToQueue: ({ context }) => {
-        const queueType = context.queueType ?? "arrival";
-        actions.onStartWalking(
-          context.agentId,
-          context.targetPosition,
-          `to_${queueType}_queue`,
-        );
-      },
-      startWalkingToReady: ({ context }) => {
-        actions.onStartWalking(
-          context.agentId,
-          context.targetPosition,
-          "to_ready",
-        );
-      },
-      startWalkingToBoss: ({ context }) => {
-        actions.onStartWalking(
-          context.agentId,
-          context.targetPosition,
-          "to_boss",
-        );
-      },
-      startWalkingToDesk: ({ context }) => {
-        actions.onStartWalking(
-          context.agentId,
-          context.targetPosition,
-          "to_desk",
-        );
-      },
-      startWalkingToElevator: ({ context }) => {
-        actions.onStartWalking(
-          context.agentId,
-          context.targetPosition,
-          "to_elevator",
-        );
-      },
-
-      // Queue actions
-      joinQueue: ({ context }) => {
-        if (context.queueType) {
-          actions.onQueueJoined(
-            context.agentId,
-            context.queueType,
-            context.queueIndex,
-          );
-        }
-      },
-      leaveQueue: ({ context }) => {
-        actions.onQueueLeft(context.agentId);
-      },
-
-      // Conversation actions
-      showArrivalBossBubble: ({ context }) => {
-        const name = context.agentName ?? "Agent";
-        actions.onShowBossBubble(`Here's your task, ${name}!`, "clipboard");
-      },
-      showArrivalAgentBubble: ({ context }) => {
-        actions.onShowAgentBubble(
-          context.agentId,
-          getRandomWorkAcceptanceQuote(),
-          "thumbs-up",
-        );
-      },
-      showDepartureBossBubble: ({ context }) => {
-        const name = context.agentName ?? "Agent";
-        actions.onShowBossBubble(
-          `Good work, ${name}. I'll take that.`,
-          "check",
-        );
-      },
-      showDepartureAgentBubble: ({ context }) => {
-        actions.onShowAgentBubble(
-          context.agentId,
-          getRandomWorkCompletionQuote(),
-          "file-text",
-        );
-      },
-      clearBossBubble: () => {
-        actions.onClearBossBubble();
-      },
-      clearAgentBubble: ({ context }) => {
-        actions.onClearAgentBubble(context.agentId);
-      },
-      showFarewellBubble: ({ context }) => {
-        // Fun farewell messages when agent leaves (100 phrases)
-        const farewells = [
-          // Classic goodbyes
-          "Peace out! ✌️",
-          "Later gators! 🐊",
-          "Off to lunch! 🍕",
-          "Task complete!",
-          "Bye bye! 👋",
-          "See ya! 😎",
-          "Mission done!",
-          "Adios! 🎉",
-          "Catch ya later!",
-          "Gotta bounce! 🏀",
-          // Work done vibes
-          "Nailed it! 💅",
-          "Done and dusted!",
-          "That's a wrap! 🎬",
-          "Job well done!",
-          "Crushed it! 💪",
-          "Another one down!",
-          "Check that off!",
-          "Work's done here!",
-          "Mission complete!",
-          "All finished up!",
-          // Casual exits
-          "I'm outta here!",
-          "Time to jet! ✈️",
-          "Heading out!",
-          "Off I go!",
-          "Gotta run!",
-          "Time to split!",
-          "Making my exit!",
-          "Dipping out!",
-          "Bouncing now!",
-          "Rolling out! 🛞",
-          // Fun phrases
-          "To infinity! 🚀",
-          "Smell ya later!",
-          "Toodaloo! 👋",
-          "Ciao for now!",
-          "Hasta la vista!",
-          "Au revoir! 🇫🇷",
-          "Sayonara! 🇯🇵",
-          "Arrivederci! 🇮🇹",
-          "Cheerio! 🇬🇧",
-          "Ta-ta for now!",
-          // Food-related
-          "Snack time! 🍿",
-          "Coffee break! ☕",
-          "Lunch awaits! 🥪",
-          "Pizza calling! 🍕",
-          "Taco Tuesday? 🌮",
-          "Need caffeine! ☕",
-          "Donut run! 🍩",
-          "Sushi time! 🍣",
-          "Hungry now!",
-          "Brunch o'clock!",
-          // Relaxation
-          "Nap time! 😴",
-          "Beach bound! 🏖️",
-          "Netflix time! 📺",
-          "Couch calling!",
-          "Hammock mode! 🏝️",
-          "R&R time!",
-          "Vacation mode!",
-          "Chill time! 🧊",
-          "Spa day! 💆",
-          "Me time!",
-          // Energetic
-          "Boom! Done! 💥",
-          "Drop the mic! 🎤",
-          "And scene! 🎭",
-          "Exit stage left!",
-          "Finito!",
-          "That's all folks!",
-          "The end! 🔚",
-          "Curtain call! 🎪",
-          "Bam! Complete!",
-          "Kapow! Done! 💫",
-          // Emoji-heavy
-          "Later! 🙌",
-          "Byeee! 💨",
-          "Gone! 💨",
-          "Zoom zoom! 🏎️",
-          "Whoosh! 💨",
-          "Poof! ✨",
-          "Deuces! ✌️",
-          "Peacing out! ☮️",
-          "Waving bye! 👋",
-          "Off like a rocket! 🚀",
-          // Professional-ish
-          "Until next time!",
-          "Be seeing you!",
-          "Take care now!",
-          "Have a good one!",
-          "Keep it real!",
-          "Stay classy!",
-          "Stay awesome! ⭐",
-          "Rock on! 🤘",
-          "Over and out!",
-          "Signing off! 📝",
-          // Random fun
-          "Yeet! 🚀",
-          "I'm ghost! 👻",
-          "Vanishing act! 🎩",
-          "Ninja exit! 🥷",
-          "Stealth mode! 🕵️",
-          "Beam me up! 🛸",
-          "Teleporting out!",
-          "Level complete! 🎮",
-          "Quest finished! ⚔️",
-          "Achievement get! 🏆",
-        ];
-        const msg = farewells[Math.floor(Math.random() * farewells.length)];
-        actions.onShowAgentBubble(context.agentId, msg);
-      },
-
-      // Boss availability
-      claimBoss: ({ context }) => {
-        actions.onSetBossInUse(context.queueType);
-      },
-      releaseBoss: () => {
-        actions.onSetBossInUse(null);
-      },
-
-      // Elevator actions
-      openElevator: () => {
-        actions.onOpenElevator();
-      },
-      closeElevator: () => {
-        actions.onCloseElevator();
-      },
-
-      // Removal
-      removeAgent: ({ context }) => {
-        actions.onAgentRemoved(context.agentId);
-      },
-
-      // Context updates
+      ...buildSharedActions(actions),
+      // Context mutation actions — must be defined inline inside setup() so
+      // that XState v5 can infer the full AgentMachineEvent type.
       updateQueueIndex: assign({
         queueIndex: (_, params: { newIndex: number }) => params.newIndex,
       }),
@@ -362,7 +61,7 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
         queueType: "departure" as const,
       }),
       clearQueueType: assign({
-        queueType: null,
+        queueType: null as "arrival" | "departure" | null,
       }),
       incrementConversationStep: assign({
         conversationStep: ({ context }) => context.conversationStep + 1,
@@ -371,40 +70,23 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
         conversationStep: 0,
       }),
     },
-    guards: {
-      isAtFrontOfQueue: ({ context }) => context.queueIndex === 0,
-      isArrival: ({ context }) => context.queueType === "arrival",
-      isDeparture: ({ context }) => context.queueType === "departure",
-    },
-    delays: {
-      BOSS_PAUSE: 100,
-      ELEVATOR_PAUSE: 500,
-      DOOR_CLOSE_DELAY: 520, // Wait for door close animation (500ms) + minimal buffer
-    },
+    guards: sharedGuards,
+    delays: sharedDelays,
   }).createMachine({
     id: "agent",
     initial: "waiting",
-    context: {
-      agentId: "",
-      agentName: null,
-      desk: null,
-      queueType: null,
-      queueIndex: -1,
-      currentPosition: { x: 0, y: 0 },
-      targetPosition: { x: 0, y: 0 },
-      conversationStep: 0,
-    },
+    context: defaultAgentContext,
 
     states: {
       // ======================================================================
-      // WAITING - Initial state before SPAWN is received
+      // WAITING — Initial state before SPAWN is received
       // ======================================================================
       waiting: {
-        // No entry actions - just waiting for SPAWN event
+        // No entry actions — just waiting for a SPAWN event
       },
 
       // ======================================================================
-      // IDLE - Agent is at their desk working
+      // IDLE — Agent is at their desk working
       // ======================================================================
       idle: {
         entry: [{ type: "notifyPhaseChange", params: { phase: "idle" } }],
@@ -417,7 +99,7 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
       },
 
       // ======================================================================
-      // ARRIVAL FLOW - New agent joining the office
+      // ARRIVAL FLOW — New agent joining the office
       // ======================================================================
       arrival: {
         initial: "arriving",
@@ -426,7 +108,7 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
             entry: [
               { type: "notifyPhaseChange", params: { phase: "arriving" } },
               "setQueueTypeArrival",
-              "openElevator", // Open elevator for agent to exit
+              "openElevator",
               "startWalkingToQueue",
             ],
             on: {
@@ -440,7 +122,7 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
                 type: "notifyPhaseChange",
                 params: { phase: "in_arrival_queue" },
               },
-              "closeElevator", // Agent has exited elevator
+              "closeElevator",
               "joinQueue",
             ],
             on: {
@@ -488,7 +170,6 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
               },
               agent_responds: {
                 entry: ["incrementConversationStep", "showArrivalAgentBubble"],
-                // Short delay then proceed - don't wait for bubble dismissal
                 after: {
                   800: "done",
                 },
@@ -540,7 +221,7 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
       },
 
       // ======================================================================
-      // DEPARTURE FLOW - Agent leaving the office
+      // DEPARTURE FLOW — Agent leaving the office
       // ======================================================================
       departure: {
         initial: "departing",
@@ -548,7 +229,7 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
           departing: {
             entry: [
               { type: "notifyPhaseChange", params: { phase: "departing" } },
-              "clearAgentBubble", // Clear any lingering tool use bubbles
+              "clearAgentBubble",
               "startWalkingToQueue",
             ],
             on: {
@@ -649,8 +330,8 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
                 params: { phase: "walking_to_elevator" },
               },
               "releaseBoss",
-              "showFarewellBubble", // Show fun goodbye message
-              "openElevator", // Open elevator BEFORE agent starts walking
+              "showFarewellBubble",
+              "openElevator",
               "startWalkingToElevator",
             ],
             on: {
@@ -661,7 +342,6 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
           in_elevator: {
             entry: [
               { type: "notifyPhaseChange", params: { phase: "in_elevator" } },
-              // Elevator already open from walking_to_elevator
             ],
             after: {
               ELEVATOR_PAUSE: "waiting_for_door_close",
@@ -669,16 +349,13 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
           },
 
           waiting_for_door_close: {
-            // Agent signals they're ready to leave, waits for elevator to actually close
             entry: ["closeElevator"],
             on: {
-              // Elevator doors are closing - start the door animation delay
               ELEVATOR_DOOR_CLOSING: "elevator_closing",
             },
           },
 
           elevator_closing: {
-            // Agent stays visible while doors close animation plays
             after: {
               DOOR_CLOSE_DELAY: "removed",
             },
@@ -694,7 +371,7 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
 
     // Global spawn event handlers
     on: {
-      // Normal spawn - start arrival flow from elevator
+      // Normal spawn — start arrival flow from elevator
       SPAWN: {
         target: ".arrival.arriving",
         actions: assign({
@@ -705,7 +382,7 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
           targetPosition: ({ event }) => event.position,
         }),
       },
-      // Mid-session spawn - agent already at desk (skip arrival)
+      // Mid-session spawn — agent already at desk (skip arrival)
       SPAWN_AT_DESK: {
         target: ".idle",
         actions: assign({
@@ -718,7 +395,7 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
           queueIndex: -1,
         }),
       },
-      // Mid-session spawn - agent already in arrival queue (getting work from boss)
+      // Mid-session spawn — agent already in arrival queue
       SPAWN_IN_ARRIVAL_QUEUE: {
         target: ".arrival.in_queue",
         actions: assign({
@@ -731,7 +408,7 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
           queueIndex: ({ event }) => event.queueIndex,
         }),
       },
-      // Mid-session spawn - agent already in departure queue (turning in work)
+      // Mid-session spawn — agent already in departure queue
       SPAWN_IN_DEPARTURE_QUEUE: {
         target: ".departure.in_queue",
         actions: assign({

@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.core.path_utils import compress_path, compress_paths_in_text, truncate_long_words
 from app.core.quotes import get_random_job_completion_quote
 from app.core.summary_service import get_summary_service
+from app.core.whiteboard_tracker import WhiteboardTracker
 from app.models.agents import (
     Agent,
     AgentState,
@@ -48,22 +49,6 @@ def _empty_history_list() -> list[HistoryEntry]:
 
 def _empty_todo_list() -> list[TodoItem]:
     return cast(list[TodoItem], [])
-
-
-def _empty_tool_usage() -> dict[str, int]:
-    return cast(dict[str, int], {})
-
-
-def _empty_agent_lifespans() -> list[AgentLifespan]:
-    return cast(list[AgentLifespan], [])
-
-
-def _empty_news_items() -> list[NewsItem]:
-    return cast(list[NewsItem], [])
-
-
-def _empty_file_edits() -> dict[str, int]:
-    return cast(dict[str, int], {})
 
 
 def _empty_background_tasks() -> list[BackgroundTask]:
@@ -107,22 +92,116 @@ class StateMachine:
     tool_uses_since_compaction: int = 0
     print_report: bool = False
     last_user_prompt: str | None = None
-
-    tool_usage: dict[str, int] = field(default_factory=_empty_tool_usage)
-    task_completed_count: int = 0
-    bug_fixed_count: int = 0
-    coffee_break_count: int = 0
-    code_written_count: int = 0
-    recent_error_count: int = 0
-    recent_success_count: int = 0
-    consecutive_successes: int = 0
-    last_incident_time: str | None = None
-    agent_lifespans: list[AgentLifespan] = field(default_factory=_empty_agent_lifespans)
-    news_items: list[NewsItem] = field(default_factory=_empty_news_items)
-    coffee_cups: int = 0
-    file_edits: dict[str, int] = field(default_factory=_empty_file_edits)
     background_tasks: list[BackgroundTask] = field(default_factory=_empty_background_tasks)
     conversation: list[ConversationEntry] = field(default_factory=_empty_conversation)
+
+    # Whiteboard tracking delegated to WhiteboardTracker
+    whiteboard: WhiteboardTracker = field(default_factory=WhiteboardTracker)
+
+    # ---------------------------------------------------------------------------
+    # Backward-compatible property aliases so existing code that accesses
+    # sm.tool_usage, sm.agent_lifespans, etc. continues to work.
+    # ---------------------------------------------------------------------------
+
+    @property
+    def tool_usage(self) -> dict[str, int]:
+        return self.whiteboard.tool_usage
+
+    @property
+    def task_completed_count(self) -> int:
+        return self.whiteboard.task_completed_count
+
+    @task_completed_count.setter
+    def task_completed_count(self, value: int) -> None:
+        self.whiteboard.task_completed_count = value
+
+    @property
+    def bug_fixed_count(self) -> int:
+        return self.whiteboard.bug_fixed_count
+
+    @bug_fixed_count.setter
+    def bug_fixed_count(self, value: int) -> None:
+        self.whiteboard.bug_fixed_count = value
+
+    @property
+    def coffee_break_count(self) -> int:
+        return self.whiteboard.coffee_break_count
+
+    @coffee_break_count.setter
+    def coffee_break_count(self, value: int) -> None:
+        self.whiteboard.coffee_break_count = value
+
+    @property
+    def code_written_count(self) -> int:
+        return self.whiteboard.code_written_count
+
+    @code_written_count.setter
+    def code_written_count(self, value: int) -> None:
+        self.whiteboard.code_written_count = value
+
+    @property
+    def recent_error_count(self) -> int:
+        return self.whiteboard.recent_error_count
+
+    @recent_error_count.setter
+    def recent_error_count(self, value: int) -> None:
+        self.whiteboard.recent_error_count = value
+
+    @property
+    def recent_success_count(self) -> int:
+        return self.whiteboard.recent_success_count
+
+    @recent_success_count.setter
+    def recent_success_count(self, value: int) -> None:
+        self.whiteboard.recent_success_count = value
+
+    @property
+    def consecutive_successes(self) -> int:
+        return self.whiteboard.consecutive_successes
+
+    @consecutive_successes.setter
+    def consecutive_successes(self, value: int) -> None:
+        self.whiteboard.consecutive_successes = value
+
+    @property
+    def last_incident_time(self) -> str | None:
+        return self.whiteboard.last_incident_time
+
+    @last_incident_time.setter
+    def last_incident_time(self, value: str | None) -> None:
+        self.whiteboard.last_incident_time = value
+
+    @property
+    def agent_lifespans(self) -> list[AgentLifespan]:
+        return self.whiteboard.agent_lifespans
+
+    @agent_lifespans.setter
+    def agent_lifespans(self, value: list[AgentLifespan]) -> None:
+        self.whiteboard.agent_lifespans = value
+
+    @property
+    def news_items(self) -> list[NewsItem]:
+        return self.whiteboard.news_items
+
+    @news_items.setter
+    def news_items(self, value: list[NewsItem]) -> None:
+        self.whiteboard.news_items = value
+
+    @property
+    def coffee_cups(self) -> int:
+        return self.whiteboard.coffee_cups
+
+    @coffee_cups.setter
+    def coffee_cups(self, value: int) -> None:
+        self.whiteboard.coffee_cups = value
+
+    @property
+    def file_edits(self) -> dict[str, int]:
+        return self.whiteboard.file_edits
+
+    @file_edits.setter
+    def file_edits(self, value: dict[str, int]) -> None:
+        self.whiteboard.file_edits = value
 
     def to_game_state(self, session_id: str) -> GameState:
         """Convert current state to a GameState for frontend consumption."""
@@ -151,21 +230,21 @@ class StateMachine:
         activity_level = min(1.0, self.tool_uses_since_compaction / 100.0)
 
         whiteboard_data = WhiteboardData(
-            tool_usage=self.tool_usage.copy(),
-            task_completed_count=self.task_completed_count,
-            bug_fixed_count=self.bug_fixed_count,
-            coffee_break_count=self.coffee_break_count,
-            code_written_count=self.code_written_count,
-            recent_error_count=self.recent_error_count,
-            recent_success_count=self.recent_success_count,
+            tool_usage=self.whiteboard.get_tool_usage_snapshot(),
+            task_completed_count=self.whiteboard.task_completed_count,
+            bug_fixed_count=self.whiteboard.bug_fixed_count,
+            coffee_break_count=self.whiteboard.coffee_break_count,
+            code_written_count=self.whiteboard.code_written_count,
+            recent_error_count=self.whiteboard.recent_error_count,
+            recent_success_count=self.whiteboard.recent_success_count,
             activity_level=activity_level,
-            consecutive_successes=self.consecutive_successes,
-            last_incident_time=self.last_incident_time,
-            agent_lifespans=self.agent_lifespans.copy(),
-            news_items=self.news_items.copy(),
-            coffee_cups=self.coffee_cups,
-            file_edits=self.file_edits.copy(),
-            background_tasks=self.background_tasks.copy(),
+            consecutive_successes=self.whiteboard.consecutive_successes,
+            last_incident_time=self.whiteboard.last_incident_time,
+            agent_lifespans=self.whiteboard.get_agent_lifespans_snapshot(),
+            news_items=self.whiteboard.get_news_items_snapshot(),
+            coffee_cups=self.whiteboard.coffee_cups,
+            file_edits=self.whiteboard.get_file_edits_snapshot(),
+            background_tasks=self.whiteboard.get_background_tasks_snapshot(),
         )
 
         return GameState(
@@ -312,81 +391,6 @@ class StateMachine:
 
         return None
 
-    def _add_news_item(self, category: str, headline: str) -> None:
-        """Add a news item to the ticker, keeping only the last 20 items."""
-        news_item = NewsItem(
-            category=category,
-            headline=headline,
-            timestamp=datetime.now().isoformat(),
-        )
-        self.news_items.insert(0, news_item)
-        if len(self.news_items) > 20:
-            self.news_items = self.news_items[:20]
-
-    def _categorize_tool(self, tool_name: str) -> str:
-        """Categorize a tool name into a broader category for pizza chart."""
-        tool_categories = {
-            "Read": "read",
-            "Glob": "read",
-            "Grep": "read",
-            "Write": "write",
-            "Edit": "edit",
-            "Bash": "bash",
-            "Task": "task",
-            "Agent": "task",
-            "TodoWrite": "todo",
-            "WebSearch": "web",
-            "WebFetch": "web",
-        }
-        return tool_categories.get(tool_name, "other")
-
-    def _track_tool_use(self, event: Event) -> None:
-        """Track tool usage statistics for whiteboard display."""
-        if not event.data:
-            return
-
-        tool_name = event.data.tool_name or "unknown"
-        tool_input: dict[str, str | int | bool | list[str] | None] = event.data.tool_input or {}
-        success = event.data.success
-        error_type = event.data.error_type
-
-        category = self._categorize_tool(tool_name)
-        self.tool_usage[category] = self.tool_usage.get(category, 0) + 1
-
-        if success is False or error_type:
-            self.recent_error_count += 1
-            self.consecutive_successes = 0
-            self.last_incident_time = datetime.now().isoformat()
-            error_msg = error_type or "unknown error"
-            self._add_news_item("error", f"⚠️ {tool_name} failed: {error_msg}")
-        else:
-            self.recent_success_count += 1
-            self.consecutive_successes += 1
-
-        if tool_name in ("Edit", "Write"):
-            self.code_written_count += 1
-
-            file_path = tool_input.get("file_path", "")
-            if isinstance(file_path, str) and file_path:
-                file_name = file_path.split("/")[-1] if "/" in file_path else file_path
-                self.file_edits[file_name] = self.file_edits.get(file_name, 0) + 1
-
-        if tool_name == "Bash":
-            cmd = tool_input.get("command", "")
-            if isinstance(cmd, str) and "fix" in cmd.lower():
-                self.bug_fixed_count += 1
-
-        if tool_name == "TodoWrite":
-            todos_data = tool_input.get("todos", [])
-            if isinstance(todos_data, list):
-                completed_count = 0
-                for t in todos_data:
-                    if isinstance(t, dict):
-                        t_dict: dict[str, str] = cast(dict[str, str], t)
-                        if t_dict.get("status") == "completed":
-                            completed_count += 1
-                self.task_completed_count = completed_count
-
     def _update_token_usage(self, event: Event) -> None:
         """Update token counts from event data or JSONL transcript."""
         if not event.data:
@@ -424,28 +428,15 @@ class StateMachine:
         if event.event_type == EventType.SESSION_START:
             self.phase = OfficePhase.STARTING
             self.boss_state = BossState.IDLE
-            self.tool_usage = {}
-            self.task_completed_count = 0
-            self.bug_fixed_count = 0
-            self.coffee_break_count = 0
-            self.code_written_count = 0
-            self.recent_error_count = 0
-            self.recent_success_count = 0
-            self.consecutive_successes = 0
-            self.last_incident_time = None
-            self.agent_lifespans = []
-            self.news_items = []
-            self.coffee_cups = 0
-            self.file_edits = {}
-            self.background_tasks = []
-            self._add_news_item("session", "📋 New session started - ready for work!")
+            self.whiteboard.reset()
+            self.whiteboard.add_news_item("session", "New session started - ready for work!")
 
         elif event.event_type == EventType.CONTEXT_COMPACTION:
             self.tool_uses_since_compaction = 0
-            self.coffee_cups += 1
-            self.coffee_break_count += 1
-            self._add_news_item(
-                "coffee", f"☕ Coffee break #{self.coffee_cups}! Context compacted."
+            self.whiteboard.record_compaction()
+            self.whiteboard.add_news_item(
+                "coffee",
+                f"Coffee break #{self.whiteboard.coffee_cups}! Context compacted.",
             )
 
         elif event.event_type == EventType.PRE_TOOL_USE:
@@ -526,7 +517,7 @@ class StateMachine:
                 self.agents[agent_id].state = AgentState.WORKING
 
             self.tool_uses_since_compaction += 1
-            self._track_tool_use(event)
+            self.whiteboard.track_tool_use(event)
 
         elif event.event_type == EventType.SUBAGENT_START:
             if event.data and event.data.agent_id and len(self.agents) < self.MAX_AGENTS:
@@ -540,21 +531,9 @@ class StateMachine:
                 self.agents[agent.id] = agent
                 self.phase = OfficePhase.BUSY
 
-                # Use short name from agent (already generated in _create_agent)
                 short_name = agent.name or f"Agent-{agent.id[-4:]}"
-                self.agent_lifespans.append(
-                    AgentLifespan(
-                        agent_id=agent.id,
-                        agent_name=short_name,
-                        color=agent.color,
-                        start_time=datetime.now().isoformat(),
-                        end_time=None,
-                    )
-                )
-                if len(self.agent_lifespans) > 10:
-                    self.agent_lifespans = self.agent_lifespans[-10:]
-
-                self._add_news_item("agent", f"🆕 {short_name} joins the team!")
+                self.whiteboard.record_agent_start(agent.id, short_name, agent.color)
+                self.whiteboard.add_news_item("agent", f"{short_name} joins the team!")
 
         elif event.event_type == EventType.SUBAGENT_STOP:
             if event.data:
@@ -593,13 +572,10 @@ class StateMachine:
                                 f"Credited {tool_count} subagent tool uses to safety counter"
                             )
 
-                    for lifespan in self.agent_lifespans:
-                        if lifespan.agent_id == agent_id and lifespan.end_time is None:
-                            lifespan.end_time = datetime.now().isoformat()
-                            break
+                    self.whiteboard.record_agent_stop(agent_id)
 
                     agent_name = stopping_agent.name or f"Agent-{agent_id[-4:]}"
-                    self._add_news_item("agent", f"✅ {agent_name} completed their task!")
+                    self.whiteboard.add_news_item("agent", f"{agent_name} completed their task!")
 
         elif event.event_type == EventType.CLEANUP:
             if event.data and event.data.agent_id:
@@ -621,7 +597,7 @@ class StateMachine:
                 persistent=True,
             )
 
-            self._add_news_item("session", "🎉 Job completed! Great work everyone!")
+            self.whiteboard.add_news_item("session", "Job completed! Great work everyone!")
 
         elif event.event_type == EventType.SESSION_END:
             self.phase = OfficePhase.ENDED
@@ -634,37 +610,13 @@ class StateMachine:
                 status = event.data.background_task_status or "completed"
                 summary = event.data.background_task_summary
 
-                # Create or update background task entry
-                existing_task = None
-                for task in self.background_tasks:
-                    if task.task_id == task_id:
-                        existing_task = task
-                        break
+                self.whiteboard.update_background_task(task_id, status, summary)
 
-                if existing_task:
-                    existing_task.status = status
-                    existing_task.summary = summary
-                    existing_task.completed_at = datetime.now().isoformat()
-                else:
-                    new_task = BackgroundTask(
-                        task_id=task_id,
-                        status=status,
-                        summary=summary,
-                        started_at=datetime.now().isoformat(),
-                        completed_at=datetime.now().isoformat() if status != "running" else None,
-                    )
-                    self.background_tasks.insert(0, new_task)
-
-                # Keep only last 10 tasks
-                if len(self.background_tasks) > 10:
-                    self.background_tasks = self.background_tasks[:10]
-
-                # Add news item with status emoji
-                status_emoji = "✅" if status == "completed" else "❌"
+                status_emoji = "Completed" if status == "completed" else "Failed"
                 task_id_short = task_id[:8] if len(task_id) > 8 else task_id
                 summary_short = (summary[:30] + "...") if summary and len(summary) > 30 else summary
                 headline = f"{status_emoji} Task {task_id_short}: {summary_short or status}"
-                self._add_news_item("agent", headline)
+                self.whiteboard.add_news_item("agent", headline)
 
     def _tool_to_thought(self, event: Event) -> BubbleContent:
         """Convert a tool use event to thought bubble content."""
