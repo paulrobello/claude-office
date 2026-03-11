@@ -5,21 +5,21 @@
 # =============================================================================
 # Stage 1: Frontend Build
 # =============================================================================
-FROM node:20-slim AS frontend-builder
+FROM oven/bun:1-slim AS frontend-builder
 
 WORKDIR /app/frontend
 
 # Copy package files first for better layer caching
-COPY frontend/package.json frontend/package-lock.json* ./
+COPY frontend/package.json frontend/bun.lock* ./
 
 # Install dependencies
-RUN npm ci
+RUN bun install --frozen-lockfile
 
 # Copy frontend source
 COPY frontend/ ./
 
 # Build static export
-RUN npm run build
+RUN bun run build
 
 # =============================================================================
 # Stage 2: Python Runtime
@@ -38,7 +38,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Copy backend dependency files
-COPY backend/pyproject.toml backend/uv.lock* ./
+COPY backend/pyproject.toml backend/uv.lock* backend/README.md* ./
 
 # Install dependencies (without dev dependencies)
 RUN uv sync --no-dev --frozen
@@ -51,6 +51,7 @@ COPY --from=frontend-builder /app/frontend/out ./static
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash appuser && \
+    mkdir -p /app/data && \
     chown -R appuser:appuser /app
 USER appuser
 

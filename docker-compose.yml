@@ -28,7 +28,7 @@ services:
       # Container path where ~/.claude is mounted
       - CLAUDE_PATH_CONTAINER=/claude-data
       # Database location (use mounted volume for persistence)
-      - DATABASE_URL=sqlite+aiosqlite:///app/data/visualizer.db
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/visualizer.db
       # Claude API settings (optional - enables AI summaries)
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
       - SUMMARY_ENABLED=${SUMMARY_ENABLED:-true}
