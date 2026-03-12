@@ -293,3 +293,7 @@ Contributions are welcome! Please ensure that all pull requests:
 - [Hooks README](hooks/README.md) - Hook installation details
 - [Scripts README](scripts/README.md) - Testing and simulation scripts
 - [CLAUDE.md](CLAUDE.md) - AI assistant instructions for this project
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=paulrobello/claude-office&type=Date)](https://star-history.com/#paulrobello/claude-office&Date)
