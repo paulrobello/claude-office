@@ -192,7 +192,8 @@ async def handle_subagent_stop(
     agent_id = event.data.agent_id
     native_agent_id = event.data.native_agent_id
 
-    # Resolve agent: try by agent_id first, then fall back to native_id lookup.
+    # Resolve agent: try by agent_id first, then fall back to native_id lookup,
+    # then try linking an unlinked agent (missed SubagentInfo).
     if agent_id and agent_id in sm.agents:
         resolved_agent_id = agent_id
     elif native_agent_id:
@@ -202,6 +203,17 @@ async def handle_subagent_stop(
                 resolved_agent_id = aid
                 logger.info(f"Resolved native agent {native_agent_id} to {aid}")
                 break
+        # Fallback: link an unlinked agent (SubagentInfo was missed)
+        if not resolved_agent_id:
+            for aid, agent in sm.agents.items():
+                if agent.native_id is None:
+                    agent.native_id = native_agent_id
+                    resolved_agent_id = aid
+                    logger.info(
+                        f"Late-linked agent {aid} to native ID {native_agent_id} "
+                        f"(SubagentInfo was missed)"
+                    )
+                    break
         if not resolved_agent_id:
             logger.warning(f"SUBAGENT_STOP for unknown native agent {native_agent_id}, skipping")
             return

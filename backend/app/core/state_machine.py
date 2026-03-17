@@ -540,7 +540,8 @@ class StateMachine:
                 agent_id = event.data.agent_id
                 native_agent_id = event.data.native_agent_id
 
-                # Try to find agent by agent_id first, then by native_id
+                # Try to find agent by agent_id first, then by native_id,
+                # then fallback to linking an unlinked agent.
                 stopping_agent = None
                 if agent_id:
                     stopping_agent = self.agents.get(agent_id)
@@ -551,6 +552,14 @@ class StateMachine:
                             agent_id = aid
                             stopping_agent = agent
                             break
+                    # Fallback: link an unlinked agent (missed SubagentInfo)
+                    if not stopping_agent:
+                        for aid, agent in self.agents.items():
+                            if agent.native_id is None:
+                                agent.native_id = native_agent_id
+                                agent_id = aid
+                                stopping_agent = agent
+                                break
 
                 if stopping_agent and agent_id:
                     stopping_agent.state = AgentState.WAITING
