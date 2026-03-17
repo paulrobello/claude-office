@@ -230,7 +230,9 @@ async def handle_subagent_stop(
     await broadcast_state(event.session_id, sm)
 
     sm.remove_agent(resolved_agent_id)
-    await persist_synthetic_event_fn(event.session_id, EventType.CLEANUP, event.data)
+    # Persist CLEANUP with the resolved agent_id so replay can also remove the agent.
+    cleanup_data = EventData(agent_id=resolved_agent_id)
+    await persist_synthetic_event_fn(event.session_id, EventType.CLEANUP, cleanup_data)
     await broadcast_state(event.session_id, sm)
 
 
