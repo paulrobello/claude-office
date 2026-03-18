@@ -35,6 +35,76 @@ from app.models.sessions import (
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class ResolvedAgent:
+    """Result of agent resolution by ID or native ID."""
+
+    agent_id: str
+    agent: Agent
+    was_late_linked: bool = False
+
+
+def resolve_agent_for_stop(
+    agents: dict[str, Agent],
+    arrival_queue: list[str],
+    agent_id: str | None,
+    native_agent_id: str | None,
+) -> ResolvedAgent | None:
+    """Resolve an agent for SUBAGENT_STOP by ID, native ID, or fallback linking.
+
+    Resolution order:
+    1. Direct agent_id match (synchronous agents)
+    2. Native ID match (agents that received SubagentInfo)
+    3. Fallback: link oldest unlinked agent from arrival_queue (missed SubagentInfo)
+
+    The fallback prefers the oldest unlinked agent (FIFO) to handle cases where
+    multiple background agents started but SubagentInfo was missed for some.
+
+    Args:
+        agents: Dict of agent_id -> Agent
+        arrival_queue: List of agent_ids in arrival order
+        agent_id: Optional agent_id from event
+        native_agent_id: Optional native_agent_id from event
+
+    Returns:
+        ResolvedAgent if found, None otherwise
+    """
+    # 1. Try direct agent_id match
+    if agent_id and agent_id in agents:
+        return ResolvedAgent(agent_id=agent_id, agent=agents[agent_id])
+
+    if not native_agent_id:
+        return None
+
+    # 2. Try native_id match
+    for aid, agent in agents.items():
+        if agent.native_id == native_agent_id:
+            return ResolvedAgent(agent_id=aid, agent=agent)
+
+    # 3. Fallback: link oldest unlinked agent (FIFO from arrival_queue)
+    # This handles the case where SubagentInfo was missed
+    for aid in arrival_queue:
+        agent = agents.get(aid)
+        if agent and agent.native_id is None:
+            agent.native_id = native_agent_id
+            logger.info(
+                f"Late-linked agent {aid} to native ID {native_agent_id} (SubagentInfo was missed)"
+            )
+            return ResolvedAgent(agent_id=aid, agent=agent, was_late_linked=True)
+
+    # 4. Last resort: any unlinked agent not in arrival_queue
+    for aid, agent in agents.items():
+        if agent.native_id is None:
+            agent.native_id = native_agent_id
+            logger.warning(
+                f"Late-linked orphan agent {aid} to native ID {native_agent_id} "
+                f"(not in arrival_queue)"
+            )
+            return ResolvedAgent(agent_id=aid, agent=agent, was_late_linked=True)
+
+    return None
+
+
 def _empty_agents() -> dict[str, Agent]:
     return cast(dict[str, Agent], {})
 
@@ -309,7 +379,7 @@ class StateMachine:
                                 "input_tokens": input_tokens,
                                 "output_tokens": output_tokens,
                             }
-                except json.JSONDecodeError, KeyError:
+                except (json.JSONDecodeError, KeyError):
                     continue
 
         except Exception:
@@ -537,31 +607,17 @@ class StateMachine:
 
         elif event.event_type == EventType.SUBAGENT_STOP:
             if event.data:
-                agent_id = event.data.agent_id
-                native_agent_id = event.data.native_agent_id
+                # Use shared resolution logic with fallback linking
+                resolved = resolve_agent_for_stop(
+                    agents=self.agents,
+                    arrival_queue=self.arrival_queue,
+                    agent_id=event.data.agent_id,
+                    native_agent_id=event.data.native_agent_id,
+                )
 
-                # Try to find agent by agent_id first, then by native_id,
-                # then fallback to linking an unlinked agent.
-                stopping_agent = None
-                if agent_id:
-                    stopping_agent = self.agents.get(agent_id)
-                if not stopping_agent and native_agent_id:
-                    # Look up by native_id
-                    for aid, agent in self.agents.items():
-                        if agent.native_id == native_agent_id:
-                            agent_id = aid
-                            stopping_agent = agent
-                            break
-                    # Fallback: link an unlinked agent (missed SubagentInfo)
-                    if not stopping_agent:
-                        for aid, agent in self.agents.items():
-                            if agent.native_id is None:
-                                agent.native_id = native_agent_id
-                                agent_id = aid
-                                stopping_agent = agent
-                                break
-
-                if stopping_agent and agent_id:
+                if resolved:
+                    agent_id = resolved.agent_id
+                    stopping_agent = resolved.agent
                     stopping_agent.state = AgentState.WAITING
                     if agent_id not in self.handin_queue:
                         self.handin_queue.append(agent_id)

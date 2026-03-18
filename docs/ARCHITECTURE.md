@@ -9,6 +9,7 @@ System architecture and design documentation for Claude Office Visualizer.
 - [Data Flow](#data-flow)
 - [Components](#components)
 - [Event System](#event-system)
+- [Subagent Lifecycle](#subagent-lifecycle)
 - [Mid-Session Joining](#mid-session-joining)
 - [Frontend State Management](#frontend-state-management)
 - [Boss State Machine](#boss-state-machine)
@@ -290,6 +291,49 @@ sequenceDiagram
     B->>F: WebSocket: state_update
     Note over F: Agent returns to elevator
 ```
+
+## Subagent Lifecycle
+
+### Agent ID Resolution
+
+When a `SUBAGENT_STOP` event arrives, the backend must identify which agent to stop. This is handled by `resolve_agent_for_stop()` in `state_machine.py`:
+
+**Resolution Order:**
+1. **Direct agent_id match** - For synchronous subagents (spawned with explicit agent_id)
+2. **Native ID lookup** - For agents that received `SUBAGENT_INFO` (linked to `native_agent_id`)
+3. **Fallback linking** - For agents that missed `SUBAGENT_INFO` (late-link to `native_agent_id`)
+
+### Fallback Linking
+
+When native `SubagentStart` hooks don't produce `SUBAGENT_INFO` events (e.g., backend restart, missed hook), agents remain unlinked (`native_id=None`). The fallback logic:
+
+1. **FIFO from arrival_queue** - Links the oldest unlinked agent first
+2. **Last resort** - Links any unlinked agent not in the arrival queue
+
+```python
+# Example: Fallback linking flow
+agents = {
+    "subagent_abc": Agent(native_id=None),  # Unlinked
+    "subagent_def": Agent(native_id="xyz"),  # Already linked
+}
+arrival_queue = ["subagent_abc", "subagent_def"]
+
+# SUBAGENT_STOP with native_agent_id="new_id"
+# Resolves to: subagent_abc (oldest unlinked)
+```
+
+**Why FIFO?** When multiple background agents start in parallel without `SUBAGENT_INFO`, FIFO linking matches the most likely completion order (oldest starts first, likely finishes first).
+
+### CLEANUP Event Persistence
+
+When an agent is removed, a `CLEANUP` event is persisted with the resolved `agent_id`:
+
+```python
+cleanup_data = EventData(agent_id=resolved_agent_id)
+await persist_synthetic_event_fn(session_id, EventType.CLEANUP, cleanup_data)
+```
+
+This ensures event replay correctly removes agents even when the original `SUBAGENT_STOP` had `agent_id=None`.
 
 ## Mid-Session Joining
 

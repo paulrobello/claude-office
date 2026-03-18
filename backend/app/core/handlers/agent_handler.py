@@ -16,7 +16,7 @@ from typing import Any
 
 from app.core.broadcast_service import broadcast_state
 from app.core.jsonl_parser import get_first_user_prompt, get_last_assistant_response
-from app.core.state_machine import StateMachine
+from app.core.state_machine import StateMachine, resolve_agent_for_stop
 from app.core.summary_service import get_summary_service
 from app.core.transcript_poller import get_transcript_poller
 from app.models.agents import Agent, AgentState, BossState
@@ -189,37 +189,23 @@ async def handle_subagent_stop(
     if not event.data:
         return
 
-    agent_id = event.data.agent_id
-    native_agent_id = event.data.native_agent_id
+    # Use shared resolution logic with fallback linking
+    resolved = resolve_agent_for_stop(
+        agents=sm.agents,
+        arrival_queue=sm.arrival_queue,
+        agent_id=event.data.agent_id,
+        native_agent_id=event.data.native_agent_id,
+    )
 
-    # Resolve agent: try by agent_id first, then fall back to native_id lookup,
-    # then try linking an unlinked agent (missed SubagentInfo).
-    if agent_id and agent_id in sm.agents:
-        resolved_agent_id = agent_id
-    elif native_agent_id:
-        resolved_agent_id = None
-        for aid, agent in sm.agents.items():
-            if agent.native_id == native_agent_id:
-                resolved_agent_id = aid
-                logger.info(f"Resolved native agent {native_agent_id} to {aid}")
-                break
-        # Fallback: link an unlinked agent (SubagentInfo was missed)
-        if not resolved_agent_id:
-            for aid, agent in sm.agents.items():
-                if agent.native_id is None:
-                    agent.native_id = native_agent_id
-                    resolved_agent_id = aid
-                    logger.info(
-                        f"Late-linked agent {aid} to native ID {native_agent_id} "
-                        f"(SubagentInfo was missed)"
-                    )
-                    break
-        if not resolved_agent_id:
-            logger.warning(f"SUBAGENT_STOP for unknown native agent {native_agent_id}, skipping")
-            return
-    else:
-        logger.warning("SUBAGENT_STOP with no agent_id or native_agent_id, skipping")
+    if not resolved:
+        logger.warning(
+            f"SUBAGENT_STOP for unknown agent "
+            f"(agent_id={event.data.agent_id}, native_agent_id={event.data.native_agent_id}), "
+            f"skipping"
+        )
         return
+
+    resolved_agent_id = resolved.agent_id
 
     poller = get_transcript_poller()
     if poller:

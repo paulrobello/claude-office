@@ -3,7 +3,7 @@ name = "claude-office-visualizer"
 version = "0.10.0"
 description = "Real-time pixel art visualization of Claude Code operations"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.134.0",
     "uvicorn[standard]>=0.41.0",
@@ -38,7 +38,7 @@ requires = [
 build-backend = "hatchling.build"
 
 [tool.ruff]
-target-version = "py314"
+target-version = "py313"
 line-length = 100
 
 [tool.ruff.lint]
@@ -55,7 +55,7 @@ select = [
 ]
 
 [tool.pyright]
-pythonVersion = "3.14"
+pythonVersion = "3.13"
 typeCheckingMode = "strict"
 include = [
     "app",

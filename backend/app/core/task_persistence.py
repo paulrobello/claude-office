@@ -34,7 +34,7 @@ def _deserialize_list(data: str | None) -> list[str]:
         if isinstance(result, list):
             return cast(list[str], result)
         return []
-    except json.JSONDecodeError, TypeError:
+    except (json.JSONDecodeError, TypeError):
         return []
 
 
@@ -52,7 +52,7 @@ def _deserialize_metadata(data: str | None) -> dict[str, Any] | None:
         if isinstance(result, dict):
             return cast(dict[str, Any], result)
         return None
-    except json.JSONDecodeError, TypeError:
+    except (json.JSONDecodeError, TypeError):
         return None
 
 
