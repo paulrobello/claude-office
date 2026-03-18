@@ -10,25 +10,42 @@ Beads status mapping:
     blocked      → pending (with blocked_by populated)
     deferred     → pending
     closed       → completed
+
+Configuration:
+    BEADS_POLL_INTERVAL: Polling interval in seconds (default: 3.0)
+    Set via environment variable or app config.
 """
 
 import asyncio
 import contextlib
+import hashlib
 import json
 import logging
+import os
 import subprocess
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from app.models.common import TodoItem, TodoStatus
 
 logger = logging.getLogger(__name__)
 
-POLL_INTERVAL_SECONDS = 3.0
+# Configurable via environment variable
+DEFAULT_POLL_INTERVAL_SECONDS = 3.0
 INACTIVITY_TIMEOUT = timedelta(minutes=60)
+
+
+def _get_poll_interval() -> float:
+    """Get polling interval from environment or use default."""
+    try:
+        val = os.environ.get("BEADS_POLL_INTERVAL", str(DEFAULT_POLL_INTERVAL_SECONDS))
+        return float(val)
+    except ValueError:
+        return DEFAULT_POLL_INTERVAL_SECONDS
+
 
 _BEADS_STATUS_MAP: dict[str, TodoStatus] = {
     "open": TodoStatus.PENDING,
@@ -46,8 +63,20 @@ def has_beads(project_root: str | None) -> bool:
     return (Path(project_root) / ".beads").is_dir()
 
 
-def _run_bd_query(project_root: str) -> list[dict[str, Any]]:
-    """Run `bd query` and return parsed JSON issues."""
+@dataclass
+class BeadsQueryResult:
+    """Result from running bd query."""
+
+    issues: list[dict[str, Any]]
+    error: str | None = None
+    success: bool = True
+
+
+def _run_bd_query(project_root: str) -> BeadsQueryResult:
+    """Run `bd query` and return parsed JSON issues.
+
+    Returns a BeadsQueryResult with issues on success, or error message on failure.
+    """
     try:
         result = subprocess.run(
             ["bd", "query", "status=open OR status=in_progress OR status=blocked", "--json"],
@@ -57,19 +86,51 @@ def _run_bd_query(project_root: str) -> list[dict[str, Any]]:
             cwd=project_root,
         )
         if result.returncode != 0:
-            if result.stderr.strip():
-                logger.debug(f"bd query stderr: {result.stderr.strip()[:200]}")
-            return []
+            error_msg = result.stderr.strip()[:200] if result.stderr.strip() else "unknown error"
+            return BeadsQueryResult(issues=[], error=f"bd query failed: {error_msg}", success=False)
         output = result.stdout.strip()
         if not output:
-            return []
+            return BeadsQueryResult(issues=[])
         data = json.loads(output)
         if isinstance(data, list):
-            return data
-        return []
-    except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError, OSError) as e:
-        logger.debug(f"beads query failed: {e}")
-        return []
+            return BeadsQueryResult(issues=cast(list[dict[str, Any]], data))
+        return BeadsQueryResult(issues=[])
+    except subprocess.TimeoutExpired:
+        return BeadsQueryResult(issues=[], error="bd query timed out", success=False)
+    except json.JSONDecodeError as e:
+        return BeadsQueryResult(issues=[], error=f"invalid JSON from bd query: {e}", success=False)
+    except FileNotFoundError:
+        return BeadsQueryResult(issues=[], error="bd CLI not found", success=False)
+    except OSError as e:
+        return BeadsQueryResult(issues=[], error=f"OS error running bd: {e}", success=False)
+
+
+def _compute_issues_hash(issues: list[dict[str, Any]]) -> str:
+    """Compute a stable hash of issue fields for change detection.
+
+    Uses specific fields (id, title, status, owner) to avoid edge cases
+    with JSON serialization of floats or nested structures.
+    """
+    if not issues:
+        return ""
+
+    # Extract stable fields and sort for consistent hashing
+    hash_items: list[tuple[str, str, str, str]] = []
+    for issue in issues:
+        item = (
+            str(issue.get("id", "")),
+            str(issue.get("title", "")),
+            str(issue.get("status", "open")),
+            str(issue.get("owner", "")),
+        )
+        hash_items.append(item)
+
+    # Sort by id for consistent ordering
+    hash_items.sort(key=lambda x: x[0])
+
+    # Create hash from concatenated fields
+    content = "|".join("|".join(item) for item in hash_items)
+    return hashlib.sha256(content.encode()).hexdigest()
 
 
 def _convert_issue_to_todo(issue: dict[str, Any]) -> TodoItem:
@@ -104,6 +165,7 @@ class BeadsState:
     last_hash: str = ""
     last_activity: datetime = field(default_factory=lambda: datetime.now(UTC))
     poll_task: asyncio.Task[None] | None = None
+    has_seen_success: bool = False  # Track if we've ever had a successful query
 
 
 class BeadsPoller:
@@ -161,7 +223,7 @@ class BeadsPoller:
                     if datetime.now(UTC) - state.last_activity > INACTIVITY_TIMEOUT:
                         logger.debug(f"Beads polling for {session_id} timed out")
                         return
-                await asyncio.sleep(POLL_INTERVAL_SECONDS)
+                await asyncio.sleep(_get_poll_interval())
                 await self._check_for_changes(session_id)
         except asyncio.CancelledError:
             raise
@@ -176,18 +238,33 @@ class BeadsPoller:
 
         # Run bd query in a thread to avoid blocking the event loop
         loop = asyncio.get_event_loop()
-        issues = await loop.run_in_executor(None, _run_bd_query, state.project_root)
+        result = await loop.run_in_executor(None, _run_bd_query, state.project_root)
 
-        # Hash to detect changes
-        issues_hash = json.dumps(issues, sort_keys=True)
+        # Handle errors with first-time WARNING
+        if not result.success:
+            if not state.has_seen_success:
+                logger.warning(
+                    f"Beads query failed for session {session_id}: {result.error} "
+                    f"(subsequent failures will be logged at DEBUG level)"
+                )
+            else:
+                logger.debug(f"Beads query failed for session {session_id}: {result.error}")
+            return
+
+        state.has_seen_success = True
+
+        # Hash to detect changes using stable field-based hash
+        issues_hash = _compute_issues_hash(result.issues)
         if issues_hash == state.last_hash:
             return
 
         state.last_hash = issues_hash
         state.last_activity = datetime.now(UTC)
 
-        todos = [_convert_issue_to_todo(issue) for issue in issues if issue.get("title")]
-        logger.debug(f"Beads update for {session_id}: {len(issues)} issues → {len(todos)} todos")
+        todos = [_convert_issue_to_todo(issue) for issue in result.issues if issue.get("title")]
+        logger.debug(
+            f"Beads update for {session_id}: {len(result.issues)} issues → {len(todos)} todos"
+        )
 
         try:
             await self._todo_callback(session_id, todos)

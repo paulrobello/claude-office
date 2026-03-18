@@ -14,6 +14,7 @@ System architecture and design documentation for Claude Office Visualizer.
 - [Boss State Machine](#boss-state-machine)
 - [Work Acceptance Quotes](#work-acceptance-quotes)
 - [Work Completion Quotes](#work-completion-quotes)
+- [Beads Issue Tracker Integration](#beads-issue-tracker-integration)
 - [Context Compaction Animation](#context-compaction-animation)
 - [Printer Animation](#printer-animation)
 - [City Skyline Window](#city-skyline-window)
@@ -125,6 +126,7 @@ graph LR
 | `core/path_utils.py` | Path utilities for transcript file handling |
 | `core/task_persistence.py` | Task list persistence from TodoWrite tool |
 | `core/task_file_poller.py` | Polls external task files for todo list updates |
+| `core/beads_poller.py` | Polls beads issue tracker for task list integration |
 | `core/broadcast_service.py` | Service for broadcasting state updates to WebSocket clients |
 | `core/whiteboard_tracker.py` | Tracks whiteboard data (tool usage, agent lifespans, etc.) |
 | `core/constants.py` | Shared constants |
@@ -402,6 +404,37 @@ When agents turn in completed work, they display a random quote from a pool of 1
 - `frontend/src/constants/quotes.ts` - Quote definitions (`WORK_COMPLETION_QUOTES` array)
 - `backend/app/core/quotes.py` - Backend quote generation for boss completion messages
 - Displayed when agent reaches the departure ready spot
+
+## Beads Issue Tracker Integration
+
+The visualizer can integrate with the [beads](https://github.com/paulrobello/beads) issue tracker CLI. When a session's project root contains a `.beads/` directory, the poller automatically:
+
+1. Detects the presence of `.beads/` on session start
+2. Polls `bd query --json` for open/in_progress/blocked issues
+3. Converts beads issues to `TodoItem` objects for the task list panel
+4. Updates in real-time when issues change status
+
+**Status Mapping:**
+
+| Beads Status | TodoStatus |
+|--------------|------------|
+| `open` | `pending` |
+| `in_progress` | `in_progress` |
+| `blocked` | `pending` |
+| `deferred` | `pending` |
+| `closed` | `completed` |
+
+**Configuration:**
+
+| Environment Variable | Default | Description |
+|---------------------|---------|-------------|
+| `BEADS_POLL_INTERVAL` | `3.0` | Polling interval in seconds |
+
+**Implementation:**
+- `backend/app/core/beads_poller.py` - Poller implementation with hash-based change detection
+- `backend/app/core/event_processor.py` - Integration with session lifecycle
+- Thread pool execution for non-blocking CLI calls
+- WARNING-level logging on first failure, DEBUG for subsequent failures
 
 ## Context Compaction Animation
 
