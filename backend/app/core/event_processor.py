@@ -34,6 +34,7 @@ from app.core.handlers import (
 )
 from app.core.jsonl_parser import get_last_assistant_response
 from app.core.state_machine import StateMachine
+from app.core.beads_poller import get_beads_poller, has_beads, init_beads_poller
 from app.core.task_file_poller import init_task_file_poller
 from app.core.task_persistence import load_tasks, save_tasks
 from app.core.transcript_poller import init_transcript_poller
@@ -99,6 +100,8 @@ class EventProcessor:
         self._sessions_lock = asyncio.Lock()
         self._transcript_poller_initialized = False
         self._task_poller_initialized = False
+        self._beads_poller_initialized = False
+        self._beads_sessions: set[str] = set()  # Sessions with active beads polling
 
     # ------------------------------------------------------------------
     # Poller lifecycle helpers
@@ -116,6 +119,12 @@ class EventProcessor:
             init_task_file_poller(self._handle_task_file_update)
             self._task_poller_initialized = True
 
+    def _ensure_beads_poller(self) -> None:
+        """Initialise the beads poller if not already done."""
+        if not self._beads_poller_initialized:
+            init_beads_poller(self._handle_beads_update)
+            self._beads_poller_initialized = True
+
     # ------------------------------------------------------------------
     # Callbacks for pollers
     # ------------------------------------------------------------------
@@ -128,6 +137,18 @@ class EventProcessor:
 
         sm.todos = todos
         logger.debug(f"Updated todos for session {session_id}: {len(todos)} items")
+
+        await save_tasks(session_id, todos)
+        await broadcast_state(session_id, sm)
+
+    async def _handle_beads_update(self, session_id: str, todos: list[TodoItem]) -> None:
+        """Handle beads issue updates: update SM and broadcast."""
+        sm = self.sessions.get(session_id)
+        if not sm:
+            return
+
+        sm.todos = todos
+        logger.debug(f"Updated beads todos for session {session_id}: {len(todos)} items")
 
         await save_tasks(session_id, todos)
         await broadcast_state(session_id, sm)
@@ -258,10 +279,11 @@ class EventProcessor:
             sm.history = sm.history[-500:]
 
         # ------------------------------------------------------------------
-        # SESSION_START – start task-file polling
+        # SESSION_START – start task-file polling + beads polling
         # ------------------------------------------------------------------
         if event.event_type == EventType.SESSION_START:
             await handle_session_start(sm, event, self._ensure_task_file_poller)
+            await self._start_beads_if_available(event.session_id)
 
         # ------------------------------------------------------------------
         # Auto-start task polling for missed SESSION_START (backend restart)
@@ -272,12 +294,17 @@ class EventProcessor:
             self._ensure_task_file_poller,
             self._derive_task_list_id,
         )
+        await self._start_beads_if_available(event.session_id)
 
         # ------------------------------------------------------------------
-        # SESSION_END – stop task-file polling
+        # SESSION_END – stop task-file polling + beads polling
         # ------------------------------------------------------------------
         if event.event_type == EventType.SESSION_END:
             await handle_session_end(sm, event)
+            beads = get_beads_poller()
+            if beads:
+                await beads.stop_polling(event.session_id)
+            self._beads_sessions.discard(event.session_id)
 
         # ------------------------------------------------------------------
         # Default state broadcast + history event notification
@@ -553,6 +580,23 @@ class EventProcessor:
             ]:
                 sm.agents[agent_id].bubble = None
             await broadcast_state(session_id, sm)
+
+    async def _start_beads_if_available(self, session_id: str) -> None:
+        """Start beads polling if the session's project has a .beads/ directory."""
+        if session_id in self._beads_sessions:
+            return
+        project_root = await self.get_project_root(session_id)
+        if not project_root:
+            return
+        if has_beads(project_root):
+            self._ensure_beads_poller()
+            beads = get_beads_poller()
+            if beads and not await beads.is_polling(session_id):
+                await beads.start_polling(session_id, project_root)
+                self._beads_sessions.add(session_id)
+        else:
+            # Only log once per session to avoid spam
+            self._beads_sessions.add(session_id)
 
     async def _derive_task_list_id(self, session_id: str) -> str | None:
         """Derive the task_list_id from the session's project root.
