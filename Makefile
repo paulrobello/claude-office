@@ -1,6 +1,7 @@
 .PHONY: install install-all dev backend frontend simulate checkall lint fmt test typecheck gen-types \
 	hooks-install hooks-uninstall hooks-reinstall hooks-status hooks-logs hooks-logs-follow hooks-logs-clear \
 	hooks-debug-on hooks-debug-off clean clean-db clean-all \
+	opencode-install opencode-uninstall opencode-reinstall opencode-build \
 	dev-tmux dev-tmux-kill dev-tmux-backend dev-tmux-frontend \
 	build-static frontend-build-static \
 	docker-build docker-up docker-down docker-logs docker-shell
@@ -13,9 +14,10 @@ install:
 	cd backend && uv sync
 	cd frontend && $(PKG_INSTALL)
 	cd hooks && uv sync
+	cd opencode-plugin && $(PKG_INSTALL)
 
-install-all: install hooks-install
-	@echo "All components installed including hooks"
+install-all: install hooks-install opencode-install
+	@echo "All components installed including hooks and OpenCode plugin"
 
 dev:
 	@echo "Starting backend and frontend in parallel..."
@@ -99,6 +101,19 @@ hooks-debug-off:
 	@sed -i '' 's/CLAUDE_OFFICE_DEBUG=1/CLAUDE_OFFICE_DEBUG=0/' ~/.claude/claude-office-config.env 2>/dev/null || true
 	@echo "Hook debug logging disabled"
 
+# OpenCode plugin management targets
+opencode-install:
+	cd opencode-plugin && ./install.sh
+
+opencode-uninstall:
+	cd opencode-plugin && ./uninstall.sh
+
+opencode-reinstall: opencode-uninstall opencode-install
+	@echo "OpenCode plugin reinstalled"
+
+opencode-build:
+	cd opencode-plugin && $(PKG_INSTALL) && $(PKG_MGR) run build
+
 # tmux-based dev targets for better monitoring
 TMUX_SESSION=claude-office
 
@@ -135,6 +150,7 @@ clean-db:
 
 clean:
 	rm -rf frontend/.next
+	rm -rf opencode-plugin/dist
 
 clean-all: clean clean-db hooks-logs-clear
 	@echo "All build artifacts and data cleaned"

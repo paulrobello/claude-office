@@ -119,7 +119,7 @@ Then open [http://localhost:3000](http://localhost:3000) and run any Claude Code
 - Python 3.14+
 - Node.js 20+ (Bun auto-detected if available)
 - uv (Python package manager)
-- Claude Code CLI installed and configured
+- Claude Code CLI installed and configured, **or** [OpenCode](https://opencode.ai) with Bun
 
 ## Installation
 
@@ -203,6 +203,58 @@ make dev
 | `make hooks-debug-on` | Enable debug logging |
 | `make hooks-debug-off` | Disable debug logging |
 
+### OpenCode Integration
+
+This fork adds support for [OpenCode](https://opencode.ai) as an alternative to Claude Code CLI. The `opencode-plugin/` directory contains a plugin that sends OpenCode lifecycle events to the same backend API.
+
+#### Install
+
+```bash
+make opencode-install
+```
+
+This builds the plugin, links it globally, and registers it in your `~/.config/opencode/opencode.json`.
+
+#### Uninstall
+
+```bash
+make opencode-uninstall
+```
+
+#### OpenCode Plugin Commands
+
+| Command | Description |
+|---------|-------------|
+| `make opencode-install` | Build and register plugin with OpenCode |
+| `make opencode-uninstall` | Remove plugin from OpenCode |
+| `make opencode-reinstall` | Uninstall and reinstall plugin |
+| `make opencode-build` | Build plugin without registering |
+
+#### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLAUDE_OFFICE_API_URL` | `http://localhost:8000/api/v1/events` | Backend API endpoint |
+| `CLAUDE_OFFICE_TIMEOUT_MS` | `1500` | HTTP request timeout |
+| `CLAUDE_OFFICE_DEBUG` | `0` | Set to `1` to log events to stderr |
+
+#### Event Mapping
+
+The plugin maps OpenCode events to claude-office backend events:
+
+| OpenCode Event | Backend Event |
+|----------------|---------------|
+| `session.created` | `session_start` |
+| `session.deleted` | `session_end` |
+| `session.idle` | `stop` |
+| `session.compacted` | `context_compaction` |
+| `chat.message` hook | `user_prompt_submit` |
+| `tool.execute.before` | `pre_tool_use` / `subagent_start` |
+| `tool.execute.after` | `post_tool_use` / `subagent_stop` |
+| `permission.ask` | `permission_request` |
+| `step-finish` part | `reporting` (token usage) |
+| `message.updated` (assistant) | `reporting` (token usage) |
+
 ### Docker Deployment
 
 | Command | Description |
@@ -239,6 +291,10 @@ claude-office/
 │   ├── src/              # Hook implementation
 │   ├── install.sh        # Hook installer
 │   └── uninstall.sh      # Hook uninstaller
+├── opencode-plugin/      # OpenCode integration
+│   ├── src/              # Plugin TypeScript source
+│   ├── install.sh        # Plugin installer
+│   └── uninstall.sh      # Plugin uninstaller
 ├── scripts/              # Utility scripts
 ├── docs/                 # Documentation
 └── Makefile              # Project orchestration
@@ -291,6 +347,7 @@ Contributions are welcome! Please ensure that all pull requests:
 - [Backend README](backend/README.md) - Backend-specific setup
 - [Frontend README](frontend/README.md) - Frontend-specific setup
 - [Hooks README](hooks/README.md) - Hook installation details
+- [OpenCode Plugin](opencode-plugin/) - OpenCode integration plugin
 - [Scripts README](scripts/README.md) - Testing and simulation scripts
 - [CLAUDE.md](CLAUDE.md) - AI assistant instructions for this project
 
