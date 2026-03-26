@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import delete, select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from app.config import get_settings
 from app.core.broadcast_service import broadcast_error, broadcast_event, broadcast_state
@@ -508,13 +509,12 @@ class EventProcessor:
             self.sessions[session_id] = sm
 
     async def _persist_event(self, event: Event) -> None:
-        """Save event to database and manage session records."""
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(
-                select(SessionRecord).where(SessionRecord.id == event.session_id)
-            )
-            session_rec = result.scalar_one_or_none()
+        """Save event to database and manage session records.
 
+        Uses INSERT OR IGNORE to avoid UNIQUE constraint race conditions
+        when multiple events arrive concurrently for the same session.
+        """
+        async with AsyncSessionLocal() as db:
             project_name = event.data.project_name if event.data else None
             project_dir = event.data.project_dir if event.data else None
             working_dir = event.data.working_dir if event.data else None
@@ -522,35 +522,55 @@ class EventProcessor:
             source_dir = project_dir or working_dir
             project_root = derive_git_root(source_dir) if source_dir else None
 
-            if not session_rec:
-                session_rec = SessionRecord(
+            # Upsert: insert if not exists, ignore if already present.
+            # This avoids UNIQUE constraint failures from concurrent events.
+            # All column values are supplied explicitly here because Core-level INSERT
+            # statements do not evaluate ORM-level default= lambdas — omitting them
+            # would leave created_at, updated_at, and status as NULL.
+            now = datetime.now(UTC)
+            stmt = (
+                sqlite_insert(SessionRecord)
+                .values(
                     id=event.session_id,
                     project_name=project_name,
                     project_root=project_root,
+                    status="active",
+                    created_at=now,
+                    updated_at=now,
                 )
-                db.add(session_rec)
-            else:
-                if project_name and not session_rec.project_name:
+                .on_conflict_do_nothing(index_elements=["id"])
+            )
+            await db.execute(stmt)
+
+            # Fetch the (guaranteed to exist) session record for updates.
+            result = await db.execute(
+                select(SessionRecord).where(SessionRecord.id == event.session_id)
+            )
+            session_rec = result.scalar_one_or_none()
+            if session_rec is None:
+                raise RuntimeError(
+                    f"SessionRecord {event.session_id!r} not found after upsert — possible flush failure"
+                )
+
+            # Update project info if not yet set.
+            if project_name and not session_rec.project_name:
+                session_rec.project_name = project_name
+            if project_root and not session_rec.project_root:
+                session_rec.project_root = project_root
+                logger.info(f"Cached project_root for session {event.session_id}: {project_root}")
+
+            if event.event_type == EventType.SESSION_START:
+                await db.execute(
+                    delete(EventRecord).where(EventRecord.session_id == event.session_id)
+                )
+                session_rec.status = "active"
+                session_rec.updated_at = datetime.now(UTC)
+                # SESSION_START always reflects the freshest metadata.
+                if project_name:
                     session_rec.project_name = project_name
-
-                if project_root and not session_rec.project_root:
+                if project_root:
                     session_rec.project_root = project_root
-                    logger.info(
-                        f"Cached project_root for session {event.session_id}: {project_root}"
-                    )
-
-                if event.event_type == EventType.SESSION_START:
-                    await db.execute(
-                        delete(EventRecord).where(EventRecord.session_id == event.session_id)
-                    )
-                    session_rec.status = "active"
-                    session_rec.updated_at = datetime.now(UTC)
-                    if project_name:
-                        session_rec.project_name = project_name
-                    if project_root:
-                        session_rec.project_root = project_root
-
-            if event.event_type == EventType.SESSION_END:
+            elif event.event_type == EventType.SESSION_END:
                 session_rec.status = "completed"
                 session_rec.updated_at = datetime.now(UTC)
 

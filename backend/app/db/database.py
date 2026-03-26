@@ -69,6 +69,8 @@ class AsyncSessionLocal:
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         if self._session:
+            if exc_type is not None:
+                await self._session.rollback()
             await self._session.close()
 
 
