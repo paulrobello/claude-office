@@ -21,6 +21,7 @@ const SIDEBAR_MIN_WIDTH = 180;
 const SIDEBAR_MAX_WIDTH = 500;
 const SIDEBAR_DEFAULT_WIDTH = 288; // equivalent to w-72
 const SESSIONS_MIN_HEIGHT = 80;
+const SESSIONS_MAX_HEIGHT = 800;
 const SESSIONS_DEFAULT_HEIGHT = 280;
 
 // ============================================================================
@@ -64,6 +65,7 @@ export function SessionSidebar({
     (e: React.MouseEvent) => {
       e.preventDefault();
       setIsDragging(true);
+      document.body.style.cursor = "ew-resize";
       const startX = e.clientX;
       const startWidth = sidebarWidth;
 
@@ -78,6 +80,7 @@ export function SessionSidebar({
 
       const onMouseUp = () => {
         setIsDragging(false);
+        document.body.style.cursor = "";
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
       };
@@ -93,19 +96,21 @@ export function SessionSidebar({
     (e: React.MouseEvent) => {
       e.preventDefault();
       setIsDragging(true);
+      document.body.style.cursor = "ns-resize";
       const startY = e.clientY;
       const startHeight = sessionsHeight;
 
       const onMouseMove = (ev: MouseEvent) => {
-        const newHeight = Math.max(
-          SESSIONS_MIN_HEIGHT,
-          startHeight + ev.clientY - startY,
+        const newHeight = Math.min(
+          SESSIONS_MAX_HEIGHT,
+          Math.max(SESSIONS_MIN_HEIGHT, startHeight + ev.clientY - startY),
         );
         setSessionsHeight(newHeight);
       };
 
       const onMouseUp = () => {
         setIsDragging(false);
+        document.body.style.cursor = "";
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
       };

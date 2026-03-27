@@ -13,6 +13,7 @@ const SIDEBAR_MIN_WIDTH = 200;
 const SIDEBAR_MAX_WIDTH = 600;
 const SIDEBAR_DEFAULT_WIDTH = 320; // equivalent to w-80
 const AGENT_PANEL_MIN_HEIGHT = 60;
+const AGENT_PANEL_MAX_HEIGHT = 800;
 const AGENT_PANEL_DEFAULT_HEIGHT = 240;
 
 // ============================================================================
@@ -39,6 +40,7 @@ export function RightSidebar(): React.ReactNode {
     (e: React.MouseEvent) => {
       e.preventDefault();
       setIsDragging(true);
+      document.body.style.cursor = "ew-resize";
       const startX = e.clientX;
       const startWidth = sidebarWidth;
 
@@ -53,6 +55,7 @@ export function RightSidebar(): React.ReactNode {
 
       const onMouseUp = () => {
         setIsDragging(false);
+        document.body.style.cursor = "";
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
       };
@@ -68,19 +71,21 @@ export function RightSidebar(): React.ReactNode {
     (e: React.MouseEvent) => {
       e.preventDefault();
       setIsDragging(true);
+      document.body.style.cursor = "ns-resize";
       const startY = e.clientY;
       const startHeight = agentPanelHeight;
 
       const onMouseMove = (ev: MouseEvent) => {
-        const newHeight = Math.max(
-          AGENT_PANEL_MIN_HEIGHT,
-          startHeight + ev.clientY - startY,
+        const newHeight = Math.min(
+          AGENT_PANEL_MAX_HEIGHT,
+          Math.max(AGENT_PANEL_MIN_HEIGHT, startHeight + ev.clientY - startY),
         );
         setAgentPanelHeight(newHeight);
       };
 
       const onMouseUp = () => {
         setIsDragging(false);
+        document.body.style.cursor = "";
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
       };
