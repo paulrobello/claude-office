@@ -14,6 +14,7 @@ import {
 
 export interface Session {
   id: string;
+  label: string | null;
   projectName: string | null;
   projectRoot: string | null;
   createdAt: string;
@@ -98,7 +99,7 @@ export function useSessions(
           if (newSession) {
             setSessionId(newSession.id);
             showStatus(
-              `Session deleted. Switched to ${newSession.projectName || newSession.id.slice(0, 8)}`,
+              `Session deleted. Switched to ${newSession.label || newSession.projectName || newSession.id.slice(0, 8)}`,
               "info",
             );
           }
@@ -112,7 +113,7 @@ export function useSessions(
       window.removeEventListener("session-deleted", handleSessionDeleted);
   }, [fetchSessions, sessionId, showStatus]);
 
-  // Auto-select most recent active session on initial mount only
+  // Auto-select most active session on initial mount only
   useEffect(() => {
     // Only auto-select once on initial load, not when user manually selects sim session
     if (
@@ -121,13 +122,18 @@ export function useSessions(
       sessionId === "sim_session_123"
     ) {
       hasAutoSelected.current = true;
-      // Find an active session, or fall back to the first one
-      const activeSession =
-        sessions.find((s) => s.status === "active") || sessions[0];
-      if (activeSession) {
-        setSessionId(activeSession.id);
+      // Pick the active session with the most events — this is always the long-running
+      // main session, not short-lived child sessions which have few events.
+      const activeSessions = sessions.filter((s) => s.status === "active");
+      const candidates = activeSessions.length > 0 ? activeSessions : sessions;
+      const bestSession = candidates.reduce(
+        (best, s) => (s.eventCount > best.eventCount ? s : best),
+        candidates[0],
+      );
+      if (bestSession) {
+        setSessionId(bestSession.id);
         showStatus(
-          `Connected to ${activeSession.projectName || activeSession.id.slice(0, 8)}`,
+          `Connected to ${bestSession.label || bestSession.projectName || bestSession.id.slice(0, 8)}`,
           "info",
         );
       }
@@ -165,7 +171,7 @@ export function useSessions(
 
       setSessionId(newSessionInProject.id);
       showStatus(
-        `Auto-followed new session: ${newSessionInProject.projectName || newSessionInProject.id.slice(0, 8)}`,
+        `Auto-followed new session: ${newSessionInProject.label || newSessionInProject.projectName || newSessionInProject.id.slice(0, 8)}`,
         "info",
       );
     }

@@ -20,7 +20,6 @@ import type {
   Event,
   Session,
   Part,
-  ToolPart,
   StepFinishPart,
   AssistantMessage,
   Permission,
@@ -186,11 +185,16 @@ async function sendEvent(event: BackendEvent): Promise<void> {
 const activeSessions = new Set<string>();
 
 /**
- * Track tool parts we've already sent pre_tool_use for (by callID),
- * so we only send each transition once.
+ * Track child session ID -> parent session ID for @mention subagent sessions.
+ * When OpenCode creates a child session via @agent mention, it has a parentID.
+ * We emit subagent_start on the parent and subagent_stop when the child ends.
  */
-const toolsSentPre = new Set<string>();
-const toolsSentPost = new Set<string>();
+const childToParent = new Map<string, string>();
+
+/**
+ * Track child session ID -> agent name for @mention subagent sessions.
+ */
+const childToAgent = new Map<string, string>();
 
 // ---------------------------------------------------------------------------
 // Plugin entry point
@@ -236,84 +240,10 @@ const plugin: Plugin = async (ctx: PluginInput): Promise<Hooks> => {
 
   async function handlePartUpdate(part: Part): Promise<void> {
     switch (part.type) {
-      // --- Tool state machine transitions ---
-      case "tool": {
-        const toolPart = part as ToolPart;
-        const key = `${toolPart.sessionID}:${toolPart.callID}`;
-
-        if (
-          toolPart.state.status === "running" &&
-          !toolsSentPre.has(key)
-        ) {
-          toolsSentPre.add(key);
-          // Emit pre_tool_use or subagent_start based on tool name
-          if (isSubagentTool(toolPart.tool)) {
-            const input = toolPart.state.input || {};
-            await sendEvent(
-              makeEvent("subagent_start", toolPart.sessionID, {
-                agent_id: `subagent_${toolPart.callID}`,
-                tool_name: toolPart.tool,
-                tool_use_id: toolPart.callID,
-                task_description: (input.prompt as string) ?? (input.description as string) ?? "",
-                agent_name: (input.description as string) ?? toolPart.tool,
-                agent_type: (input.subagent_type as string) ?? "",
-              })
-            );
-          } else {
-            await sendEvent(
-              makeEvent("pre_tool_use", toolPart.sessionID, {
-                tool_name: toolPart.tool,
-                tool_use_id: toolPart.callID,
-                tool_input: toolPart.state.input as Record<string, unknown>,
-                agent_id: "main",
-              })
-            );
-          }
-        }
-
-        if (
-          (toolPart.state.status === "completed" ||
-            toolPart.state.status === "error") &&
-          !toolsSentPost.has(key)
-        ) {
-          toolsSentPost.add(key);
-          const success = toolPart.state.status === "completed";
-
-          if (isSubagentTool(toolPart.tool)) {
-            await sendEvent(
-              makeEvent("subagent_stop", toolPart.sessionID, {
-                agent_id: `subagent_${toolPart.callID}`,
-                tool_name: toolPart.tool,
-                tool_use_id: toolPart.callID,
-                success,
-                result_summary: success
-                  ? truncate((toolPart.state as { output?: string }).output ?? "", 200)
-                  : (toolPart.state as { error?: string }).error ?? "Error",
-              })
-            );
-          } else {
-            await sendEvent(
-              makeEvent("post_tool_use", toolPart.sessionID, {
-                tool_name: toolPart.tool,
-                tool_use_id: toolPart.callID,
-                success,
-                agent_id: "main",
-                summary: success
-                  ? (toolPart.state as { title?: string }).title ?? `${toolPart.tool} completed`
-                  : `${toolPart.tool} failed`,
-              })
-            );
-          }
-
-          // Garbage-collect tracking sets to prevent unbounded growth
-          // (safe because a tool won't transition again after completion)
-          setTimeout(() => {
-            toolsSentPre.delete(key);
-            toolsSentPost.delete(key);
-          }, 60_000);
-        }
-        break;
-      }
+      // NOTE: "tool" parts are intentionally NOT handled here.
+      // tool.execute.before/after hooks are the sole source of pre_tool_use /
+      // post_tool_use / subagent_start / subagent_stop events. Handling them
+      // here too would send duplicates for every tool call.
 
       // --- Subtask parts -> subagent_start ---
       case "subtask": {
@@ -387,11 +317,28 @@ const plugin: Plugin = async (ctx: PluginInput): Promise<Hooks> => {
           const session = event.properties.info as Session;
           if (!activeSessions.has(session.id)) {
             activeSessions.add(session.id);
-            await sendEvent(
-              makeEvent("session_start", session.id, {
-                summary: `Session started (opencode)`,
-              })
-            );
+            const parentID = (session as unknown as { parentID?: string }).parentID;
+            if (parentID) {
+              // Child session created via @agent mention — emit subagent_start on parent
+              const agentName = (session as unknown as { agent?: string }).agent ?? "subagent";
+              childToParent.set(session.id, parentID);
+              childToAgent.set(session.id, agentName);
+              await sendEvent(
+                makeEvent("subagent_start", parentID, {
+                  agent_id: `subagent_${session.id}`,
+                  native_agent_id: session.id,
+                  agent_name: agentName,
+                  agent_type: agentName,
+                  summary: `@${agentName} subagent started`,
+                })
+              );
+            } else {
+              await sendEvent(
+                makeEvent("session_start", session.id, {
+                  summary: `Session started (opencode)`,
+                })
+              );
+            }
           }
           break;
         }
@@ -399,30 +346,78 @@ const plugin: Plugin = async (ctx: PluginInput): Promise<Hooks> => {
         case "session.deleted": {
           const session = event.properties.info as Session;
           activeSessions.delete(session.id);
-          await sendEvent(
-            makeEvent("session_end", session.id, {
-              reason: "deleted",
-            })
-          );
+          const parentID = childToParent.get(session.id);
+          if (parentID) {
+            // Child session deleted — clean up tracking maps
+            const agentName = childToAgent.get(session.id) ?? "subagent";
+            childToParent.delete(session.id);
+            childToAgent.delete(session.id);
+            // Only emit subagent_stop if we haven't already (session.idle fires first usually)
+            await sendEvent(
+              makeEvent("subagent_stop", parentID, {
+                agent_id: `subagent_${session.id}`,
+                native_agent_id: session.id,
+                agent_name: agentName,
+                success: true,
+                reason: "deleted",
+              })
+            );
+          } else {
+            await sendEvent(
+              makeEvent("session_end", session.id, {
+                reason: "deleted",
+              })
+            );
+          }
           break;
         }
 
         case "session.idle": {
           const { sessionID } = event.properties;
-          // session.idle fires when the agent finishes processing.
-          // Map to "stop" to trigger the "done working" animation.
-          await sendEvent(
-            makeEvent("stop", sessionID, {
-              summary: "Agent idle",
-            })
-          );
+          const parentID = childToParent.get(sessionID);
+          if (parentID) {
+            // Child session (subagent via @mention) went idle — emit subagent_stop on parent
+            const agentName = childToAgent.get(sessionID) ?? "subagent";
+            await sendEvent(
+              makeEvent("subagent_stop", parentID, {
+                agent_id: `subagent_${sessionID}`,
+                native_agent_id: sessionID,
+                agent_name: agentName,
+                success: true,
+                summary: `@${agentName} subagent finished`,
+              })
+            );
+          } else {
+            // session.idle fires when the agent finishes processing.
+            // Map to "stop" to trigger the "done working" animation.
+            await sendEvent(
+              makeEvent("stop", sessionID, {
+                summary: "Agent idle",
+              })
+            );
+          }
+          break;
+        }
+
+        case "session.updated": {
+          // OpenCode sets the session title as the agent processes. Use this
+          // to update the agent name map for @mention child sessions so the
+          // visualizer shows the real name instead of "subagent".
+          const updatedSession = event.properties.info as Session;
+          if (childToParent.has(updatedSession.id) && updatedSession.title) {
+            const title = updatedSession.title.trim();
+            if (title && title !== childToAgent.get(updatedSession.id)) {
+              childToAgent.set(updatedSession.id, title);
+              debug("Updated agent name from session.updated:", title);
+            }
+          }
           break;
         }
 
         case "session.compacted": {
-          const { sessionID } = event.properties;
+          const { sessionID: compactedSessionID } = event.properties;
           await sendEvent(
-            makeEvent("context_compaction", sessionID, {
+            makeEvent("context_compaction", compactedSessionID, {
               summary: "Context window compacted",
             })
           );

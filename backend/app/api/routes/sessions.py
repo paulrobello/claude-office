@@ -5,6 +5,7 @@ from datetime import UTC
 from typing import Annotated, Any, TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,6 +47,7 @@ class SessionSummary(TypedDict):
     """Summary data for a session in the list view."""
 
     id: str
+    label: str | None
     projectName: str | None
     projectRoot: str | None
     createdAt: str
@@ -73,15 +75,36 @@ class ReplayEntry(TypedDict):
 
 @router.get("")
 async def list_sessions(db: Annotated[AsyncSession, Depends(get_db)]) -> list[SessionSummary]:
-    """List all sessions with event counts."""
+    """List all sessions with event counts.
+
+    Only returns sessions that have received a ``session_start`` event.  Child
+    sessions spawned by OpenCode @agent mentions never receive a ``session_start``
+    — they start directly with ``user_prompt_submit`` / ``pre_tool_use`` events —
+    so filtering on this event type keeps them out of the sidebar.
+    """
     logger.debug("API: list_sessions called")
     try:
+        # Find all session IDs that have at least one session_start event.
+        # Child @agent sessions never get session_start, so they're excluded.
+        sessions_with_start_stmt = (
+            select(EventRecord.session_id)
+            .where(EventRecord.event_type == "session_start")
+            .distinct()
+        )
+        start_result = await db.execute(sessions_with_start_stmt)
+        sessions_with_start: set[str] = {row[0] for row in start_result.all()}
+
         stmt = select(SessionRecord).order_by(SessionRecord.updated_at.desc())
         result = await db.execute(stmt)
         records = result.scalars().all()
 
         sessions: list[SessionSummary] = []
         for rec in records:
+            # Skip child sessions (no session_start event) unless it's the special
+            # simulation session which also lacks one but is always valid.
+            if rec.id not in sessions_with_start and not rec.id.startswith("sim_"):
+                continue
+
             count_stmt = select(func.count(EventRecord.id)).where(EventRecord.session_id == rec.id)
             count_res = await db.execute(count_stmt)
             count = count_res.scalar() or 0
@@ -100,6 +123,7 @@ async def list_sessions(db: Annotated[AsyncSession, Depends(get_db)]) -> list[Se
             sessions.append(
                 {
                     "id": rec.id,
+                    "label": rec.label,
                     "projectName": rec.project_name,
                     "projectRoot": rec.project_root,
                     "createdAt": created_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
@@ -111,6 +135,46 @@ async def list_sessions(db: Annotated[AsyncSession, Depends(get_db)]) -> list[Se
         return sessions
     except Exception as e:
         logger.exception("Error in list_sessions: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+class LabelUpdate(BaseModel):
+    """Request body for updating a session label."""
+
+    label: str | None = None
+
+
+@router.patch("/{session_id}/label")
+async def update_session_label(
+    session_id: str, body: LabelUpdate, db: Annotated[AsyncSession, Depends(get_db)]
+) -> dict[str, str]:
+    """Update the label of a session.
+
+    Args:
+        session_id: Identifier for the session to update.
+        body: Request body containing the new label value.
+        db: Database session dependency.
+
+    Returns:
+        A status payload confirming the update.
+
+    Raises:
+        HTTPException: If the session is not found or update fails.
+    """
+    try:
+        result = await db.execute(select(SessionRecord).where(SessionRecord.id == session_id))
+        session = result.scalar_one_or_none()
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        session.label = body.label
+        await db.commit()
+        return {"status": "success", "message": f"Label updated for session {session_id}"}
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
