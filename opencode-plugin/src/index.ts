@@ -196,6 +196,39 @@ const childToParent = new Map<string, string>();
  */
 const childToAgent = new Map<string, string>();
 
+/**
+ * Track pending task tool calls: parentSessionId -> Set<callID>.
+ * When tool.execute.before fires for a task/agent tool, we store the callID.
+ * When session.created fires for a child session with a parentID, if that
+ * parent has pending task calls, we know the child session corresponds to
+ * one of those tool calls — suppress the duplicate subagent_start and link
+ * the child session to the tool call for stop deduplication.
+ *
+ * Note: we can't match a specific callID to a specific child session (OpenCode
+ * doesn't expose this mapping), but since tool calls are sequential within a
+ * session, we pop the oldest pending call when a child session appears.
+ */
+const pendingTaskCalls = new Map<string, string[]>(); // parentId -> callID[]
+
+/**
+ * Track child session ID -> tool callID for task-tool-spawned child sessions.
+ * These children should NOT emit separate subagent_start/stop since the
+ * tool.execute.before/after hooks already handle those events.
+ */
+const childSessionToCallId = new Map<string, string>();
+
+/**
+ * Track child session ID -> parent session ID for task-tool-spawned children.
+ * Needed for agent_update events when session.updated fires with a real title.
+ */
+const childSessionToParent = new Map<string, string>();
+
+/**
+ * Track which child sessions have already had subagent_stop emitted, to
+ * prevent double-stop from both session.idle AND session.deleted firing.
+ */
+const childStopped = new Set<string>();
+
 // ---------------------------------------------------------------------------
 // Plugin entry point
 // ---------------------------------------------------------------------------
@@ -319,19 +352,34 @@ const plugin: Plugin = async (ctx: PluginInput): Promise<Hooks> => {
             activeSessions.add(session.id);
             const parentID = (session as unknown as { parentID?: string }).parentID;
             if (parentID) {
-              // Child session created via @agent mention — emit subagent_start on parent
-              const agentName = (session as unknown as { agent?: string }).agent ?? "subagent";
-              childToParent.set(session.id, parentID);
-              childToAgent.set(session.id, agentName);
-              await sendEvent(
-                makeEvent("subagent_start", parentID, {
-                  agent_id: `subagent_${session.id}`,
-                  native_agent_id: session.id,
-                  agent_name: agentName,
-                  agent_type: agentName,
-                  summary: `@${agentName} subagent started`,
-                })
-              );
+              // Child session — check if it was spawned by a task tool call.
+              // task tool calls register pending callIDs before their child session appears.
+              const pendingCalls = pendingTaskCalls.get(parentID);
+              if (pendingCalls && pendingCalls.length > 0) {
+                // This child session corresponds to the oldest pending task call.
+                // Suppress duplicate subagent_start — tool.execute.before already fired it.
+                const callId = pendingCalls.shift()!;
+                if (pendingCalls.length === 0) {
+                  pendingTaskCalls.delete(parentID);
+                }
+                childSessionToCallId.set(session.id, callId);
+                childSessionToParent.set(session.id, parentID);
+                debug("Child session", session.id, "linked to task callID", callId, "- suppressing duplicate start");
+              } else {
+                // No pending task call — this is a true @mention subagent session.
+                const agentName = (session as unknown as { agent?: string }).agent ?? "subagent";
+                childToParent.set(session.id, parentID);
+                childToAgent.set(session.id, agentName);
+                await sendEvent(
+                  makeEvent("subagent_start", parentID, {
+                    agent_id: `subagent_${session.id}`,
+                    native_agent_id: session.id,
+                    agent_name: agentName,
+                    agent_type: agentName,
+                    summary: `@${agentName} subagent started`,
+                  })
+                );
+              }
             } else {
               await sendEvent(
                 makeEvent("session_start", session.id, {
@@ -346,55 +394,78 @@ const plugin: Plugin = async (ctx: PluginInput): Promise<Hooks> => {
         case "session.deleted": {
           const session = event.properties.info as Session;
           activeSessions.delete(session.id);
-          const parentID = childToParent.get(session.id);
-          if (parentID) {
-            // Child session deleted — clean up tracking maps
-            const agentName = childToAgent.get(session.id) ?? "subagent";
-            childToParent.delete(session.id);
-            childToAgent.delete(session.id);
-            // Only emit subagent_stop if we haven't already (session.idle fires first usually)
-            await sendEvent(
-              makeEvent("subagent_stop", parentID, {
-                agent_id: `subagent_${session.id}`,
-                native_agent_id: session.id,
-                agent_name: agentName,
-                success: true,
-                reason: "deleted",
-              })
-            );
+
+          if (childSessionToCallId.has(session.id)) {
+            // Task-tool-spawned child — tool.execute.after already handles subagent_stop.
+            // Just clean up our tracking maps.
+            childSessionToCallId.delete(session.id);
+            childSessionToParent.delete(session.id);
+            childStopped.delete(session.id);
+            debug("Child session", session.id, "deleted (task-tool-spawned) — stop handled by tool.execute.after");
           } else {
-            await sendEvent(
-              makeEvent("session_end", session.id, {
-                reason: "deleted",
-              })
-            );
+            const parentID = childToParent.get(session.id);
+            if (parentID) {
+              // @mention child session deleted — clean up tracking maps.
+              const agentName = childToAgent.get(session.id) ?? "subagent";
+              childToParent.delete(session.id);
+              childToAgent.delete(session.id);
+              // Only emit subagent_stop if we haven't already (session.idle fires first usually)
+              if (!childStopped.has(session.id)) {
+                childStopped.add(session.id);
+                await sendEvent(
+                  makeEvent("subagent_stop", parentID, {
+                    agent_id: `subagent_${session.id}`,
+                    native_agent_id: session.id,
+                    agent_name: agentName,
+                    success: true,
+                    reason: "deleted",
+                  })
+                );
+              }
+              childStopped.delete(session.id);
+            } else {
+              await sendEvent(
+                makeEvent("session_end", session.id, {
+                  reason: "deleted",
+                })
+              );
+            }
           }
           break;
         }
 
         case "session.idle": {
           const { sessionID } = event.properties;
-          const parentID = childToParent.get(sessionID);
-          if (parentID) {
-            // Child session (subagent via @mention) went idle — emit subagent_stop on parent
-            const agentName = childToAgent.get(sessionID) ?? "subagent";
-            await sendEvent(
-              makeEvent("subagent_stop", parentID, {
-                agent_id: `subagent_${sessionID}`,
-                native_agent_id: sessionID,
-                agent_name: agentName,
-                success: true,
-                summary: `@${agentName} subagent finished`,
-              })
-            );
+
+          if (childSessionToCallId.has(sessionID)) {
+            // Task-tool-spawned child went idle — tool.execute.after handles it.
+            debug("Child session", sessionID, "idle (task-tool-spawned) — stop handled by tool.execute.after");
           } else {
-            // session.idle fires when the agent finishes processing.
-            // Map to "stop" to trigger the "done working" animation.
-            await sendEvent(
-              makeEvent("stop", sessionID, {
-                summary: "Agent idle",
-              })
-            );
+            const parentID = childToParent.get(sessionID);
+            if (parentID) {
+              // @mention child session went idle — emit subagent_stop on parent.
+              const agentName = childToAgent.get(sessionID) ?? "subagent";
+              if (!childStopped.has(sessionID)) {
+                childStopped.add(sessionID);
+                await sendEvent(
+                  makeEvent("subagent_stop", parentID, {
+                    agent_id: `subagent_${sessionID}`,
+                    native_agent_id: sessionID,
+                    agent_name: agentName,
+                    success: true,
+                    summary: `@${agentName} subagent finished`,
+                  })
+                );
+              }
+            } else {
+              // session.idle fires when the agent finishes processing.
+              // Map to "stop" to trigger the "done working" animation.
+              await sendEvent(
+                makeEvent("stop", sessionID, {
+                  summary: "Agent idle",
+                })
+              );
+            }
           }
           break;
         }
@@ -404,11 +475,29 @@ const plugin: Plugin = async (ctx: PluginInput): Promise<Hooks> => {
           // to update the agent name map for @mention child sessions so the
           // visualizer shows the real name instead of "subagent".
           const updatedSession = event.properties.info as Session;
-          if (childToParent.has(updatedSession.id) && updatedSession.title) {
-            const title = updatedSession.title.trim();
-            if (title && title !== childToAgent.get(updatedSession.id)) {
+          const title = updatedSession.title?.trim();
+          if (!title) break;
+
+          if (childSessionToCallId.has(updatedSession.id)) {
+            // Task-tool-spawned child — update agent name via agent_update event
+            // targeted at the parent session, keyed by callID.
+            const parentID = childSessionToParent.get(updatedSession.id);
+            const callId = childSessionToCallId.get(updatedSession.id)!;
+            if (parentID && title) {
+              debug("Updating task-agent name:", callId, "->", title);
+              await sendEvent(
+                makeEvent("agent_update", parentID, {
+                  agent_id: `subagent_${callId}`,
+                  agent_name: title,
+                  summary: `Agent renamed: ${title}`,
+                })
+              );
+            }
+          } else if (childToParent.has(updatedSession.id)) {
+            // @mention child session — update agent name map
+            if (title !== childToAgent.get(updatedSession.id)) {
               childToAgent.set(updatedSession.id, title);
-              debug("Updated agent name from session.updated:", title);
+              debug("Updated @mention agent name from session.updated:", title);
             }
           }
           break;
@@ -506,6 +595,14 @@ const plugin: Plugin = async (ctx: PluginInput): Promise<Hooks> => {
 
       // For Task/Agent tools, emit subagent_start instead
       if (isSubagentTool(tool)) {
+        // Register this callID as a pending task tool call on this session.
+        // When session.created fires for the child session, it will find this
+        // and link the child session to this callID instead of emitting a
+        // duplicate subagent_start.
+        const pending = pendingTaskCalls.get(sessionID) ?? [];
+        pending.push(callID);
+        pendingTaskCalls.set(sessionID, pending);
+
         await sendEvent(
           makeEvent("subagent_start", sessionID, {
             agent_id: `subagent_${callID}`,
@@ -549,6 +646,17 @@ const plugin: Plugin = async (ctx: PluginInput): Promise<Hooks> => {
       const { tool, sessionID, callID } = input;
 
       if (isSubagentTool(tool)) {
+        // Clean up pendingTaskCalls in case child session never appeared (error case)
+        const pending = pendingTaskCalls.get(sessionID);
+        if (pending) {
+          const idx = pending.indexOf(callID);
+          if (idx !== -1) {
+            pending.splice(idx, 1);
+            if (pending.length === 0) {
+              pendingTaskCalls.delete(sessionID);
+            }
+          }
+        }
         await sendEvent(
           makeEvent("subagent_stop", sessionID, {
             agent_id: `subagent_${callID}`,
