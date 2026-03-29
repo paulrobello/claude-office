@@ -35,6 +35,7 @@ import type { Session } from "@/hooks/useSessions";
 import { useFloorConfig } from "@/hooks/useFloorConfig";
 import { useNavigationStore } from "@/stores/navigationStore";
 import { Breadcrumb } from "@/components/navigation/Breadcrumb";
+import { ViewTransition } from "@/components/navigation/ViewTransition";
 import { BuildingView } from "@/components/views/BuildingView";
 import { FloorView } from "@/components/views/FloorView";
 import { RoomView } from "@/components/views/RoomView";
@@ -389,14 +390,18 @@ export default function V2TestPage(): React.ReactNode {
           <MobileAgentActivity agents={agents} boss={boss} />
         </div>
       ) : (
-        <div className="flex-grow flex gap-2 overflow-hidden min-h-0">
-          {view === "building" && <BuildingView />}
-          {view === "floor" && <FloorView />}
-          {/* Always mount RoomView to avoid PixiJS lifecycle errors on re-mount */}
-          <div className={view === "room" ? "contents" : "hidden"}>
-            <RoomView />
-          </div>
-        </div>
+        <ViewTransition view={view}>
+          {(activeView) => (
+            <>
+              {activeView === "building" && <BuildingView />}
+              {activeView === "floor" && <FloorView />}
+              {/* Always mount RoomView to avoid PixiJS lifecycle errors on re-mount */}
+              <div className={activeView === "room" ? "contents" : "hidden"}>
+                <RoomView />
+              </div>
+            </>
+          )}
+        </ViewTransition>
       )}
 
       {/* Fixed bottom-right toast — never overlaps header or content */}
