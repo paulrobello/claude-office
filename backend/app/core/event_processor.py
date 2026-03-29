@@ -34,6 +34,7 @@ from app.core.handlers import (
     handle_user_prompt_submit,
 )
 from app.core.jsonl_parser import get_last_assistant_response
+from app.core.product_mapper import get_product_mapper
 from app.core.state_machine import StateMachine
 from app.core.task_file_poller import init_task_file_poller
 from app.core.task_persistence import load_tasks, save_tasks
@@ -244,6 +245,17 @@ class EventProcessor:
 
         sm = self.sessions[event.session_id]
 
+        # Sync room assignment from DB to state machine
+        if not sm.floor_id:
+            room_assignment = get_product_mapper().resolve(
+                project_name=event.data.project_name if event.data else None,
+                project_dir=event.data.project_dir if event.data else None,
+                working_dir=event.data.working_dir if event.data else None,
+            )
+            if room_assignment:
+                sm.floor_id = room_assignment.floor_id
+                sm.room_id = room_assignment.room_id
+
         sm.transition(event)
 
         agent_id = event.data.agent_id if event.data and event.data.agent_id else "main"
@@ -400,6 +412,16 @@ class EventProcessor:
             logger.info(f"Restoring session {session_id} from {len(events)} events in DB")
 
             sm = StateMachine()
+
+            # Load room assignment from session record
+            session_result = await db.execute(
+                select(SessionRecord).where(SessionRecord.id == session_id)
+            )
+            session_rec = session_result.scalar_one_or_none()
+            if session_rec:
+                sm.floor_id = session_rec.floor_id
+                sm.room_id = session_rec.room_id
+
             skipped_count = 0
             for rec in events:
                 try:
@@ -522,11 +544,20 @@ class EventProcessor:
             source_dir = project_dir or working_dir
             project_root = derive_git_root(source_dir) if source_dir else None
 
+            # Resolve room assignment via ProductMapper
+            room_assignment = get_product_mapper().resolve(
+                project_name=project_name,
+                project_dir=project_dir,
+                working_dir=working_dir,
+            )
+
             if not session_rec:
                 session_rec = SessionRecord(
                     id=event.session_id,
                     project_name=project_name,
                     project_root=project_root,
+                    floor_id=room_assignment.floor_id if room_assignment else None,
+                    room_id=room_assignment.room_id if room_assignment else None,
                 )
                 db.add(session_rec)
             else:
@@ -539,6 +570,14 @@ class EventProcessor:
                         f"Cached project_root for session {event.session_id}: {project_root}"
                     )
 
+                if room_assignment and not session_rec.room_id:
+                    session_rec.floor_id = room_assignment.floor_id
+                    session_rec.room_id = room_assignment.room_id
+                    logger.info(
+                        f"Assigned session {event.session_id} to room "
+                        f"{room_assignment.floor_id}/{room_assignment.room_id}"
+                    )
+
                 if event.event_type == EventType.SESSION_START:
                     await db.execute(
                         delete(EventRecord).where(EventRecord.session_id == event.session_id)
@@ -549,6 +588,9 @@ class EventProcessor:
                         session_rec.project_name = project_name
                     if project_root:
                         session_rec.project_root = project_root
+                    if room_assignment:
+                        session_rec.floor_id = room_assignment.floor_id
+                        session_rec.room_id = room_assignment.room_id
 
             if event.event_type == EventType.SESSION_END:
                 session_rec.status = "completed"
