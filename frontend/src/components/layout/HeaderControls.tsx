@@ -51,6 +51,7 @@ export function HeaderControls({
     <div className="flex gap-4 items-center">
       <button
         onClick={onSimulate}
+        data-tour-id="simulate-btn"
         className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 rounded text-xs font-bold transition-colors"
       >
         <Play size={14} fill="currentColor" />

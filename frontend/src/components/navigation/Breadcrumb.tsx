@@ -12,6 +12,7 @@ export function Breadcrumb(): React.ReactNode {
     <nav className="flex items-center gap-1.5 text-sm font-mono">
       <button
         onClick={goToBuilding}
+        data-tour-id="breadcrumb-building"
         className={`flex items-center gap-1 px-2 py-0.5 rounded transition-colors ${
           view === "building"
             ? "text-white bg-slate-800"

@@ -21,6 +21,8 @@ function RoomCard({
   return (
     <button
       onClick={onClick}
+      data-tour-id={`room-${room.id}`}
+      data-room-id={room.id}
       className="group flex flex-col rounded-lg overflow-hidden w-56 flex-shrink-0 transition-all duration-200"
       style={
         isActive

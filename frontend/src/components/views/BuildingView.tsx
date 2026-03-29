@@ -20,6 +20,8 @@ function FloorRow({
   return (
     <button
       onClick={onClick}
+      data-tour-id={`floor-${floor.id}`}
+      data-floor-id={floor.id}
       className={`group flex items-stretch w-full rounded-lg border transition-all duration-200 ${
         isPlaceholder
           ? "border-slate-800 bg-slate-900/50 hover:border-slate-700 hover:bg-slate-900"

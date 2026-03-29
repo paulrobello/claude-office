@@ -338,6 +338,7 @@ export function OfficeGame(): ReactNode {
   return (
     <div
       ref={containerRef}
+      data-tour-id="game-canvas"
       className="w-full h-full flex items-center justify-center overflow-hidden relative"
       onClick={handleCanvasClick}
       onMouseMove={handleMouseMove}
