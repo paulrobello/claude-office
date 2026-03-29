@@ -396,7 +396,8 @@ export default function V2TestPage(): React.ReactNode {
         <div className="flex-grow flex gap-2 overflow-hidden min-h-0">
           {view === "building" && <BuildingView />}
           {view === "floor" && <FloorView />}
-          {view === "room" && (
+          {/* Always mount RoomView to avoid PixiJS lifecycle errors on re-mount */}
+          <div className={view === "room" ? "contents" : "hidden"}>
             <RoomView
               sessions={sessions}
               sessionsLoading={sessionsLoading}
@@ -408,7 +409,7 @@ export default function V2TestPage(): React.ReactNode {
               onSessionSelect={handleSessionSelect}
               onDeleteSession={setSessionPendingDelete}
             />
-          )}
+          </div>
         </div>
       )}
     </main>
