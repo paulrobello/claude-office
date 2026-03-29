@@ -77,13 +77,16 @@ class ReplayEntry(TypedDict):
 async def list_sessions(
     db: Annotated[AsyncSession, Depends(get_db)],
     room_id: str | None = None,
+    floor_id: str | None = None,
 ) -> list[SessionSummary]:
-    """List all sessions with event counts, optionally filtered by room."""
-    logger.debug("API: list_sessions called (room_id=%s)", room_id)
+    """List all sessions with event counts, optionally filtered by room or floor."""
+    logger.debug("API: list_sessions called (room_id=%s, floor_id=%s)", room_id, floor_id)
     try:
         stmt = select(SessionRecord).order_by(SessionRecord.updated_at.desc())
         if room_id:
             stmt = stmt.where(SessionRecord.room_id == room_id)
+        if floor_id:
+            stmt = stmt.where(SessionRecord.floor_id == floor_id)
         result = await db.execute(stmt)
         records = result.scalars().all()
 

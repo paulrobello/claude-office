@@ -62,32 +62,9 @@ const TOUR_STEPS: TourStep[] = [
     wideSpotlight: true,
   },
   {
-    id: "rooms-overview",
-    type: "narrated",
-    view: "floor",
-    targetTourId: null,
-    title: "Rooms",
-    description:
-      "Each room is a project. Active rooms have live Claude sessions.",
-    advanceOn: { kind: "timer", durationMs: 4000 },
-    pointerLabel: null,
-    wideSpotlight: true,
-  },
-  {
-    id: "enter-room",
-    type: "interactive",
-    view: "floor",
-    targetTourId: null,
-    title: "Enter a Room",
-    description: "Zoom into a room to see your agents at work.",
-    advanceOn: { kind: "navigation", targetView: "room" },
-    pointerLabel: "scroll or click a room",
-    wideSpotlight: true,
-  },
-  {
     id: "start-simulation",
     type: "interactive",
-    view: "room",
+    view: "floor",
     targetTourId: "simulate-btn",
     title: "Start Simulation",
     description: "Click Simulate to bring the office to life.",
@@ -98,7 +75,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: "agents-arrive",
     type: "narrated",
-    view: "room",
+    view: "floor",
     targetTourId: null,
     title: "Agents Arrive",
     description:
@@ -110,7 +87,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: "inspect-agent",
     type: "interactive",
-    view: "room",
+    view: "floor",
     targetTourId: "game-canvas",
     title: "Inspect an Agent",
     description: "Click on any character to inspect them.",
@@ -121,7 +98,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: "focus-popup",
     type: "narrated",
-    view: "room",
+    view: "floor",
     targetTourId: null,
     title: "Focus Popup",
     description:
@@ -133,7 +110,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: "zoom-out",
     type: "interactive",
-    view: "room",
+    view: "floor",
     targetTourId: "breadcrumb-building",
     title: "Zoom Out",
     description: "Try zooming back out to see the big picture.",

@@ -6,8 +6,6 @@ interface NavigationState {
   view: ViewMode;
   /** Selected floor ID (null when in building view) */
   floorId: string | null;
-  /** Selected room ID (null when not in room view) */
-  roomId: string | null;
   /** Building configuration loaded from backend */
   buildingConfig: BuildingConfig | null;
   /** Whether config is loading */
@@ -42,8 +40,6 @@ interface NavigationState {
   goToBuilding: () => void;
   /** Navigate to a specific floor */
   goToFloor: (floorId: string) => void;
-  /** Navigate to a specific room */
-  goToRoom: (floorId: string, roomId: string) => void;
   /** Set building config from API */
   setBuildingConfig: (config: BuildingConfig) => void;
   /** Set loading state */
@@ -55,7 +51,6 @@ interface NavigationState {
 export const useNavigationStore = create<NavigationState>((set, get) => ({
   view: "building",
   floorId: null,
-  roomId: null,
   buildingConfig: null,
   isLoading: true,
   transitionOrigin: null,
@@ -71,25 +66,14 @@ export const useNavigationStore = create<NavigationState>((set, get) => ({
     set({
       view: "building",
       floorId: null,
-      roomId: null,
       transitionDirection: "zoom-out",
       isTransitioning: true,
     }),
 
   goToFloor: (floorId) =>
-    set((state) => ({
+    set({
       view: "floor",
       floorId,
-      roomId: null,
-      transitionDirection: state.view === "building" ? "zoom-in" : "zoom-out",
-      isTransitioning: true,
-    })),
-
-  goToRoom: (floorId, roomId) =>
-    set({
-      view: "room",
-      floorId,
-      roomId,
       transitionDirection: "zoom-in",
       isTransitioning: true,
     }),

@@ -55,21 +55,6 @@ function FloorRow({
         </div>
       </div>
 
-      {/* Room windows preview */}
-      <div className="flex items-center gap-1.5 px-4">
-        {floor.rooms.map((room) => (
-          <div
-            key={room.id}
-            className={`w-3 h-5 rounded-sm ${
-              isPlaceholder
-                ? "bg-slate-800"
-                : "bg-slate-700 group-hover:bg-slate-600"
-            }`}
-            title={room.repo_name}
-          />
-        ))}
-      </div>
-
       {/* Arrow */}
       <div className="flex items-center px-4 text-slate-600 group-hover:text-slate-400 transition-colors">
         →

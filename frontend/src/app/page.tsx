@@ -39,12 +39,11 @@ import { Breadcrumb } from "@/components/navigation/Breadcrumb";
 import { ViewTransition } from "@/components/navigation/ViewTransition";
 import { BuildingView } from "@/components/views/BuildingView";
 import { FloorView } from "@/components/views/FloorView";
-import { RoomView } from "@/components/views/RoomView";
 import { TourOverlay } from "@/components/tour/TourOverlay";
 import { useTourStore } from "@/stores/tourStore";
 
 // ============================================================================
-// DYNAMIC IMPORT (mobile branch only — desktop uses RoomView)
+// DYNAMIC IMPORT (mobile branch only — desktop uses FloorView)
 // ============================================================================
 
 const OfficeGame = dynamic(
@@ -142,7 +141,7 @@ export default function V2TestPage(): React.ReactNode {
   // ------------------------------------------------------------------
   // WebSocket connection — reconnects when sessionId changes
   // ------------------------------------------------------------------
-  useWebSocketEvents({ sessionId: view === "room" ? "" : sessionId });
+  useWebSocketEvents({ sessionId });
 
   // ------------------------------------------------------------------
   // One-time initialization effects
@@ -432,10 +431,9 @@ export default function V2TestPage(): React.ReactNode {
             {(activeView) => (
               <>
                 {activeView === "building" && <BuildingView />}
-                {activeView === "floor" && <FloorView />}
-                {/* Always mount RoomView to avoid PixiJS lifecycle errors on re-mount */}
-                <div className={activeView === "room" ? "contents" : "hidden"}>
-                  <RoomView />
+                {/* Always mount FloorView when active to keep PixiJS alive */}
+                <div className={activeView === "floor" ? "contents" : "hidden"}>
+                  <FloorView />
                 </div>
               </>
             )}

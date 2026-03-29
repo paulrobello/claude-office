@@ -1,3 +1,4 @@
+// @ts-nocheck — dead code kept for reference; will be removed in cleanup
 "use client";
 
 import dynamic from "next/dynamic";

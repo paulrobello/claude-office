@@ -1,5 +1,5 @@
-/** View modes for the three-tier navigation */
-export type ViewMode = "building" | "floor" | "room";
+/** View modes for the two-tier navigation */
+export type ViewMode = "building" | "floor";
 
 /** Room configuration from backend */
 export interface RoomConfig {

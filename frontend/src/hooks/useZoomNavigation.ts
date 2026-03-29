@@ -17,11 +17,11 @@ interface ZoomState {
 /**
  * Adds scroll/pinch-to-zoom navigation between views.
  *
- * In Building/Floor views, scrolling in toward an element scales the view
- * with CSS transforms. When the scale crosses SNAP_THRESHOLD, it triggers
- * a view transition to the element under the cursor.
+ * In Building view, scrolling in toward a floor scales the view with CSS
+ * transforms. When the scale crosses SNAP_THRESHOLD, it triggers a view
+ * transition to the floor under the cursor.
  *
- * In Room view, this hook is inactive — react-zoom-pan-pinch handles zoom.
+ * In Floor view, this hook is inactive — react-zoom-pan-pinch handles zoom.
  */
 export function useZoomNavigation(containerRef: React.RefObject<HTMLDivElement | null>): ZoomState {
   const view = useNavigationStore((s) => s.view);
@@ -31,8 +31,8 @@ export function useZoomNavigation(containerRef: React.RefObject<HTMLDivElement |
 
   const handleWheel = useCallback(
     (e: WheelEvent) => {
-      // In room view, let react-zoom-pan-pinch handle it
-      if (view === "room") return;
+      // Only handle zoom in building view; floor view uses react-zoom-pan-pinch
+      if (view !== "building") return;
       // Don't interfere during transitions
       if (isTransitioning) return;
       // Cooldown after snap
@@ -48,34 +48,15 @@ export function useZoomNavigation(containerRef: React.RefObject<HTMLDivElement |
       setZoom((prev) => {
         const newScale = Math.max(0.3, Math.min(4, prev.scale + zoomDelta));
 
-        // Check for snap-in threshold
+        // Check for snap-in threshold (building → floor)
         if (newScale >= SNAP_THRESHOLD) {
           lastSnapTime.current = Date.now();
 
-          const target = findTargetUnderCursor(e.clientX, e.clientY, view);
-          if (target) {
+          const target = findTargetUnderCursor(e.clientX, e.clientY);
+          if (target?.floorId) {
             const store = useNavigationStore.getState();
             store.setTransitionOrigin({ x: e.clientX, y: e.clientY });
-
-            if (view === "building" && target.floorId) {
-              store.goToFloor(target.floorId);
-            } else if (view === "floor" && target.floorId && target.roomId) {
-              store.goToRoom(target.floorId, target.roomId);
-            }
-          }
-
-          return { scale: 1, originX: 0, originY: 0 };
-        }
-
-        // Check for snap-out threshold
-        if (newScale <= SNAP_OUT_THRESHOLD) {
-          lastSnapTime.current = Date.now();
-
-          const store = useNavigationStore.getState();
-          store.setTransitionOrigin({ x: e.clientX, y: e.clientY });
-
-          if (view === "floor") {
-            store.goToBuilding();
+            store.goToFloor(target.floorId);
           }
 
           return { scale: 1, originX: 0, originY: 0 };
@@ -105,27 +86,19 @@ export function useZoomNavigation(containerRef: React.RefObject<HTMLDivElement |
 }
 
 /**
- * Find the floor or room element under the cursor using data attributes.
+ * Find the floor element under the cursor using data attributes.
  */
 function findTargetUnderCursor(
   clientX: number,
   clientY: number,
-  view: string,
-): { floorId?: string; roomId?: string } | null {
+): { floorId?: string } | null {
   const elements = document.elementsFromPoint(clientX, clientY);
 
   for (const el of elements) {
     if (!(el instanceof HTMLElement)) continue;
 
-    if (view === "building" && el.dataset.floorId) {
+    if (el.dataset.floorId) {
       return { floorId: el.dataset.floorId };
-    }
-
-    if (view === "floor" && el.dataset.roomId) {
-      const floorId = useNavigationStore.getState().floorId;
-      if (floorId) {
-        return { floorId, roomId: el.dataset.roomId };
-      }
     }
   }
 
