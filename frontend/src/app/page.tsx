@@ -21,10 +21,8 @@ import {
 } from "@/stores/gameStore";
 import { useShallow } from "zustand/react/shallow";
 import { Menu, X } from "lucide-react";
-import { SessionSidebar } from "@/components/layout/SessionSidebar";
 import { MobileDrawer } from "@/components/layout/MobileDrawer";
 import { MobileAgentActivity } from "@/components/layout/MobileAgentActivity";
-import { RightSidebar } from "@/components/layout/RightSidebar";
 import { HeaderControls } from "@/components/layout/HeaderControls";
 import {
   StatusToast,

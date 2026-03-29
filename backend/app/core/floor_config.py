@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 import tomli
 from pydantic import BaseModel, Field
@@ -42,13 +43,13 @@ class FloorConfig(BaseModel):
     floor_number: int
     accent: str
     icon: str
-    rooms: list[RoomConfig] = Field(default_factory=list)
+    rooms: list[RoomConfig] = Field(default_factory=lambda: [])
 
 
 class BuildingConfig(BaseModel):
     """Top-level building configuration."""
 
-    floors: list[FloorConfig] = Field(default_factory=list)
+    floors: list[FloorConfig] = Field(default_factory=lambda: [])
 
     def get_floor(self, floor_id: str) -> FloorConfig | None:
         """Look up a floor by its generated id."""
@@ -77,7 +78,7 @@ def load_building_config(
     Returns:
         A :class:`BuildingConfig`. Returns an empty config on errors.
     """
-    raw: dict = {}
+    raw: dict[str, Any] = {}
 
     if toml_string is not None:
         raw = tomli.loads(toml_string)
@@ -89,15 +90,18 @@ def load_building_config(
 
     floors: list[FloorConfig] = []
     for entry in raw.get("floors", []):
-        floor_id = entry["name"].lower().replace(" ", "")
-        rooms = [RoomConfig(id=r, repo_name=r) for r in entry.get("repos", [])]
+        entry_dict: dict[str, Any] = entry
+        floor_id: str = entry_dict["name"].lower().replace(" ", "")
+        rooms: list[RoomConfig] = [
+            RoomConfig(id=str(r), repo_name=str(r)) for r in entry_dict.get("repos", [])
+        ]
         floors.append(
             FloorConfig(
                 id=floor_id,
-                name=entry["name"],
-                floor_number=entry["floor_number"],
-                accent=entry["accent"],
-                icon=entry["icon"],
+                name=str(entry_dict["name"]),
+                floor_number=int(entry_dict["floor_number"]),
+                accent=str(entry_dict["accent"]),
+                icon=str(entry_dict["icon"]),
                 rooms=rooms,
             )
         )

@@ -2,10 +2,7 @@
 
 from pathlib import Path
 
-import pytest
-
-from app.core.floor_config import FloorConfig, RoomConfig, BuildingConfig, load_building_config
-
+from app.core.floor_config import RoomConfig, load_building_config
 
 SAMPLE_TOML = """
 [[floors]]
