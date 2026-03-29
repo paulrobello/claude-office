@@ -90,6 +90,11 @@ export interface AgentAnimationState {
 
   // Animation state
   isTyping: boolean; // True when agent is actively using tools
+
+  // Character type overlays (from backend)
+  characterType?: string | null;
+  parentSessionId?: string | null;
+  parentId?: string | null;
 }
 
 /**
@@ -418,6 +423,9 @@ export const useGameStore = create<GameStore>()(
           queueType: null,
           queueIndex: -1,
           isTyping: false,
+          characterType: backendAgent.characterType ?? null,
+          parentSessionId: backendAgent.parentSessionId ?? null,
+          parentId: backendAgent.parentId ?? null,
         };
         newAgents.set(backendAgent.id, animState);
 
@@ -1091,6 +1099,9 @@ export const useGameStore = create<GameStore>()(
                 currentTask: backendAgent.currentTask ?? null,
                 desk: backendAgent.desk ?? null,
                 name: backendAgent.name ?? null,
+                characterType: backendAgent.characterType ?? null,
+                parentSessionId: backendAgent.parentSessionId ?? null,
+                parentId: backendAgent.parentId ?? null,
               });
             }
           }

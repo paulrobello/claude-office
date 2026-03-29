@@ -30,8 +30,8 @@ export function RoomView(): React.ReactNode {
   const { sessions, loading, sessionId, selectSession } =
     useRoomSessions(roomId);
 
-  // Connect WebSocket to the selected session
-  useWebSocketEvents({ sessionId });
+  // Connect WebSocket to the room (merged view) or fallback to selected session
+  useWebSocketEvents({ sessionId, roomId: roomId ?? undefined });
 
   return (
     <div className="flex-grow flex gap-2 overflow-hidden min-h-0">

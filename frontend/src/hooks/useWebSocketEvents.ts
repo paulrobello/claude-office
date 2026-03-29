@@ -25,6 +25,7 @@ import type { GameState, WebSocketMessage, Position } from "@/types";
 interface UseWebSocketEventsOptions {
   sessionId: string;
   enabled?: boolean;
+  roomId?: string;
 }
 
 // ============================================================================
@@ -34,6 +35,7 @@ interface UseWebSocketEventsOptions {
 export function useWebSocketEvents({
   sessionId,
   enabled = true,
+  roomId,
 }: UseWebSocketEventsOptions): void {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -421,7 +423,9 @@ export function useWebSocketEvents({
       reconnectTimeoutRef.current = null;
     }
 
-    const wsUrl = `ws://localhost:8000/ws/${sessionId}`;
+    const wsUrl = roomId
+      ? `ws://localhost:8000/ws/room/${roomId}`
+      : `ws://localhost:8000/ws/${sessionId}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -477,7 +481,7 @@ export function useWebSocketEvents({
         }, 2000);
       }
     };
-  }, [sessionId, enabled, handleMessage, setConnected, setSessionId]);
+  }, [sessionId, roomId, enabled, handleMessage, setConnected, setSessionId]);
 
   // Effect to manage WebSocket connection
   useEffect(() => {
@@ -504,7 +508,7 @@ export function useWebSocketEvents({
         reconnectTimeoutRef.current = null;
       }
     };
-  }, [sessionId, enabled, connect]);
+  }, [sessionId, roomId, enabled, connect]);
 }
 
 // ============================================================================

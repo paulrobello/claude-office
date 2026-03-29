@@ -555,6 +555,82 @@ export function OfficeGame(): ReactNode {
                       />
                     ))}
 
+                  {/* Character Type Overlays - crown/badge/dot per agent type */}
+                  {Array.from(agents.values())
+                    .filter(
+                      (agent) =>
+                        agent.characterType &&
+                        !isInElevatorZone(agent.currentPosition),
+                    )
+                    .map((agent) => (
+                      <pixiContainer
+                        key={`chartype-${agent.id}`}
+                        zIndex={agent.currentPosition.y + 20}
+                      >
+                        {/* Lead crown overlay */}
+                        {agent.characterType === "lead" && (
+                          <pixiText
+                            text="👑"
+                            style={{ fontSize: 14 }}
+                            x={agent.currentPosition.x - 8}
+                            y={agent.currentPosition.y - 52}
+                          />
+                        )}
+
+                        {/* Teammate badge + nameplate overlay */}
+                        {agent.characterType === "teammate" && (
+                          <>
+                            <pixiText
+                              text="🎖️"
+                              style={{ fontSize: 10 }}
+                              x={agent.currentPosition.x - 6}
+                              y={agent.currentPosition.y - 46}
+                            />
+                            {agent.name && (
+                              <pixiText
+                                text={agent.name}
+                                style={{
+                                  fontSize: 7,
+                                  fill: agent.color ?? "#3b82f6",
+                                  fontFamily: "monospace",
+                                  fontWeight: "bold",
+                                }}
+                                x={agent.currentPosition.x - 18}
+                                y={agent.currentPosition.y - 34}
+                              />
+                            )}
+                          </>
+                        )}
+
+                        {/* Subagent shoulder dot */}
+                        {agent.characterType === "subagent" && (
+                          <pixiGraphics
+                            draw={(g) => {
+                              const parentAgent = agent.parentId
+                                ? Array.from(agents.values()).find(
+                                    (a) => a.id === agent.parentId,
+                                  )
+                                : null;
+                              const dotColor = parentAgent?.color ?? "#f59e0b";
+                              g.clear();
+                              g.circle(0, 0, 4);
+                              g.fill({
+                                color: parseInt(dotColor.replace("#", ""), 16),
+                              });
+                              g.circle(0, 0, 4);
+                              g.stroke({
+                                color: 0xffffff,
+                                alpha: 0.4,
+                                width: 1,
+                              });
+                            }}
+                            x={agent.currentPosition.x + 10}
+                            y={agent.currentPosition.y - 28}
+                          />
+                        )}
+                      </pixiContainer>
+                    ))}
+
                   {/* Bubbles Layer - rendered on top of everything */}
                   {Array.from(agents.values())
                     .filter(

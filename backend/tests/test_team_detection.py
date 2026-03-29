@@ -2,6 +2,7 @@
 """Tests for team detection and orchestrator routing in EventProcessor."""
 
 import asyncio
+from typing import Any
 
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -31,7 +32,7 @@ def ensure_test_db() -> None:
     override_engine(engine)
 
 
-def _make_event(event_type: EventType, session_id: str = "s1", **kwargs: object) -> Event:
+def _make_event(event_type: EventType, session_id: str = "s1", **kwargs: Any) -> Event:
     return Event(
         event_type=event_type,
         session_id=session_id,
@@ -44,8 +45,10 @@ class TestTeamDetection:
     async def test_lead_session_detected_when_no_teammate_name(self) -> None:
         ep = EventProcessor()
         event = _make_event(
-            EventType.SESSION_START, session_id="lead-sess",
-            team_name="squad", project_name="myapp",
+            EventType.SESSION_START,
+            session_id="lead-sess",
+            team_name="squad",
+            project_name="myapp",
         )
         await ep.process_event(event)
         sm = ep.sessions.get("lead-sess")
@@ -57,8 +60,11 @@ class TestTeamDetection:
     async def test_teammate_session_detected_when_teammate_name_present(self) -> None:
         ep = EventProcessor()
         event = _make_event(
-            EventType.SESSION_START, session_id="tm-sess",
-            team_name="squad", teammate_name="implementer", project_name="myapp",
+            EventType.SESSION_START,
+            session_id="tm-sess",
+            team_name="squad",
+            teammate_name="implementer",
+            project_name="myapp",
         )
         await ep.process_event(event)
         sm = ep.sessions.get("tm-sess")
@@ -72,7 +78,8 @@ class TestTeamDetection:
         ep = EventProcessor()
         # Solo session gets an orchestrator for its room
         event = _make_event(
-            EventType.SESSION_START, session_id="solo-sess",
+            EventType.SESSION_START,
+            session_id="solo-sess",
             project_name="panoptica",
         )
         await ep.process_event(event)
@@ -86,7 +93,8 @@ class TestOrchestratorUpdated:
     async def test_orchestrator_updated_on_event(self) -> None:
         ep = EventProcessor()
         event = _make_event(
-            EventType.SESSION_START, session_id="s1",
+            EventType.SESSION_START,
+            session_id="s1",
             project_name="myapp",
         )
         await ep.process_event(event)
