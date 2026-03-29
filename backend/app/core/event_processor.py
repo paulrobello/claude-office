@@ -19,7 +19,12 @@ from sqlalchemy import delete, select
 
 from app.config import get_settings
 from app.core.beads_poller import get_beads_poller, has_beads, init_beads_poller
-from app.core.broadcast_service import broadcast_error, broadcast_event, broadcast_state
+from app.core.broadcast_service import (
+    broadcast_error,
+    broadcast_event,
+    broadcast_room_state,
+    broadcast_state,
+)
 from app.core.handlers import (
     enrich_agent_from_transcript,
     ensure_task_poller_running,
@@ -35,6 +40,7 @@ from app.core.handlers import (
 )
 from app.core.jsonl_parser import get_last_assistant_response
 from app.core.product_mapper import get_product_mapper
+from app.core.room_orchestrator import RoomOrchestrator
 from app.core.state_machine import StateMachine
 from app.core.task_file_poller import init_task_file_poller
 from app.core.task_persistence import load_tasks, save_tasks
@@ -84,6 +90,19 @@ def derive_git_root(working_dir: str) -> str | None:
     return None
 
 
+async def _find_lead_session(
+    sess: Any, team_name: str
+) -> "SessionRecord | None":
+    """Find the lead session for a team."""
+    result = await sess.execute(
+        select(SessionRecord).where(
+            SessionRecord.team_name == team_name,
+            SessionRecord.is_lead.is_(True),
+        ).limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
 class EventProcessor:
     """Routes Claude Code hook events to focused handler modules.
 
@@ -98,6 +117,7 @@ class EventProcessor:
 
     def __init__(self) -> None:
         self.sessions: dict[str, StateMachine] = {}
+        self.orchestrators: dict[str, RoomOrchestrator] = {}  # room_id -> orchestrator
         self._sessions_lock = asyncio.Lock()
         self._transcript_poller_initialized = False
         self._task_poller_initialized = False
@@ -173,7 +193,11 @@ class EventProcessor:
             session_id: Identifier for the session to purge.
         """
         async with self._sessions_lock:
-            self.sessions.pop(session_id, None)
+            sm = self.sessions.pop(session_id, None)
+            if sm and sm.room_id and sm.room_id in self.orchestrators:
+                self.orchestrators[sm.room_id].remove_session(session_id)
+                if self.orchestrators[sm.room_id].is_empty:
+                    del self.orchestrators[sm.room_id]
 
     async def clear_all_sessions(self) -> None:
         """Clear all in-memory session state."""
@@ -256,6 +280,25 @@ class EventProcessor:
                 sm.floor_id = room_assignment.floor_id
                 sm.room_id = room_assignment.room_id
 
+        # Sync team identity from SessionRecord to StateMachine
+        async with AsyncSessionLocal() as sess:
+            record = await sess.get(SessionRecord, event.session_id)
+            if record:
+                if record.team_name and not sm.team_name:
+                    sm.team_name = record.team_name
+                    sm.teammate_name = record.teammate_name
+                    sm.is_lead = record.is_lead
+
+                # Teammate inherits lead's room assignment
+                if record.team_name and not record.is_lead and not sm.room_id:
+                    lead = await _find_lead_session(sess, record.team_name)
+                    if lead and lead.room_id:
+                        sm.room_id = lead.room_id
+                        sm.floor_id = lead.floor_id
+                        record.room_id = lead.room_id
+                        record.floor_id = lead.floor_id
+                        await sess.commit()
+
         sm.transition(event)
 
         agent_id = event.data.agent_id if event.data and event.data.agent_id else "main"
@@ -323,6 +366,14 @@ class EventProcessor:
         # ------------------------------------------------------------------
         await broadcast_state(event.session_id, sm)
         await broadcast_event(event.session_id, event_dict)
+
+        # Update orchestrator and broadcast room-level state
+        if sm.room_id:
+            if sm.room_id not in self.orchestrators:
+                self.orchestrators[sm.room_id] = RoomOrchestrator(sm.room_id)
+            orch = self.orchestrators[sm.room_id]
+            orch.update_session(event.session_id, sm)
+            await broadcast_room_state(sm.room_id, orch)
 
         # ------------------------------------------------------------------
         # SUBAGENT_START
@@ -591,6 +642,13 @@ class EventProcessor:
                     if room_assignment:
                         session_rec.floor_id = room_assignment.floor_id
                         session_rec.room_id = room_assignment.room_id
+
+            # Sync team fields to SessionRecord
+            if event.data and event.data.team_name:
+                session_rec.team_name = event.data.team_name
+                session_rec.teammate_name = event.data.teammate_name
+                # Lead: teammate_name absent in payload
+                session_rec.is_lead = (event.data.teammate_name is None)
 
             if event.event_type == EventType.SESSION_END:
                 session_rec.status = "completed"

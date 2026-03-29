@@ -16,6 +16,7 @@ __all__ = [
     "broadcast_state",
     "broadcast_event",
     "broadcast_error",
+    "broadcast_room_state",
 ]
 
 
@@ -53,6 +54,11 @@ async def broadcast_event(
         "event": dict(event_dict),
     }
     await manager.broadcast(payload, session_id)
+
+
+async def broadcast_room_state(room_id: str, orchestrator: Any) -> None:
+    """Stub for Task 6. Broadcast merged room state to room WebSocket subscribers."""
+    pass
 
 
 async def broadcast_error(session_id: str, message: str, timestamp: str) -> None:
