@@ -11,6 +11,18 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { GitStatusPanel } from "@/components/game/GitStatusPanel";
 import type { Session } from "@/hooks/useSessions";
+import { useRef, useState, useCallback } from "react";
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const SIDEBAR_MIN_WIDTH = 180;
+const SIDEBAR_MAX_WIDTH = 500;
+const SIDEBAR_DEFAULT_WIDTH = 288; // equivalent to w-72
+const SESSIONS_MIN_HEIGHT = 80;
+const SESSIONS_MAX_HEIGHT = 800;
+const SESSIONS_DEFAULT_HEIGHT = 280;
 
 // ============================================================================
 // TYPES
@@ -32,8 +44,8 @@ interface SessionSidebarProps {
 
 /**
  * Desktop left sidebar containing the collapsible session browser and git
- * status panel. The collapse toggle always renders so the sidebar remains
- * accessible at its minimum width when collapsed.
+ * status panel. Supports drag-to-resize both the sidebar width (right edge)
+ * and the sessions panel height (divider between sessions and git status).
  */
 export function SessionSidebar({
   sessions,
@@ -44,11 +56,76 @@ export function SessionSidebar({
   onSessionSelect,
   onDeleteSession,
 }: SessionSidebarProps): React.ReactNode {
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
+  const [sessionsHeight, setSessionsHeight] = useState(SESSIONS_DEFAULT_HEIGHT);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // ==== Horizontal resize (right edge) ========================================================================
+  const handleWidthDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsDragging(true);
+      document.body.style.cursor = "ew-resize";
+      const startX = e.clientX;
+      const startWidth = sidebarWidth;
+
+      const onMouseMove = (ev: MouseEvent) => {
+        // Dragging right edge: moving right increases width
+        const newWidth = Math.min(
+          SIDEBAR_MAX_WIDTH,
+          Math.max(SIDEBAR_MIN_WIDTH, startWidth + (ev.clientX - startX)),
+        );
+        setSidebarWidth(newWidth);
+      };
+
+      const onMouseUp = () => {
+        setIsDragging(false);
+        document.body.style.cursor = "";
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+      };
+
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    },
+    [sidebarWidth],
+  );
+
+  // ==== Vertical resize (sessions ↕ events divider) ========================================================================
+  const handleHeightDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsDragging(true);
+      document.body.style.cursor = "ns-resize";
+      const startY = e.clientY;
+      const startHeight = sessionsHeight;
+
+      const onMouseMove = (ev: MouseEvent) => {
+        const newHeight = Math.min(
+          SESSIONS_MAX_HEIGHT,
+          Math.max(SESSIONS_MIN_HEIGHT, startHeight + ev.clientY - startY),
+        );
+        setSessionsHeight(newHeight);
+      };
+
+      const onMouseUp = () => {
+        setIsDragging(false);
+        document.body.style.cursor = "";
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+      };
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    },
+    [sessionsHeight],
+  );
+
   return (
     <aside
-      className={`flex flex-col gap-1.5 flex-shrink-0 overflow-hidden transition-all duration-300 ${
-        isCollapsed ? "w-10" : "w-72"
+      className={`relative flex flex-col gap-1.5 flex-shrink-0 overflow-hidden ${
+        isDragging ? "select-none" : "transition-all duration-300"
       }`}
+      style={{ width: isCollapsed ? 40 : sidebarWidth }}
     >
       {/* Collapse Toggle */}
       <button
@@ -66,8 +143,11 @@ export function SessionSidebar({
       {!isCollapsed && (
         <>
           {/* Session Browser */}
-          <div className="bg-slate-950 border border-slate-800 rounded-lg overflow-hidden flex-shrink-0 max-h-[40%]">
-            <div className="bg-slate-900 px-3 py-2 border-b border-slate-800 flex items-center gap-2">
+          <div
+            className="bg-slate-950 border border-slate-800 rounded-lg overflow-hidden flex-shrink-0 flex flex-col"
+            style={{ height: sessionsHeight }}
+          >
+            <div className="bg-slate-900 px-3 py-2 border-b border-slate-800 flex items-center gap-2 flex-shrink-0">
               <History size={14} className="text-purple-500" />
               <span className="text-slate-300 font-bold uppercase tracking-wider text-xs">
                 Sessions
@@ -77,7 +157,7 @@ export function SessionSidebar({
               </span>
             </div>
 
-            <div className="overflow-y-auto max-h-72 p-2">
+            <div className="overflow-y-auto flex-grow p-2">
               {sessionsLoading && sessions.length === 0 ? (
                 <div className="p-4 text-center text-slate-600 text-xs italic">
                   Loading sessions...
@@ -159,11 +239,29 @@ export function SessionSidebar({
             </div>
           </div>
 
+          {/* Vertical Resize Handle (sessions $ git status) */}
+          <div
+            className="flex-shrink-0 h-3 cursor-ns-resize flex items-center justify-center group -my-1"
+            onMouseDown={handleHeightDragStart}
+            title="Drag to resize"
+          >
+            <div className="w-10 h-1 rounded-full bg-slate-700 group-hover:bg-purple-500 transition-colors" />
+          </div>
+
           {/* Git Status Panel */}
           <div className="flex-grow min-h-0">
             <GitStatusPanel />
           </div>
         </>
+      )}
+
+      {/* Horizontal Resize Handle (right edge) */}
+      {!isCollapsed && (
+        <div
+          className="absolute right-0 top-0 w-1.5 h-full cursor-ew-resize z-10 hover:bg-purple-500/40 transition-colors"
+          onMouseDown={handleWidthDragStart}
+          title="Drag to resize"
+        />
       )}
     </aside>
   );
