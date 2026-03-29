@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ViewMode, BuildingConfig, FloorConfig } from "@/types/navigation";
+import type { ViewMode, BuildingConfig, FloorConfig, TransitionDirection } from "@/types/navigation";
 
 interface NavigationState {
   /** Current view mode */
@@ -12,6 +12,16 @@ interface NavigationState {
   buildingConfig: BuildingConfig | null;
   /** Whether config is loading */
   isLoading: boolean;
+  /** Pixel coordinates of the click/scroll that triggered the transition */
+  transitionOrigin: { x: number; y: number } | null;
+  /** Direction of the current transition */
+  transitionDirection: TransitionDirection;
+  /** Whether a transition animation is in progress */
+  isTransitioning: boolean;
+  /** Set transition origin for the next navigation */
+  setTransitionOrigin: (origin: { x: number; y: number } | null) => void;
+  /** Mark transition as complete */
+  completeTransition: () => void;
   /** All sessions from backend (for room/floor summaries) */
   allSessions: {
     id: string;
@@ -48,14 +58,41 @@ export const useNavigationStore = create<NavigationState>((set, get) => ({
   roomId: null,
   buildingConfig: null,
   isLoading: true,
+  transitionOrigin: null,
+  transitionDirection: null,
+  isTransitioning: false,
+  setTransitionOrigin: (origin) => set({ transitionOrigin: origin }),
+  completeTransition: () =>
+    set({ isTransitioning: false, transitionDirection: null, transitionOrigin: null }),
   allSessions: [],
   setAllSessions: (sessions) => set({ allSessions: sessions }),
 
-  goToBuilding: () => set({ view: "building", floorId: null, roomId: null }),
+  goToBuilding: () =>
+    set({
+      view: "building",
+      floorId: null,
+      roomId: null,
+      transitionDirection: "zoom-out",
+      isTransitioning: true,
+    }),
 
-  goToFloor: (floorId) => set({ view: "floor", floorId, roomId: null }),
+  goToFloor: (floorId) =>
+    set((state) => ({
+      view: "floor",
+      floorId,
+      roomId: null,
+      transitionDirection: state.view === "building" ? "zoom-in" : "zoom-out",
+      isTransitioning: true,
+    })),
 
-  goToRoom: (floorId, roomId) => set({ view: "room", floorId, roomId }),
+  goToRoom: (floorId, roomId) =>
+    set({
+      view: "room",
+      floorId,
+      roomId,
+      transitionDirection: "zoom-in",
+      isTransitioning: true,
+    }),
 
   setBuildingConfig: (config) =>
     set({ buildingConfig: config, isLoading: false }),

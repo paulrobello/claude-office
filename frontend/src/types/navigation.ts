@@ -22,3 +22,6 @@ export interface BuildingConfig {
   building_name: string;
   floors: FloorConfig[];
 }
+
+/** Direction of the view transition animation */
+export type TransitionDirection = "zoom-in" | "zoom-out" | null;
