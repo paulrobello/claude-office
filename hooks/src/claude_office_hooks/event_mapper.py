@@ -287,6 +287,26 @@ def _handle_session_end(raw_data: dict[str, Any], data: dict[str, Any]) -> None:
     data["reason"] = raw_data.get("reason")
 
 
+def _handle_task_created(raw_data: dict[str, Any], data: dict[str, Any]) -> None:
+    """Populate data for a task_created event."""
+    # Claude Code may nest task data under "task" key or at top level
+    task = raw_data.get("task") or raw_data
+    data["task_id"] = task.get("id") or raw_data.get("id")
+    data["task_subject"] = task.get("content") or raw_data.get("content")
+
+
+def _handle_task_completed(raw_data: dict[str, Any], data: dict[str, Any]) -> None:
+    """Populate data for a task_completed event."""
+    task = raw_data.get("task") or raw_data
+    data["task_id"] = task.get("id") or raw_data.get("id")
+    data["task_subject"] = task.get("content") or raw_data.get("content")
+
+
+def _handle_teammate_idle(raw_data: dict[str, Any], data: dict[str, Any]) -> None:
+    """Populate data for a teammate_idle event (no extra fields beyond team fields)."""
+    pass  # team_name and teammate_name are extracted globally below
+
+
 def map_event(
     event_type: str,
     raw_data: dict[str, Any],
@@ -331,6 +351,14 @@ def map_event(
     task_list_id = os.environ.get("CLAUDE_CODE_TASK_LIST_ID")
     if task_list_id:
         data["task_list_id"] = task_list_id
+
+    # Extract team fields — present on ALL events from Agent Teams sessions
+    team_name = raw_data.get("team_name") or os.environ.get("CLAUDE_TEAM_NAME")
+    if team_name:
+        data["team_name"] = team_name
+    teammate_name = raw_data.get("teammate_name") or os.environ.get("CLAUDE_TEAMMATE_NAME")
+    if teammate_name:
+        data["teammate_name"] = teammate_name
 
     payload: dict[str, Any] = {
         "event_type": event_type,
@@ -381,5 +409,14 @@ def map_event(
 
     elif event_type == "session_end":
         _handle_session_end(raw_data, data)
+
+    elif event_type == "task_created":
+        _handle_task_created(raw_data, data)
+
+    elif event_type == "task_completed":
+        _handle_task_completed(raw_data, data)
+
+    elif event_type == "teammate_idle":
+        _handle_teammate_idle(raw_data, data)
 
     return payload

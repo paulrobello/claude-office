@@ -18,6 +18,10 @@ HOOK_TYPES = [
     "SubagentStart",
     "SubagentStop",
     "PreCompact",
+    # Phase 4: Agent Teams
+    "TaskCreated",
+    "TaskCompleted",
+    "TeammateIdle",
 ]
 
 
