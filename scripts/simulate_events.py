@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Simulation entry point for the Claude Office Visualizer.
 
-Runs one of three pre-built scenarios against the backend API:
+Runs one of five pre-built scenarios against the backend API:
 
+  quick       All visual elements, no compaction (~45 s)
   basic       Simple agent spawn/complete (~60 s)
   complex     Multi-agent workflow with context compaction (~5-10 min) [default]
   edge_cases  Error handling, permissions, orphan cleanup (~2 min)
+  teams       Agent Teams: lead + 3 teammates + subagents + kanban (~4 min)
 
 Usage::
 
@@ -32,11 +34,15 @@ from scripts.scenarios._base import SimulationContext
 from scripts.scenarios.basic import run as run_basic
 from scripts.scenarios.complex import run as run_complex
 from scripts.scenarios.edge_cases import run as run_edge_cases
+from scripts.scenarios.quick import run as run_quick
+from scripts.scenarios.teams import run as run_teams
 
 SCENARIOS: dict[str, object] = {
+    "quick": run_quick,
     "basic": run_basic,
     "complex": run_complex,
     "edge_cases": run_edge_cases,
+    "teams": run_teams,
 }
 
 DEFAULT_SCENARIO = "complex"

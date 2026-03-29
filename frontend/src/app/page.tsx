@@ -330,10 +330,7 @@ export default function V2TestPage(): React.ReactNode {
           </div>
         </div>
 
-        {/* Centered status toast */}
-        <div className="absolute left-1/3 -translate-x-1/2 flex items-center pointer-events-none">
-          <StatusToast message={statusMessage} />
-        </div>
+        {/* Status toast — rendered outside header flow to avoid overlap */}
 
         {!isMobile && (
           <HeaderControls
@@ -401,6 +398,11 @@ export default function V2TestPage(): React.ReactNode {
           </div>
         </div>
       )}
+
+      {/* Fixed bottom-right toast — never overlaps header or content */}
+      <div className="fixed bottom-5 right-5 z-50 pointer-events-none">
+        <StatusToast message={statusMessage} />
+      </div>
     </main>
   );
 }

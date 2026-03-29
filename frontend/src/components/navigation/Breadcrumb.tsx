@@ -19,7 +19,7 @@ export function Breadcrumb(): React.ReactNode {
         }`}
       >
         <span>🏢</span>
-        <span>Panoptica</span>
+        <span>{buildingConfig?.building_name ?? "Building"}</span>
       </button>
 
       {floor && (

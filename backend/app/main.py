@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from rich.logging import RichHandler
+from sqlalchemy import text
 
 from app.api.routes import events, floors, preferences, sessions
 from app.api.websocket import manager
@@ -28,6 +29,36 @@ logging.basicConfig(
 settings = get_settings()
 
 
+async def _migrate_schema(conn) -> None:  # type: ignore[type-arg]
+    """Add any columns missing from the sessions table.
+
+    SQLAlchemy's ``create_all`` creates tables but never alters existing ones.
+    This function handles incremental column additions so development databases
+    automatically stay in sync with the model without a full reset.
+    """
+    # Only SQLite needs this; other backends use Alembic migrations.
+    dialect = conn.dialect.name if hasattr(conn, "dialect") else ""
+    if dialect != "sqlite":
+        return
+
+    result = await conn.execute(text("PRAGMA table_info(sessions)"))
+    existing: set[str] = {row[1] for row in result.fetchall()}
+
+    new_columns = [
+        ("floor_id", "TEXT"),
+        ("room_id", "TEXT"),
+        ("team_name", "TEXT"),
+        ("teammate_name", "TEXT"),
+        ("is_lead", "INTEGER NOT NULL DEFAULT 0"),
+    ]
+    for col_name, col_def in new_columns:
+        if col_name not in existing:
+            await conn.execute(
+                text(f"ALTER TABLE sessions ADD COLUMN {col_name} {col_def}")
+            )
+            logging.getLogger(__name__).info("DB migration: added column sessions.%s", col_name)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Manage application startup and shutdown lifecycle."""
@@ -35,6 +66,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _migrate_schema(conn)
 
     git_service.start()
 

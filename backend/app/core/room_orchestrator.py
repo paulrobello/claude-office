@@ -6,6 +6,7 @@ Solo sessions (one session, no team_name) get a trivial pass-through.
 Team sessions get lead/teammate/subagent character allocation and a
 merged kanban board.
 """
+
 from __future__ import annotations
 
 import logging
@@ -145,16 +146,23 @@ class RoomOrchestrator:
 
         # Lead's subagents -> character_type="subagent"
         for agent in lead_state.agents:
-            merged_agents.append(agent.model_copy(update={
-                "character_type": "subagent",
-                "parent_session_id": lead_entry.session_id,
-            }))
+            merged_agents.append(
+                agent.model_copy(
+                    update={
+                        "character_type": "subagent",
+                        "parent_session_id": lead_entry.session_id,
+                    }
+                )
+            )
 
         # Lead's kanban tasks
         for task in lead_entry.sm.kanban_tasks.values():
             all_kanban[task.task_id] = KanbanTask(
-                task_id=task.task_id, subject=task.subject, status=task.status,
-                assignee=task.assignee, linear_id=task.linear_id,
+                task_id=task.task_id,
+                subject=task.subject,
+                status=task.status,
+                assignee=task.assignee,
+                linear_id=task.linear_id,
             )
 
         desk_number = 0
@@ -167,31 +175,39 @@ class RoomOrchestrator:
             agent_state = _BOSS_TO_AGENT.get(tm_state.boss.state, AgentState.WORKING)
 
             # Teammate's boss -> Agent with character_type="teammate"
-            merged_agents.append(Agent(
-                id=tm_id,
-                name=entry.teammate_name or f"Teammate-{session_id[:4]}",
-                color=entry.color,
-                number=desk_number,
-                state=agent_state,
-                desk=desk_number,
-                bubble=tm_state.boss.bubble,
-                current_task=tm_state.boss.current_task,
-                character_type="teammate",
-                parent_session_id=session_id,
-            ))
+            merged_agents.append(
+                Agent(
+                    id=tm_id,
+                    name=entry.teammate_name or f"Teammate-{session_id[:4]}",
+                    color=entry.color,
+                    number=desk_number,
+                    state=agent_state,
+                    desk=desk_number,
+                    bubble=tm_state.boss.bubble,
+                    current_task=tm_state.boss.current_task,
+                    character_type="teammate",
+                    parent_session_id=session_id,
+                )
+            )
 
             # Teammate's subagents
             for agent in tm_state.agents:
-                merged_agents.append(agent.model_copy(update={
-                    "character_type": "subagent",
-                    "parent_session_id": session_id,
-                    "parent_id": tm_id,
-                }))
+                merged_agents.append(
+                    agent.model_copy(
+                        update={
+                            "character_type": "subagent",
+                            "parent_session_id": session_id,
+                            "parent_id": tm_id,
+                        }
+                    )
+                )
 
             # Teammate's kanban tasks
             for task in entry.sm.kanban_tasks.values():
                 all_kanban[task.task_id] = KanbanTask(
-                    task_id=task.task_id, subject=task.subject, status=task.status,
+                    task_id=task.task_id,
+                    subject=task.subject,
+                    status=task.status,
                     assignee=entry.teammate_name or task.assignee,
                     linear_id=task.linear_id,
                 )
@@ -234,14 +250,19 @@ class RoomOrchestrator:
         """Mark the first pending task as in_progress for each active session."""
         active_assignees: set[str] = set()
         for entry in self._sessions.values():
-            if (entry.sm.boss_state not in (BossState.IDLE, BossState.COMPLETING)
-                    and entry.teammate_name is not None):
+            if (
+                entry.sm.boss_state not in (BossState.IDLE, BossState.COMPLETING)
+                and entry.teammate_name is not None
+            ):
                 active_assignees.add(entry.teammate_name)
 
         promoted: set[str] = set()
         for task in tasks.values():
-            if (task.status == "pending" and task.assignee is not None
-                    and task.assignee in active_assignees
-                    and task.assignee not in promoted):
+            if (
+                task.status == "pending"
+                and task.assignee is not None
+                and task.assignee in active_assignees
+                and task.assignee not in promoted
+            ):
                 task.status = "in_progress"
                 promoted.add(task.assignee)

@@ -209,6 +209,85 @@ async def trigger_simulation() -> dict[str, str]:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+class FocusRequest(TypedDict, total=False):
+    """Optional request body for the focus endpoint."""
+
+    message: str
+
+
+@router.post("/{session_id}/focus")
+async def focus_session(
+    session_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Bring the user's existing terminal to the foreground (macOS only).
+
+    Optionally copies a message to the clipboard so the user can paste it.
+
+    Args:
+        session_id: The session to focus.
+        db: Database session dependency.
+        body: Optional JSON body with ``message`` field.
+
+    Returns:
+        A status payload with ``success`` and ``project_root`` keys.
+    """
+    result = await db.execute(select(SessionRecord).where(SessionRecord.id == session_id))
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    project_root = session.project_root
+    message: str | None = (body or {}).get("message")
+
+    try:
+        if message:
+            # Copy message to clipboard (macOS pbcopy, Linux xclip, no-op elsewhere)
+            try:
+                if os.name == "posix":
+                    if os.path.exists("/usr/bin/pbcopy"):
+                        proc = subprocess.Popen(
+                            ["pbcopy"], stdin=subprocess.PIPE, close_fds=True
+                        )
+                        proc.communicate(input=message.encode())
+                    elif os.path.exists("/usr/bin/xclip"):
+                        proc = subprocess.Popen(
+                            ["xclip", "-selection", "clipboard"],
+                            stdin=subprocess.PIPE,
+                            close_fds=True,
+                        )
+                        proc.communicate(input=message.encode())
+            except Exception:
+                pass  # Clipboard is best-effort
+
+        # Bring Terminal / iTerm2 to front using AppleScript (macOS only).
+        # We do NOT open a new window — we just activate whatever terminal the
+        # user already has open so they can paste the copied message.
+        if os.name == "posix" and os.path.exists("/usr/bin/osascript"):
+            # Prefer iTerm2 if running, fall back to Terminal.app
+            applescript = """
+tell application "System Events"
+    set iterm_running to (count of (processes whose name is "iTerm2")) > 0
+    set term_running  to (count of (processes whose name is "Terminal")) > 0
+end tell
+if iterm_running then
+    tell application "iTerm2" to activate
+else if term_running then
+    tell application "Terminal" to activate
+end if
+"""
+            subprocess.Popen(
+                ["osascript", "-e", applescript],
+                close_fds=True,
+            )
+
+        return {"success": True, "project_root": project_root}
+    except Exception as e:
+        logger.exception("Error in focus_session: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.delete("")
 async def clear_database(db: Annotated[AsyncSession, Depends(get_db)]) -> dict[str, str]:
     """Clear all sessions and events from the database."""

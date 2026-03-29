@@ -16,7 +16,7 @@ export function useFloorConfig(): void {
     fetch(`${API_URL}/floors`)
       .then((res) => res.json())
       .then((data) => setBuildingConfig(data))
-      .catch(() => setBuildingConfig({ floors: [] }));
+      .catch(() => setBuildingConfig({ building_name: "Building", floors: [] }));
   }, [setBuildingConfig, setLoading]);
 
   // Periodically fetch session summaries for room/floor activity

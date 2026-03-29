@@ -32,6 +32,7 @@ class TestRoomConnections:
         mgr = ConnectionManager()
         ws = AsyncMock()
         from starlette.websockets import WebSocketState
+
         ws.client_state = WebSocketState.CONNECTED
         await mgr.connect_room(ws, "room-1")
         await mgr.broadcast_room({"type": "test"}, "room-1")

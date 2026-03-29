@@ -129,8 +129,8 @@ export function useSessions(
       if (activeSession) {
         setSessionId(activeSession.id);
         showStatus(
-          `Connected to ${activeSession.projectName || activeSession.id.slice(0, 8)}`,
-          "info",
+          activeSession.projectName || activeSession.id.slice(0, 8),
+          "success",
         );
       }
     }

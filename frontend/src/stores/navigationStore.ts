@@ -13,8 +13,20 @@ interface NavigationState {
   /** Whether config is loading */
   isLoading: boolean;
   /** All sessions from backend (for room/floor summaries) */
-  allSessions: { id: string; roomId: string | null; status: string; eventCount: number }[];
-  setAllSessions: (sessions: { id: string; roomId: string | null; status: string; eventCount: number }[]) => void;
+  allSessions: {
+    id: string;
+    roomId: string | null;
+    status: string;
+    eventCount: number;
+  }[];
+  setAllSessions: (
+    sessions: {
+      id: string;
+      roomId: string | null;
+      status: string;
+      eventCount: number;
+    }[],
+  ) => void;
 
   /** Navigate to building view */
   goToBuilding: () => void;

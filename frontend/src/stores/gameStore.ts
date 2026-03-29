@@ -236,6 +236,24 @@ interface GameStore {
   setWhiteboardMode: (mode: WhiteboardMode) => void;
   cycleWhiteboardMode: () => void;
 
+  // ========== Focus Popup State ==========
+  focusedCharacter: {
+    agentId: string | null;
+    isBoss: boolean;
+    name: string | null;
+    currentTask: string | null;
+    sessionId: string;
+  } | null;
+  setFocusedCharacter: (
+    c: {
+      agentId: string | null;
+      isBoss: boolean;
+      name: string | null;
+      currentTask: string | null;
+      sessionId: string;
+    } | null,
+  ) => void;
+
   // ========== UI State ==========
   isConnected: boolean;
   isReplaying: boolean;
@@ -376,6 +394,9 @@ const initialState = {
   // Whiteboard
   whiteboardData: initialWhiteboardData,
   whiteboardMode: 0 as WhiteboardMode,
+
+  // Focus popup
+  focusedCharacter: null,
 
   // UI
   isConnected: false,
@@ -948,6 +969,12 @@ export const useGameStore = create<GameStore>()(
     setWhiteboardData: (whiteboardData) => set({ whiteboardData }),
 
     setWhiteboardMode: (whiteboardMode) => set({ whiteboardMode }),
+
+    // ========================================================================
+    // FOCUS POPUP ACTIONS
+    // ========================================================================
+
+    setFocusedCharacter: (focusedCharacter) => set({ focusedCharacter }),
 
     cycleWhiteboardMode: () =>
       set((state) => ({

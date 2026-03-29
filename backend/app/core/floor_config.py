@@ -49,6 +49,7 @@ class FloorConfig(BaseModel):
 class BuildingConfig(BaseModel):
     """Top-level building configuration."""
 
+    building_name: str = "Building"
     floors: list[FloorConfig] = Field(default_factory=lambda: [])
 
     def get_floor(self, floor_id: str) -> FloorConfig | None:
@@ -107,7 +108,10 @@ def load_building_config(
         )
 
     floors.sort(key=lambda f: f.floor_number, reverse=True)
-    return BuildingConfig(floors=floors)
+    return BuildingConfig(
+        building_name=str(raw.get("building_name", "Building")),
+        floors=floors,
+    )
 
 
 @lru_cache(maxsize=1)

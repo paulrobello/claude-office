@@ -19,5 +19,6 @@ export interface FloorConfig {
 
 /** Full building configuration from backend */
 export interface BuildingConfig {
+  building_name: string;
   floors: FloorConfig[];
 }

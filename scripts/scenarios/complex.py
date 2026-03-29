@@ -22,8 +22,11 @@ import time
 from scripts.scenarios._base import (
     AGENT_NAMES,
     COMPACTION_ANIMATION_DURATION,
+    FILE_PATHS,
     SimulationContext,
     TASK_DESCRIPTIONS,
+    TOOLS_ALL,
+    TOOLS_HEAVY,
 )
 
 
@@ -217,6 +220,20 @@ def run(ctx: SimulationContext) -> None:
     )
     time.sleep(2)
 
+    # Kanban tasks (shown on the K-board)
+    ctx.log("[complex] Creating kanban tasks...")
+    kanban_tasks = [
+        ("cplx-01", "[SIM-1] Review PRD and identify scope"),
+        ("cplx-02", "[SIM-2] Implement feature A — user preferences"),
+        ("cplx-03", "[SIM-3] Implement feature B — notification system"),
+        ("cplx-04", "[SIM-4] Write unit tests"),
+        ("cplx-05", "[SIM-5] Run integration tests"),
+        ("cplx-06", "[SIM-6] Deploy to staging"),
+    ]
+    for task_id, subject in kanban_tasks:
+        ctx.send_task_created(task_id, subject)
+        time.sleep(0.2)
+
     # Initial todo list
     tokens = ctx.increment_context(input_delta=25_000, output_delta=10_000)
     ctx.send_event(
@@ -319,8 +336,14 @@ def run(ctx: SimulationContext) -> None:
             {"tool_name": "Read", "tool_input": {"file_path": "backend/app/main.py"}, "agent_id": "main"},
         )
 
-        # Only update todos on the last pass to reduce spam
-        if i == len(_TODO_STATES) - 1:
+        # Update todos and mark kanban tasks complete as we progress
+        if i == 0:
+            ctx.send_task_completed("cplx-01", "[SIM-1] Review PRD and identify scope")
+            ctx.send_task_completed("cplx-02", "[SIM-2] Implement feature A — user preferences")
+        elif i == 1:
+            ctx.send_task_completed("cplx-03", "[SIM-3] Implement feature B — notification system")
+            ctx.send_task_completed("cplx-04", "[SIM-4] Write unit tests")
+        elif i == len(_TODO_STATES) - 1:
             ctx.send_event(
                 "pre_tool_use",
                 {"tool_name": "TodoWrite", "tool_input": {"todos": todo_state}, "agent_id": "main"},
@@ -347,6 +370,10 @@ def run(ctx: SimulationContext) -> None:
             },
         )
         time.sleep(1.5)
+
+    # Final kanban completions
+    ctx.send_task_completed("cplx-05", "[SIM-5] Run integration tests")
+    ctx.send_task_completed("cplx-06", "[SIM-6] Deploy to staging")
 
     # Final todos — all complete
     ctx.send_event(

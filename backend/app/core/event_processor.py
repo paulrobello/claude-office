@@ -90,15 +90,15 @@ def derive_git_root(working_dir: str) -> str | None:
     return None
 
 
-async def _find_lead_session(
-    sess: Any, team_name: str
-) -> "SessionRecord | None":
+async def _find_lead_session(sess: Any, team_name: str) -> "SessionRecord | None":
     """Find the lead session for a team."""
     result = await sess.execute(
-        select(SessionRecord).where(
+        select(SessionRecord)
+        .where(
             SessionRecord.team_name == team_name,
             SessionRecord.is_lead.is_(True),
-        ).limit(1)
+        )
+        .limit(1)
     )
     return result.scalar_one_or_none()
 
@@ -648,7 +648,7 @@ class EventProcessor:
                 session_rec.team_name = event.data.team_name
                 session_rec.teammate_name = event.data.teammate_name
                 # Lead: teammate_name absent in payload
-                session_rec.is_lead = (event.data.teammate_name is None)
+                session_rec.is_lead = event.data.teammate_name is None
 
             if event.event_type == EventType.SESSION_END:
                 session_rec.status = "completed"

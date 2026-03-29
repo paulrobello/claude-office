@@ -16,57 +16,128 @@ function RoomCard({
   sessionCount: number;
   isActive: boolean;
 }): React.ReactNode {
+  const accent = floor.accent;
+
   return (
     <button
       onClick={onClick}
-      className="group flex flex-col border border-slate-800 rounded-lg bg-slate-900 hover:border-slate-600 hover:bg-slate-800/80 transition-all duration-200 overflow-hidden w-56 flex-shrink-0"
+      className="group flex flex-col rounded-lg overflow-hidden w-56 flex-shrink-0 transition-all duration-200"
+      style={
+        isActive
+          ? {
+              border: `1px solid ${accent}60`,
+              background: `linear-gradient(160deg, ${accent}14 0%, #0f1117 60%)`,
+              boxShadow: `0 0 0 1px ${accent}30, 0 0 20px ${accent}20, 0 4px 24px rgba(0,0,0,0.6)`,
+            }
+          : {
+              border: "1px solid rgb(30 41 59)",
+              background: "#0d111a",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+            }
+      }
     >
-      {/* Room header with accent */}
+      {/* Header */}
       <div
-        className="px-4 py-2 border-b border-slate-800 flex items-center gap-2"
-        style={{ backgroundColor: floor.accent + "10" }}
+        className="px-4 py-2.5 flex items-center gap-2 border-b"
+        style={
+          isActive
+            ? {
+                borderColor: `${accent}30`,
+                background: `linear-gradient(90deg, ${accent}20, transparent)`,
+              }
+            : { borderColor: "rgb(30 41 59)" }
+        }
       >
-        <div
-          className="w-2 h-2 rounded-full"
-          style={{ backgroundColor: floor.accent }}
-        />
-        <span className="text-sm font-bold text-white truncate">
+        {/* Live indicator */}
+        <div className="relative flex-shrink-0">
+          <div
+            className="w-2 h-2 rounded-full"
+            style={{ backgroundColor: isActive ? accent : "#334155" }}
+          />
+          {isActive && (
+            <div
+              className="absolute inset-0 rounded-full animate-ping"
+              style={{ backgroundColor: accent, opacity: 0.5 }}
+            />
+          )}
+        </div>
+        <span
+          className="text-sm font-bold truncate"
+          style={{ color: isActive ? "#f8fafc" : "#64748b" }}
+        >
           {room.repo_name}
         </span>
       </div>
 
-      {/* Room content placeholder */}
-      <div className="px-4 py-6 flex flex-col items-center gap-2">
-        {/* Desk icons */}
-        <div className="flex gap-1">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="w-5 h-4 bg-slate-800 rounded-sm group-hover:bg-slate-700 transition-colors"
-            />
-          ))}
+      {/* Body */}
+      <div className="px-4 py-5 flex flex-col items-center gap-3">
+        {/* Desk / activity icons */}
+        <div className="flex gap-1.5 items-end">
+          {[0, 1, 2].map((i) =>
+            isActive ? (
+              /* Active: colored bars with staggered height & animation */
+              <div
+                key={i}
+                className="w-5 rounded-sm"
+                style={{
+                  height: i === 1 ? "20px" : "14px",
+                  background: `linear-gradient(180deg, ${accent}, ${accent}88)`,
+                  boxShadow: `0 0 6px ${accent}60`,
+                  animation: `pulse ${1.2 + i * 0.3}s ease-in-out infinite alternate`,
+                  opacity: 0.85 + i * 0.05,
+                }}
+              />
+            ) : (
+              /* Idle: flat dark squares */
+              <div key={i} className="w-5 h-4 bg-slate-800/60 rounded-sm" />
+            ),
+          )}
         </div>
-        <span className="text-xs text-slate-600 font-mono">
-          {isActive ? "active" : "idle"}
-        </span>
+
+        {/* Status badge */}
+        {isActive ? (
+          <div
+            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider"
+            style={{
+              background: `${accent}22`,
+              border: `1px solid ${accent}50`,
+              color: accent,
+            }}
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full animate-pulse"
+              style={{ backgroundColor: accent }}
+            />
+            live
+          </div>
+        ) : (
+          <span className="text-[10px] text-slate-700 font-mono uppercase tracking-wider">
+            idle
+          </span>
+        )}
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-2 border-t border-slate-800 flex justify-between items-center">
-        <span className="text-[10px] text-slate-600 font-mono uppercase">
+      <div
+        className="px-4 py-2 border-t flex justify-between items-center"
+        style={
+          isActive
+            ? { borderColor: `${accent}25` }
+            : { borderColor: "rgb(30 41 59)" }
+        }
+      >
+        <span
+          className="text-[10px] font-mono uppercase tracking-wider"
+          style={{ color: isActive ? `${accent}cc` : "#334155" }}
+        >
           {sessionCount} session{sessionCount !== 1 ? "s" : ""}
         </span>
-        <div className="flex items-center gap-1.5">
-          {isActive && (
-            <div
-              className="w-1.5 h-1.5 rounded-full animate-pulse"
-              style={{ backgroundColor: floor.accent }}
-            />
-          )}
-          <span className="text-slate-600 group-hover:text-slate-400 transition-colors">
-            →
-          </span>
-        </div>
+        <span
+          className="transition-colors"
+          style={{ color: isActive ? `${accent}cc` : "#334155" }}
+        >
+          →
+        </span>
       </div>
     </button>
   );
