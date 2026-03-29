@@ -2,9 +2,10 @@
 
 import dynamic from "next/dynamic";
 import { useNavigationStore } from "@/stores/navigationStore";
+import { useRoomSessions } from "@/hooks/useRoomSessions";
+import { useWebSocketEvents } from "@/hooks/useWebSocketEvents";
 import { SessionSidebar } from "@/components/layout/SessionSidebar";
 import { RightSidebar } from "@/components/layout/RightSidebar";
-import type { Session } from "@/hooks/useSessions";
 
 const OfficeGame = dynamic(
   () =>
@@ -21,39 +22,27 @@ const OfficeGame = dynamic(
   },
 );
 
-interface RoomViewProps {
-  sessions: Session[];
-  sessionsLoading: boolean;
-  sessionId: string;
-  leftSidebarCollapsed: boolean;
-  onToggleLeftSidebar: () => void;
-  onSessionSelect: (id: string) => Promise<void>;
-  onDeleteSession: (session: Session) => void;
-}
-
-export function RoomView({
-  sessions,
-  sessionsLoading,
-  sessionId,
-  leftSidebarCollapsed,
-  onToggleLeftSidebar,
-  onSessionSelect,
-  onDeleteSession,
-}: RoomViewProps): React.ReactNode {
+export function RoomView(): React.ReactNode {
   const { floorId, roomId, buildingConfig } = useNavigationStore();
   const floor = buildingConfig?.floors.find((f) => f.id === floorId);
   const room = floor?.rooms.find((r) => r.id === roomId);
+
+  const { sessions, loading, sessionId, selectSession } =
+    useRoomSessions(roomId);
+
+  // Connect WebSocket to the selected session
+  useWebSocketEvents({ sessionId });
 
   return (
     <div className="flex-grow flex gap-2 overflow-hidden min-h-0">
       <SessionSidebar
         sessions={sessions}
-        sessionsLoading={sessionsLoading}
+        sessionsLoading={loading}
         sessionId={sessionId}
-        isCollapsed={leftSidebarCollapsed}
-        onToggleCollapsed={onToggleLeftSidebar}
-        onSessionSelect={onSessionSelect}
-        onDeleteSession={onDeleteSession}
+        isCollapsed={false}
+        onToggleCollapsed={() => {}}
+        onSessionSelect={async (id) => selectSession(id)}
+        onDeleteSession={() => {}}
       />
 
       <div className="flex-grow border border-slate-800 rounded-lg shadow-2xl bg-slate-900 overflow-hidden relative">

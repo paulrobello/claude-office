@@ -72,7 +72,6 @@ export default function V2TestPage(): React.ReactNode {
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
     null,
   );
-  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState<boolean | null>(
@@ -121,15 +120,15 @@ export default function V2TestPage(): React.ReactNode {
   const loadPreferences = usePreferencesStore((s) => s.loadPreferences);
 
   // ------------------------------------------------------------------
-  // WebSocket connection — reconnects when sessionId changes
-  // ------------------------------------------------------------------
-  useWebSocketEvents({ sessionId });
-
-  // ------------------------------------------------------------------
   // Floor configuration + navigation
   // ------------------------------------------------------------------
   useFloorConfig();
   const view = useNavigationStore((s) => s.view);
+
+  // ------------------------------------------------------------------
+  // WebSocket connection — reconnects when sessionId changes
+  // ------------------------------------------------------------------
+  useWebSocketEvents({ sessionId: view === "room" ? "" : sessionId });
 
   // ------------------------------------------------------------------
   // One-time initialization effects
@@ -398,17 +397,7 @@ export default function V2TestPage(): React.ReactNode {
           {view === "floor" && <FloorView />}
           {/* Always mount RoomView to avoid PixiJS lifecycle errors on re-mount */}
           <div className={view === "room" ? "contents" : "hidden"}>
-            <RoomView
-              sessions={sessions}
-              sessionsLoading={sessionsLoading}
-              sessionId={sessionId}
-              leftSidebarCollapsed={leftSidebarCollapsed}
-              onToggleLeftSidebar={() =>
-                setLeftSidebarCollapsed(!leftSidebarCollapsed)
-              }
-              onSessionSelect={handleSessionSelect}
-              onDeleteSession={setSessionPendingDelete}
-            />
+            <RoomView />
           </div>
         </div>
       )}
