@@ -643,8 +643,8 @@ class EventProcessor:
                         session_rec.floor_id = room_assignment.floor_id
                         session_rec.room_id = room_assignment.room_id
 
-            # Sync team fields to SessionRecord
-            if event.data and event.data.team_name:
+            # Sync team fields to SessionRecord (set once on first team event)
+            if event.data and event.data.team_name and not session_rec.team_name:
                 session_rec.team_name = event.data.team_name
                 session_rec.teammate_name = event.data.teammate_name
                 # Lead: teammate_name absent in payload
