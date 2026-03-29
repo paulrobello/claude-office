@@ -8,7 +8,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useWebSocketEvents } from "@/hooks/useWebSocketEvents";
 import { useSessions } from "@/hooks/useSessions";
 import { useSessionSwitch } from "@/hooks/useSessionSwitch";
@@ -34,6 +34,7 @@ import { usePreferencesStore } from "@/stores/preferencesStore";
 import type { Session } from "@/hooks/useSessions";
 import { useFloorConfig } from "@/hooks/useFloorConfig";
 import { useNavigationStore } from "@/stores/navigationStore";
+import { useZoomNavigation } from "@/hooks/useZoomNavigation";
 import { Breadcrumb } from "@/components/navigation/Breadcrumb";
 import { ViewTransition } from "@/components/navigation/ViewTransition";
 import { BuildingView } from "@/components/views/BuildingView";
@@ -125,6 +126,12 @@ export default function V2TestPage(): React.ReactNode {
   // ------------------------------------------------------------------
   useFloorConfig();
   const view = useNavigationStore((s) => s.view);
+
+  // ------------------------------------------------------------------
+  // Zoom navigation (scroll/pinch between views)
+  // ------------------------------------------------------------------
+  const mainContentRef = useRef<HTMLDivElement>(null);
+  const zoomState = useZoomNavigation(mainContentRef);
 
   // ------------------------------------------------------------------
   // WebSocket connection — reconnects when sessionId changes
@@ -390,18 +397,33 @@ export default function V2TestPage(): React.ReactNode {
           <MobileAgentActivity agents={agents} boss={boss} />
         </div>
       ) : (
-        <ViewTransition view={view}>
-          {(activeView) => (
-            <>
-              {activeView === "building" && <BuildingView />}
-              {activeView === "floor" && <FloorView />}
-              {/* Always mount RoomView to avoid PixiJS lifecycle errors on re-mount */}
-              <div className={activeView === "room" ? "contents" : "hidden"}>
-                <RoomView />
-              </div>
-            </>
-          )}
-        </ViewTransition>
+        <div
+          ref={mainContentRef}
+          className="flex-grow overflow-hidden min-h-0"
+          style={
+            zoomState.scale !== 1
+              ? {
+                  transform: `scale(${zoomState.scale})`,
+                  transformOrigin: `${zoomState.originX}px ${zoomState.originY}px`,
+                  filter: `blur(${Math.min((zoomState.scale - 1) * 1.5, 3)}px)`,
+                  transition: "filter 100ms ease-out",
+                }
+              : undefined
+          }
+        >
+          <ViewTransition view={view}>
+            {(activeView) => (
+              <>
+                {activeView === "building" && <BuildingView />}
+                {activeView === "floor" && <FloorView />}
+                {/* Always mount RoomView to avoid PixiJS lifecycle errors on re-mount */}
+                <div className={activeView === "room" ? "contents" : "hidden"}>
+                  <RoomView />
+                </div>
+              </>
+            )}
+          </ViewTransition>
+        </div>
       )}
 
       {/* Fixed bottom-right toast — never overlaps header or content */}
