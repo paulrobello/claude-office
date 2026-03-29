@@ -34,7 +34,7 @@ export const MODE_INFO: Record<WhiteboardMode, ModeInfo> = {
 export const WHITEBOARD_MODE_COUNT = 12;
 
 /**
- * Returns the next mode index, wrapping around after mode 10.
+ * Returns the next mode index, wrapping around after the last mode.
  */
 export function getNextMode(current: WhiteboardMode): WhiteboardMode {
   return ((current + 1) % WHITEBOARD_MODE_COUNT) as WhiteboardMode;

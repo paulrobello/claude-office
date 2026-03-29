@@ -12,8 +12,7 @@
 
 import { Graphics } from "pixi.js";
 import { type ReactNode } from "react";
-import { useGameStore } from "@/stores/gameStore";
-import type { KanbanTask } from "@/types";
+import type { KanbanTask, WhiteboardData } from "@/types";
 
 // ============================================================================
 // LAYOUT CONSTANTS
@@ -27,6 +26,7 @@ const NOTE_H = 32;
 const NOTE_GAP = 3;
 const COL_HEADER_H = 16;
 const MAX_NOTES_PER_COL = 4;
+const COL_H = COL_HEADER_H + MAX_NOTES_PER_COL * (NOTE_H + NOTE_GAP) + NOTE_GAP;
 
 // ============================================================================
 // COLUMN DEFINITIONS
@@ -165,7 +165,7 @@ function KanbanColumn({
   accentColor,
 }: KanbanColumnProps): ReactNode {
   const colX = colIndex * COL_W;
-  const colH = 148; // available content height
+  const colH = COL_H;
 
   return (
     <pixiContainer x={colX}>
@@ -256,9 +256,12 @@ function KanbanColumn({
 // KANBAN MODE
 // ============================================================================
 
-export function KanbanMode(): ReactNode {
-  const whiteboardData = useGameStore((s) => s.whiteboardData);
-  const tasks: KanbanTask[] = whiteboardData?.kanbanTasks ?? [];
+interface KanbanModeProps {
+  data: WhiteboardData;
+}
+
+export function KanbanMode({ data }: KanbanModeProps): ReactNode {
+  const tasks: KanbanTask[] = data.kanbanTasks ?? [];
 
   if (tasks.length === 0) {
     return (

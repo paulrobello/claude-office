@@ -229,7 +229,7 @@ export function Whiteboard({ todos }: WhiteboardProps): ReactNode {
       case 10:
         return <HeatMapMode data={whiteboardData} />;
       case 11:
-        return <KanbanMode />;
+        return <KanbanMode data={whiteboardData} />;
       default:
         return <TodoListMode todos={todos} />;
     }
