@@ -139,7 +139,9 @@ async def websocket_room_endpoint(websocket: WebSocket, room_id: str) -> None:
     try:
         while True:
             await websocket.receive_text()
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
         await manager.disconnect_room(websocket, room_id)
 
 
