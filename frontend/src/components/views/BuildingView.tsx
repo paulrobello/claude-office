@@ -6,7 +6,7 @@ import type { FloorConfig } from "@/types/navigation";
 function FloorRow({
   floor,
   onClick,
-  activeRooms,
+  activeRooms: _activeRooms,
   totalSessions,
 }: {
   floor: FloorConfig;
@@ -115,7 +115,9 @@ export function BuildingView(): React.ReactNode {
               floor={floor}
               onClick={() => goToFloor(floor.id)}
               activeRooms={activeRooms}
-              totalSessions={floorSessions.filter((s) => s.status === "active").length}
+              totalSessions={
+                floorSessions.filter((s) => s.status === "active").length
+              }
             />
           );
         })}

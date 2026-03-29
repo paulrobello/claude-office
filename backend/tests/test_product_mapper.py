@@ -6,14 +6,16 @@ import pytest
 
 from app.core.product_mapper import ProductMapper, RoomAssignment
 
-
 SAMPLE_TOML = """
 [[floors]]
 name = "Recepthor"
 floor_number = 3
 accent = "#2563eb"
 icon = "⚖️"
-repos = ["recepthor-api", "recepthor-hub", "recepthor-scraper", "recepthor-web", "recepthor-serverless"]
+repos = [
+  "recepthor-api", "recepthor-hub", "recepthor-scraper",
+  "recepthor-web", "recepthor-serverless",
+]
 
 [[floors]]
 name = "Lexio"
