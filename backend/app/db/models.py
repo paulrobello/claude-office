@@ -26,6 +26,8 @@ class SessionRecord(Base):
         onupdate=lambda: datetime.now(UTC),
     )
     status: Mapped[str] = mapped_column(String, default="active")
+    floor_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    room_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     events: Mapped[list[EventRecord]] = relationship(
         "EventRecord", back_populates="session", cascade="all, delete-orphan"

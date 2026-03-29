@@ -76,6 +76,9 @@ class EventData(BaseModel):
     background_task_summary: str | None = None
     # Task list override (from CLAUDE_CODE_TASK_LIST_ID env var)
     task_list_id: str | None = None
+    # Room assignment (populated by ProductMapper)
+    floor_id: str | None = None
+    room_id: str | None = None
 
 
 class Event(BaseModel):

@@ -128,6 +128,8 @@ class GameState(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     session_id: str
+    floor_id: str | None = None
+    room_id: str | None = None
     boss: Boss
     agents: list[Agent]
     office: OfficeState

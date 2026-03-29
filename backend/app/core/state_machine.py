@@ -164,6 +164,8 @@ class StateMachine:
     last_user_prompt: str | None = None
     background_tasks: list[BackgroundTask] = field(default_factory=_empty_background_tasks)
     conversation: list[ConversationEntry] = field(default_factory=_empty_conversation)
+    floor_id: str | None = None
+    room_id: str | None = None
 
     # Whiteboard tracking delegated to WhiteboardTracker
     whiteboard: WhiteboardTracker = field(default_factory=WhiteboardTracker)
@@ -319,6 +321,8 @@ class StateMachine:
 
         return GameState(
             session_id=session_id,
+            floor_id=self.floor_id,
+            room_id=self.room_id,
             boss=boss,
             agents=agents_list,
             office=office,
