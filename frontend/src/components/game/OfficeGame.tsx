@@ -19,7 +19,7 @@ import {
   Sprite,
   Application as PixiApplication,
 } from "pixi.js";
-import { useMemo, useEffect, useRef, type ReactNode } from "react";
+import { useMemo, useEffect, useRef, useCallback, type ReactNode } from "react";
 import {
   TransformWrapper,
   TransformComponent,
@@ -94,6 +94,41 @@ import { OfficeBackground } from "./OfficeBackground";
 
 // Register PixiJS components
 extend({ Container, Text, Graphics, Sprite });
+
+// ============================================================================
+// SUB-COMPONENTS
+// ============================================================================
+
+interface SubagentDotProps {
+  x: number;
+  y: number;
+  color: string;
+}
+
+function SubagentDot({ x, y, color }: SubagentDotProps): ReactNode {
+  const drawDot = useCallback(
+    (g: Graphics) => {
+      g.clear();
+      g.circle(0, 0, 4);
+      // Safe hex parsing with fallback
+      const hex = /^#[0-9a-fA-F]{6}$/.test(color)
+        ? parseInt(color.slice(1), 16)
+        : 0xf59e0b;
+      g.fill({ color: hex });
+      g.circle(0, 0, 4);
+      g.stroke({ color: 0xffffff, alpha: 0.4, width: 1 });
+    },
+    [color],
+  );
+
+  return (
+    <pixiGraphics
+      draw={drawDot}
+      x={x}
+      y={y}
+    />
+  );
+}
 
 // ============================================================================
 // MAIN COMPONENT
@@ -603,31 +638,20 @@ export function OfficeGame(): ReactNode {
                         )}
 
                         {/* Subagent shoulder dot */}
-                        {agent.characterType === "subagent" && (
-                          <pixiGraphics
-                            draw={(g) => {
-                              const parentAgent = agent.parentId
-                                ? Array.from(agents.values()).find(
-                                    (a) => a.id === agent.parentId,
-                                  )
-                                : null;
-                              const dotColor = parentAgent?.color ?? "#f59e0b";
-                              g.clear();
-                              g.circle(0, 0, 4);
-                              g.fill({
-                                color: parseInt(dotColor.replace("#", ""), 16),
-                              });
-                              g.circle(0, 0, 4);
-                              g.stroke({
-                                color: 0xffffff,
-                                alpha: 0.4,
-                                width: 1,
-                              });
-                            }}
-                            x={agent.currentPosition.x + 10}
-                            y={agent.currentPosition.y - 28}
-                          />
-                        )}
+                        {agent.characterType === "subagent" && (() => {
+                          const parentAgent = agent.parentId
+                            ? Array.from(agents.values()).find((a) => a.id === agent.parentId)
+                            : null;
+                          const dotColor = parentAgent?.color ?? "#f59e0b";
+                          return (
+                            <SubagentDot
+                              key={`dot-${agent.id}`}
+                              x={agent.currentPosition.x + 10}
+                              y={agent.currentPosition.y - 28}
+                              color={dotColor}
+                            />
+                          );
+                        })()}
                       </pixiContainer>
                     ))}
 
