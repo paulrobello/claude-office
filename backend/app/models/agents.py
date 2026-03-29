@@ -30,6 +30,7 @@ class AgentState(StrEnum):
     REPORTING_DONE = "reporting_done"
     LEAVING = "leaving"
     IN_ELEVATOR = "in_elevator"
+    IDLE = "idle"
 
 
 class BossState(StrEnum):
@@ -61,6 +62,10 @@ class Agent(BaseModel):
     bubble: BubbleContent | None = None
     current_task: str | None = None
     position: dict[str, int] = {"x": 0, "y": 0}
+    # Agent Teams character hierarchy (Phase 4)
+    character_type: str | None = None  # "lead" | "teammate" | "subagent"
+    parent_session_id: str | None = None  # session that owns this character
+    parent_id: str | None = None  # for subagents: parent lead/teammate id
 
 
 class Boss(BaseModel):

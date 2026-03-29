@@ -36,6 +36,10 @@ class EventType(StrEnum):
     LEAVING = "leaving"
     ERROR = "error"
     BACKGROUND_TASK_NOTIFICATION = "background_task_notification"
+    # Agent Teams events (Phase 4)
+    TASK_CREATED = "task_created"
+    TASK_COMPLETED = "task_completed"
+    TEAMMATE_IDLE = "teammate_idle"
 
 
 class EventData(BaseModel):
@@ -79,6 +83,12 @@ class EventData(BaseModel):
     # Room assignment (populated by ProductMapper)
     floor_id: str | None = None
     room_id: str | None = None
+    # Agent Teams fields (Phase 4) — present on all events from team sessions
+    team_name: str | None = None
+    teammate_name: str | None = None
+    # Task-specific fields for TaskCreated/TaskCompleted events
+    task_id: str | None = None
+    task_subject: str | None = None
 
 
 class Event(BaseModel):
