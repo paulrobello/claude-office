@@ -17,7 +17,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Intended Audience :: End Users/Desktop",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: JavaScript",
     "Framework :: FastAPI",
     "Operating System :: MacOS",
@@ -46,12 +46,12 @@ keywords = [
     "pixijs",
     "websocket",
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
-    "fastapi>=0.134.0",
+    "fastapi>=0.135.2",
     "pydantic>=2.12.5",
-    "requests>=2.32.5",
-    "uvicorn>=0.41.0",
+    "requests>=2.33.0",
+    "uvicorn>=0.42.0",
     "websockets>=16.0",
 ]
 
@@ -76,12 +76,12 @@ allow-direct-references = true
 packages = ["scripts"]
 
 [tool.ruff]
-target-version = "py314"
+target-version = "py313"
 line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
 
 [tool.pyright]
-pythonVersion = "3.14"
+pythonVersion = "3.13"
 typeCheckingMode = "strict"
