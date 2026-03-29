@@ -40,6 +40,8 @@ import { ViewTransition } from "@/components/navigation/ViewTransition";
 import { BuildingView } from "@/components/views/BuildingView";
 import { FloorView } from "@/components/views/FloorView";
 import { RoomView } from "@/components/views/RoomView";
+import { TourOverlay } from "@/components/tour/TourOverlay";
+import { useTourStore } from "@/stores/tourStore";
 
 // ============================================================================
 // DYNAMIC IMPORT (mobile branch only — desktop uses RoomView)
@@ -120,6 +122,10 @@ export default function V2TestPage(): React.ReactNode {
     (state) => state.loadPersistedDebugSettings,
   );
   const loadPreferences = usePreferencesStore((s) => s.loadPreferences);
+  const startTour = useTourStore((s) => s.startTour);
+  const hasSeenTour = useTourStore((s) => s.hasSeenTour);
+  const isTourActive = useTourStore((s) => s.isActive);
+  const loadTourSeen = useTourStore((s) => s.loadTourSeen);
 
   // ------------------------------------------------------------------
   // Floor configuration + navigation
@@ -158,6 +164,10 @@ export default function V2TestPage(): React.ReactNode {
     loadPreferences();
   }, [loadPreferences]);
 
+  useEffect(() => {
+    loadTourSeen();
+  }, [loadTourSeen]);
+
   // ------------------------------------------------------------------
   // Mobile breakpoint detection
   // ------------------------------------------------------------------
@@ -173,6 +183,11 @@ export default function V2TestPage(): React.ReactNode {
   // ------------------------------------------------------------------
   const handleToggleDebug = () =>
     useGameStore.getState().setDebugMode(!debugMode);
+
+  const handleStartTour = () => {
+    useNavigationStore.getState().goToBuilding();
+    startTour();
+  };
 
   const handleConfirmClearDB = async () => {
     setIsClearModalOpen(false);
@@ -351,6 +366,8 @@ export default function V2TestPage(): React.ReactNode {
             onToggleDebug={handleToggleDebug}
             onOpenSettings={() => setIsSettingsModalOpen(true)}
             onOpenHelp={() => setIsHelpModalOpen(true)}
+            onStartTour={handleStartTour}
+            tourBounce={!hasSeenTour && !isTourActive}
           />
         )}
 
@@ -425,6 +442,9 @@ export default function V2TestPage(): React.ReactNode {
           </ViewTransition>
         </div>
       )}
+
+      {/* Tour overlay */}
+      <TourOverlay />
 
       {/* Fixed bottom-right toast — never overlaps header or content */}
       <div className="fixed bottom-5 right-5 z-50 pointer-events-none">

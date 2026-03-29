@@ -8,6 +8,7 @@ import {
   Trash2,
   HelpCircle,
   Settings,
+  Compass,
 } from "lucide-react";
 
 // ============================================================================
@@ -24,6 +25,8 @@ interface HeaderControlsProps {
   onToggleDebug: () => void;
   onOpenSettings: () => void;
   onOpenHelp: () => void;
+  onStartTour: () => void;
+  tourBounce: boolean;
 }
 
 // ============================================================================
@@ -46,6 +49,8 @@ export function HeaderControls({
   onToggleDebug,
   onOpenSettings,
   onOpenHelp,
+  onStartTour,
+  tourBounce,
 }: HeaderControlsProps): React.ReactNode {
   return (
     <div className="flex gap-4 items-center">
@@ -92,6 +97,17 @@ export function HeaderControls({
       >
         <Settings size={14} />
         SETTINGS
+      </button>
+
+      <button
+        onClick={onStartTour}
+        data-tour-id="tour-btn"
+        className={`flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 border border-orange-500/30 rounded text-xs font-bold transition-colors ${
+          tourBounce ? "animate-bounce" : ""
+        }`}
+      >
+        <Compass size={14} />
+        TOUR
       </button>
 
       <button
