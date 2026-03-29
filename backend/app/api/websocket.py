@@ -13,6 +13,7 @@ class ConnectionManager:
 
     def __init__(self) -> None:
         self.active_connections: dict[str, list[WebSocket]] = {}
+        self.room_connections: dict[str, list[WebSocket]] = {}
         self._lock = asyncio.Lock()
 
     async def connect(self, websocket: WebSocket, session_id: str) -> None:
@@ -94,6 +95,49 @@ class ConnectionManager:
                             self.active_connections[session_id].remove(conn)
                         if not self.active_connections[session_id]:
                             del self.active_connections[session_id]
+
+    async def connect_room(self, websocket: WebSocket, room_id: str) -> None:
+        """Accept a WebSocket and register it for room-level broadcasts."""
+        await websocket.accept()
+        async with self._lock:
+            if room_id not in self.room_connections:
+                self.room_connections[room_id] = []
+            self.room_connections[room_id].append(websocket)
+
+    async def disconnect_room(self, websocket: WebSocket, room_id: str) -> None:
+        """Remove a WebSocket from room-level subscriptions."""
+        async with self._lock:
+            if room_id in self.room_connections:
+                if websocket in self.room_connections[room_id]:
+                    self.room_connections[room_id].remove(websocket)
+                if not self.room_connections[room_id]:
+                    del self.room_connections[room_id]
+
+    async def broadcast_room(self, message: dict[str, Any], room_id: str) -> None:
+        """Send a message to all WebSocket connections subscribed to a room."""
+        async with self._lock:
+            connections = self.room_connections.get(room_id, []).copy()
+
+        if not connections:
+            return
+
+        failed: list[WebSocket] = []
+        for connection in connections:
+            try:
+                if connection.client_state == WebSocketState.CONNECTED:
+                    await connection.send_json(message)
+            except Exception as e:
+                logger.warning(f"Failed to send to room WebSocket: {e}")
+                failed.append(connection)
+
+        if failed:
+            async with self._lock:
+                if room_id in self.room_connections:
+                    for conn in failed:
+                        if conn in self.room_connections[room_id]:
+                            self.room_connections[room_id].remove(conn)
+                    if not self.room_connections[room_id]:
+                        del self.room_connections[room_id]
 
 
 manager = ConnectionManager()

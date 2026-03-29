@@ -117,6 +117,32 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
         await manager.disconnect(websocket, session_id)
 
 
+@app.websocket("/ws/room/{room_id}")
+async def websocket_room_endpoint(websocket: WebSocket, room_id: str) -> None:
+    """Room-level WebSocket: sends merged GameState for all sessions in a room."""
+    await manager.connect_room(websocket, room_id)
+
+    # Send current merged state immediately if available
+    orch = event_processor.orchestrators.get(room_id)
+    if orch:
+        merged = orch.merge()
+        if merged:
+            await manager.send_personal_message(
+                {
+                    "type": "state_update",
+                    "timestamp": merged.last_updated.isoformat(),
+                    "state": merged.model_dump(mode="json", by_alias=True),
+                },
+                websocket,
+            )
+
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        await manager.disconnect_room(websocket, room_id)
+
+
 if STATIC_DIR.exists():
     app.mount("/_next", StaticFiles(directory=STATIC_DIR / "_next"), name="next_static")
 

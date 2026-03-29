@@ -6,11 +6,16 @@ that handler modules can import just what they need without pulling in the
 full EventProcessor class.
 """
 
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from app.api.websocket import manager
 from app.core.state_machine import StateMachine
 from app.models.sessions import GameState, HistoryEntry
+
+if TYPE_CHECKING:
+    from app.core.room_orchestrator import RoomOrchestrator
 
 __all__ = [
     "broadcast_state",
@@ -56,9 +61,19 @@ async def broadcast_event(
     await manager.broadcast(payload, session_id)
 
 
-async def broadcast_room_state(room_id: str, orchestrator: Any) -> None:
-    """Stub for Task 6. Broadcast merged room state to room WebSocket subscribers."""
-    pass
+async def broadcast_room_state(room_id: str, orchestrator: RoomOrchestrator) -> None:
+    """Broadcast merged room state to all room-level WebSocket subscribers."""
+    merged_state = orchestrator.merge()
+    if merged_state is None:
+        return
+    await manager.broadcast_room(
+        {
+            "type": "state_update",
+            "timestamp": merged_state.last_updated.isoformat(),
+            "state": merged_state.model_dump(mode="json", by_alias=True),
+        },
+        room_id,
+    )
 
 
 async def broadcast_error(session_id: str, message: str, timestamp: str) -> None:
