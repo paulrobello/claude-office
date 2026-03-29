@@ -40,7 +40,7 @@ Before starting, ensure you have:
 
 | Requirement | Version | Check Command |
 |-------------|---------|---------------|
-| Python | 3.14+ | `python --version` |
+| Python | 3.13+ | `python --version` |
 | Node.js | 20+ | `node --version` |
 | uv | Latest | `uv --version` |
 | Claude Code | Latest | `claude --version` |

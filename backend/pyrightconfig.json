@@ -2,7 +2,7 @@
   "include": [
     "app"
   ],
-  "pythonVersion": "3.14",
+  "pythonVersion": "3.13",
   "typeCheckingMode": "strict",
   "useLibraryCodeForTypes": true
 }

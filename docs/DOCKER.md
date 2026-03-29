@@ -156,7 +156,7 @@ graph TD
     end
 
     subgraph "Stage 2: Runtime"
-        Python[Python 3.14 Slim]
+        Python[Python 3.13 Slim]
         UV[uv Package Manager]
         FastAPI[FastAPI App]
         Serve[Serve /static + API]
@@ -200,7 +200,7 @@ docker build -t claude-office:v1.0.0 .
 The Dockerfile does not currently use build arguments, but you can extend it:
 
 ```dockerfile
-ARG PYTHON_VERSION=3.14
+ARG PYTHON_VERSION=3.13
 FROM python:${PYTHON_VERSION}-slim AS runtime
 ```
 

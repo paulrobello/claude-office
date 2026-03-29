@@ -49,7 +49,7 @@ Claude Office Visualizer hooks into the Claude Code CLI and visualizes everythin
 ## Technical Stack
 
 - **Frontend**: Next.js, PixiJS, TypeScript, Zustand, XState v5
-- **Backend**: FastAPI, WebSocket, SQLite, Python 3.14+
+- **Backend**: FastAPI, WebSocket, SQLite, Python 3.13+
 - **Hooks**: Python-based Claude Code hooks that intercept events
 
 ## How It Works

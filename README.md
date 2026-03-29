@@ -121,7 +121,7 @@ Then open [http://localhost:3000](http://localhost:3000) and run any Claude Code
 
 ## Prerequisites
 
-- Python 3.14+
+- Python 3.13+
 - Node.js 20+ (Bun auto-detected if available)
 - uv (Python package manager)
 - Claude Code CLI installed and configured

@@ -27,7 +27,7 @@ The scripts directory contains testing and development utilities:
 
 | Requirement | Purpose |
 |-------------|---------|
-| Python 3.14+ | Runtime |
+| Python 3.13+ | Runtime |
 | uv | Package management |
 | Backend running | Event receiver at `localhost:8000` |
 | Frontend running | Visualization at `localhost:3000` |

@@ -24,7 +24,7 @@ RUN bun run build
 # =============================================================================
 # Stage 2: Python Runtime
 # =============================================================================
-FROM python:3.14-slim AS runtime
+FROM python:3.13-slim AS runtime
 
 # Install uv for fast Python package management
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv

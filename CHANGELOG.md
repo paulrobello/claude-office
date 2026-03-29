@@ -10,8 +10,9 @@ All notable changes to Claude Office Visualizer are documented here.
 - **Drag-to-resize panels**: Internal panels (Sessions/Git Status, Agent Status/Events) support vertical resizing via dividers
 - **useDragResize hook**: Reusable custom hook for drag-to-resize functionality with viewport-relative constraints
 
-### Fixed
+### Changed
 
+- **Python version requirement lowered to 3.13**: All components (root, backend, hooks) now require `>=3.13` instead of `>=3.14` for broader compatibility
 - **Sidebar overflow on small screens**: Max heights now use viewport-relative values (70% of viewport) instead of hardcoded 800px
 - **Unused import**: Removed unused `useRef` import from SessionSidebar
 

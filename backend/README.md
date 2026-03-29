@@ -91,7 +91,7 @@ Both systems are converted to the same `TodoItem` format for frontend display. T
 
 | Requirement | Version | Purpose |
 |-------------|---------|---------|
-| Python | 3.14+ | Runtime |
+| Python | 3.13+ | Runtime |
 | uv | Latest | Package management |
 
 ## Installation

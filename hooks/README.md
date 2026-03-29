@@ -57,7 +57,7 @@ graph LR
 
 | Requirement | Version | Purpose |
 |-------------|---------|---------|
-| Python | 3.14+ | Runtime |
+| Python | 3.13+ | Runtime |
 | uv | Latest | Package management |
 | Claude Code | Latest | Event source |
 
@@ -81,7 +81,7 @@ Or from the hooks directory:
 
 ```bash
 cd hooks
-uv tool install -p 3.14 .
+uv tool install -p 3.13 .
 ```
 
 ### Verify Installation
