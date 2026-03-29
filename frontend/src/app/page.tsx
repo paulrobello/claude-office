@@ -34,9 +34,15 @@ import Modal from "@/components/overlay/Modal";
 import SettingsModal from "@/components/overlay/SettingsModal";
 import { usePreferencesStore } from "@/stores/preferencesStore";
 import type { Session } from "@/hooks/useSessions";
+import { useFloorConfig } from "@/hooks/useFloorConfig";
+import { useNavigationStore } from "@/stores/navigationStore";
+import { Breadcrumb } from "@/components/navigation/Breadcrumb";
+import { BuildingView } from "@/components/views/BuildingView";
+import { FloorView } from "@/components/views/FloorView";
+import { RoomView } from "@/components/views/RoomView";
 
 // ============================================================================
-// DYNAMIC IMPORT
+// DYNAMIC IMPORT (mobile branch only — desktop uses RoomView)
 // ============================================================================
 
 const OfficeGame = dynamic(
@@ -120,6 +126,12 @@ export default function V2TestPage(): React.ReactNode {
   // WebSocket connection — reconnects when sessionId changes
   // ------------------------------------------------------------------
   useWebSocketEvents({ sessionId });
+
+  // ------------------------------------------------------------------
+  // Floor configuration + navigation
+  // ------------------------------------------------------------------
+  useFloorConfig();
+  const view = useNavigationStore((s) => s.view);
 
   // ------------------------------------------------------------------
   // One-time initialization effects
@@ -299,19 +311,26 @@ export default function V2TestPage(): React.ReactNode {
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           )}
-          <h1
-            className={`font-bold text-white tracking-tight flex items-center gap-2 ${
-              isMobile ? "text-lg" : "text-2xl"
-            }`}
-          >
-            <span className="text-orange-500">Claude</span>{" "}
-            {!isMobile && "Office Visualizer"}
+          <div className="flex items-center gap-3">
+            <h1
+              className={`font-bold text-white tracking-tight flex items-center gap-2 ${
+                isMobile ? "text-lg" : "text-2xl"
+              }`}
+            >
+              <span className="text-orange-500">Claude</span>{" "}
+              {!isMobile && "Office Visualizer"}
+              {!isMobile && (
+                <span className="text-xs font-mono font-normal px-2 py-0.5 bg-slate-800 rounded text-slate-400 border border-slate-700">
+                  v0.11.0
+                </span>
+              )}
+            </h1>
             {!isMobile && (
-              <span className="text-xs font-mono font-normal px-2 py-0.5 bg-slate-800 rounded text-slate-400 border border-slate-700">
-                v0.11.0
-              </span>
+              <div className="border-l border-slate-800 pl-3">
+                <Breadcrumb />
+              </div>
             )}
-          </h1>
+          </div>
         </div>
 
         {/* Centered status toast */}
@@ -377,23 +396,21 @@ export default function V2TestPage(): React.ReactNode {
         </div>
       ) : (
         <div className="flex-grow flex gap-2 overflow-hidden min-h-0">
-          <SessionSidebar
-            sessions={sessions}
-            sessionsLoading={sessionsLoading}
-            sessionId={sessionId}
-            isCollapsed={leftSidebarCollapsed}
-            onToggleCollapsed={() =>
-              setLeftSidebarCollapsed(!leftSidebarCollapsed)
-            }
-            onSessionSelect={handleSessionSelect}
-            onDeleteSession={setSessionPendingDelete}
-          />
-
-          <div className="flex-grow border border-slate-800 rounded-lg shadow-2xl bg-slate-900 overflow-hidden relative">
-            <OfficeGame />
-          </div>
-
-          <RightSidebar />
+          {view === "building" && <BuildingView />}
+          {view === "floor" && <FloorView />}
+          {view === "room" && (
+            <RoomView
+              sessions={sessions}
+              sessionsLoading={sessionsLoading}
+              sessionId={sessionId}
+              leftSidebarCollapsed={leftSidebarCollapsed}
+              onToggleLeftSidebar={() =>
+                setLeftSidebarCollapsed(!leftSidebarCollapsed)
+              }
+              onSessionSelect={handleSessionSelect}
+              onDeleteSession={setSessionPendingDelete}
+            />
+          )}
         </div>
       )}
     </main>
