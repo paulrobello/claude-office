@@ -7,10 +7,14 @@ function RoomCard({
   room,
   floor,
   onClick,
+  sessionCount,
+  isActive,
 }: {
   room: RoomConfig;
   floor: FloorConfig;
   onClick: () => void;
+  sessionCount: number;
+  isActive: boolean;
 }): React.ReactNode {
   return (
     <button
@@ -42,27 +46,47 @@ function RoomCard({
             />
           ))}
         </div>
-        <span className="text-xs text-slate-600 font-mono">idle</span>
+        <span className="text-xs text-slate-600 font-mono">
+          {isActive ? "active" : "idle"}
+        </span>
       </div>
 
       {/* Footer */}
       <div className="px-4 py-2 border-t border-slate-800 flex justify-between items-center">
         <span className="text-[10px] text-slate-600 font-mono uppercase">
-          0 agents
+          {sessionCount} session{sessionCount !== 1 ? "s" : ""}
         </span>
-        <span className="text-slate-600 group-hover:text-slate-400 transition-colors">
-          →
-        </span>
+        <div className="flex items-center gap-1.5">
+          {isActive && (
+            <div
+              className="w-1.5 h-1.5 rounded-full animate-pulse"
+              style={{ backgroundColor: floor.accent }}
+            />
+          )}
+          <span className="text-slate-600 group-hover:text-slate-400 transition-colors">
+            →
+          </span>
+        </div>
       </div>
     </button>
   );
 }
 
 export function FloorView(): React.ReactNode {
-  const { buildingConfig, floorId, goToRoom } = useNavigationStore();
+  const { buildingConfig, floorId, goToRoom, allSessions } =
+    useNavigationStore();
 
   const floor = buildingConfig?.floors.find((f) => f.id === floorId);
   if (!floor) return null;
+
+  const roomStats = new Map<string, { count: number; active: boolean }>();
+  for (const room of floor.rooms) {
+    const roomSessions = allSessions.filter((s) => s.roomId === room.id);
+    roomStats.set(room.id, {
+      count: roomSessions.length,
+      active: roomSessions.some((s) => s.status === "active"),
+    });
+  }
 
   return (
     <div className="flex flex-col h-full p-6">
@@ -82,14 +106,19 @@ export function FloorView(): React.ReactNode {
 
       {/* Room cards */}
       <div className="flex-grow flex items-start gap-3 overflow-x-auto pb-4">
-        {floor.rooms.map((room) => (
-          <RoomCard
-            key={room.id}
-            room={room}
-            floor={floor}
-            onClick={() => goToRoom(floor.id, room.id)}
-          />
-        ))}
+        {floor.rooms.map((room) => {
+          const stats = roomStats.get(room.id) ?? { count: 0, active: false };
+          return (
+            <RoomCard
+              key={room.id}
+              room={room}
+              floor={floor}
+              onClick={() => goToRoom(floor.id, room.id)}
+              sessionCount={stats.count}
+              isActive={stats.active}
+            />
+          );
+        })}
       </div>
     </div>
   );

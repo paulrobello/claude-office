@@ -6,9 +6,13 @@ import type { FloorConfig } from "@/types/navigation";
 function FloorRow({
   floor,
   onClick,
+  activeRooms,
+  totalSessions,
 }: {
   floor: FloorConfig;
   onClick: () => void;
+  activeRooms: number;
+  totalSessions: number;
 }): React.ReactNode {
   const roomCount = floor.rooms.length;
   const isPlaceholder = roomCount <= 1;
@@ -34,14 +38,17 @@ function FloorRow({
       <div className="flex-grow flex items-center gap-4 px-5 py-4">
         <span className="text-2xl">{floor.icon}</span>
         <div className="flex flex-col items-start">
-          <span
-            className="text-lg font-bold"
-            style={{ color: floor.accent }}
-          >
+          <span className="text-lg font-bold" style={{ color: floor.accent }}>
             {floor.name}
           </span>
           <span className="text-xs text-slate-500 font-mono">
             {roomCount} room{roomCount !== 1 ? "s" : ""}
+            {totalSessions > 0 && (
+              <span className="text-emerald-500">
+                {" "}
+                · {totalSessions} active
+              </span>
+            )}
           </span>
         </div>
       </div>
@@ -52,7 +59,9 @@ function FloorRow({
           <div
             key={room.id}
             className={`w-3 h-5 rounded-sm ${
-              isPlaceholder ? "bg-slate-800" : "bg-slate-700 group-hover:bg-slate-600"
+              isPlaceholder
+                ? "bg-slate-800"
+                : "bg-slate-700 group-hover:bg-slate-600"
             }`}
             title={room.repo_name}
           />
@@ -68,7 +77,7 @@ function FloorRow({
 }
 
 export function BuildingView(): React.ReactNode {
-  const { buildingConfig, goToFloor } = useNavigationStore();
+  const { buildingConfig, goToFloor, allSessions } = useNavigationStore();
 
   if (!buildingConfig) return null;
 
@@ -90,13 +99,26 @@ export function BuildingView(): React.ReactNode {
         <div className="h-2 bg-slate-800 rounded-t-lg mx-4" />
 
         {/* Floors (sorted top-down by floor_number) */}
-        {buildingConfig.floors.map((floor) => (
-          <FloorRow
-            key={floor.id}
-            floor={floor}
-            onClick={() => goToFloor(floor.id)}
-          />
-        ))}
+        {buildingConfig.floors.map((floor) => {
+          const floorRoomIds = new Set(floor.rooms.map((r) => r.id));
+          const floorSessions = allSessions.filter(
+            (s) => s.roomId && floorRoomIds.has(s.roomId),
+          );
+          const activeRooms = new Set(
+            floorSessions
+              .filter((s) => s.status === "active")
+              .map((s) => s.roomId),
+          ).size;
+          return (
+            <FloorRow
+              key={floor.id}
+              floor={floor}
+              onClick={() => goToFloor(floor.id)}
+              activeRooms={activeRooms}
+              totalSessions={floorSessions.filter((s) => s.status === "active").length}
+            />
+          );
+        })}
 
         {/* Lobby / Ground */}
         <div className="flex items-center gap-3 px-5 py-3 border border-dashed border-slate-800 rounded-lg">

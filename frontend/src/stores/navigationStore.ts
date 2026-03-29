@@ -12,6 +12,9 @@ interface NavigationState {
   buildingConfig: BuildingConfig | null;
   /** Whether config is loading */
   isLoading: boolean;
+  /** All sessions from backend (for room/floor summaries) */
+  allSessions: { id: string; roomId: string | null; status: string; eventCount: number }[];
+  setAllSessions: (sessions: { id: string; roomId: string | null; status: string; eventCount: number }[]) => void;
 
   /** Navigate to building view */
   goToBuilding: () => void;
@@ -33,6 +36,8 @@ export const useNavigationStore = create<NavigationState>((set, get) => ({
   roomId: null,
   buildingConfig: null,
   isLoading: true,
+  allSessions: [],
+  setAllSessions: (sessions) => set({ allSessions: sessions }),
 
   goToBuilding: () => set({ view: "building", floorId: null, roomId: null }),
 
@@ -40,7 +45,8 @@ export const useNavigationStore = create<NavigationState>((set, get) => ({
 
   goToRoom: (floorId, roomId) => set({ view: "room", floorId, roomId }),
 
-  setBuildingConfig: (config) => set({ buildingConfig: config, isLoading: false }),
+  setBuildingConfig: (config) =>
+    set({ buildingConfig: config, isLoading: false }),
 
   setLoading: (loading) => set({ isLoading: loading }),
 
