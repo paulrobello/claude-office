@@ -52,6 +52,8 @@ class SessionSummary(TypedDict):
     updatedAt: str
     status: str
     eventCount: int
+    floorId: str | None
+    roomId: str | None
 
 
 class ReplayEvent(TypedDict):
@@ -72,11 +74,16 @@ class ReplayEntry(TypedDict):
 
 
 @router.get("")
-async def list_sessions(db: Annotated[AsyncSession, Depends(get_db)]) -> list[SessionSummary]:
-    """List all sessions with event counts."""
-    logger.debug("API: list_sessions called")
+async def list_sessions(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    room_id: str | None = None,
+) -> list[SessionSummary]:
+    """List all sessions with event counts, optionally filtered by room."""
+    logger.debug("API: list_sessions called (room_id=%s)", room_id)
     try:
         stmt = select(SessionRecord).order_by(SessionRecord.updated_at.desc())
+        if room_id:
+            stmt = stmt.where(SessionRecord.room_id == room_id)
         result = await db.execute(stmt)
         records = result.scalars().all()
 
@@ -106,6 +113,8 @@ async def list_sessions(db: Annotated[AsyncSession, Depends(get_db)]) -> list[Se
                     "updatedAt": updated_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     "status": rec.status,
                     "eventCount": count,
+                    "floorId": rec.floor_id,
+                    "roomId": rec.room_id,
                 }
             )
         return sessions
