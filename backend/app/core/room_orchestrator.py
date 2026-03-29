@@ -71,10 +71,9 @@ class RoomOrchestrator:
 
     def add_session(self, session_id: str, sm: StateMachine) -> None:
         """Register a session. Call once when session first joins this room."""
-        is_lead = sm.is_lead or (sm.team_name is not None and sm.teammate_name is None)
-        if not sm.team_name:
-            # No team_name -> solo session, treated as lead
-            is_lead = True
+        # Team session: lead has no teammate_name, or is explicitly flagged.
+        # No team context -> solo session, always the lead.
+        is_lead = sm.is_lead or sm.teammate_name is None if sm.team_name else True
 
         color = "#f59e0b" if is_lead else self._next_teammate_color()
 
@@ -146,9 +145,10 @@ class RoomOrchestrator:
 
         # Lead's subagents -> character_type="subagent"
         for agent in lead_state.agents:
-            agent.character_type = "subagent"
-            agent.parent_session_id = lead_entry.session_id
-            merged_agents.append(agent)
+            merged_agents.append(agent.model_copy(update={
+                "character_type": "subagent",
+                "parent_session_id": lead_entry.session_id,
+            }))
 
         # Lead's kanban tasks
         for task in lead_entry.sm.kanban_tasks.values():
@@ -182,10 +182,11 @@ class RoomOrchestrator:
 
             # Teammate's subagents
             for agent in tm_state.agents:
-                agent.character_type = "subagent"
-                agent.parent_session_id = session_id
-                agent.parent_id = tm_id
-                merged_agents.append(agent)
+                merged_agents.append(agent.model_copy(update={
+                    "character_type": "subagent",
+                    "parent_session_id": session_id,
+                    "parent_id": tm_id,
+                }))
 
             # Teammate's kanban tasks
             for task in entry.sm.kanban_tasks.values():
@@ -204,7 +205,7 @@ class RoomOrchestrator:
             **lead_state.whiteboard_data.model_dump(exclude={"kanban_tasks"}),
             kanban_tasks=list(all_kanban.values()),
         )
-        desk_count = max(8, desk_number + len(merged_agents) + 2)
+        desk_count = max(8, len(merged_agents) + 2)
 
         return GameState(
             session_id=lead_entry.session_id,
@@ -231,14 +232,16 @@ class RoomOrchestrator:
 
     def _infer_in_progress(self, tasks: dict[str, KanbanTask]) -> None:
         """Mark the first pending task as in_progress for each active session."""
-        active_assignees: set[str | None] = set()
+        active_assignees: set[str] = set()
         for entry in self._sessions.values():
-            if entry.sm.boss_state not in (BossState.IDLE, BossState.COMPLETING):
+            if (entry.sm.boss_state not in (BossState.IDLE, BossState.COMPLETING)
+                    and entry.teammate_name is not None):
                 active_assignees.add(entry.teammate_name)
 
-        promoted: set[str | None] = set()
+        promoted: set[str] = set()
         for task in tasks.values():
-            if (task.status == "pending" and task.assignee in active_assignees
+            if (task.status == "pending" and task.assignee is not None
+                    and task.assignee in active_assignees
                     and task.assignee not in promoted):
                 task.status = "in_progress"
                 promoted.add(task.assignee)
