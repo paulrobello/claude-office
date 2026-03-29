@@ -28,9 +28,10 @@ export const MODE_INFO: Record<WhiteboardMode, ModeInfo> = {
   8: { name: "NEWS", icon: "📰" },
   9: { name: "COFFEE", icon: "☕" },
   10: { name: "HEATMAP", icon: "🔥" },
+  11: { name: "KANBAN", icon: "📌" },
 };
 
-export const WHITEBOARD_MODE_COUNT = 11;
+export const WHITEBOARD_MODE_COUNT = 12;
 
 /**
  * Returns the next mode index, wrapping around after mode 10.

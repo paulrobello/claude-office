@@ -34,6 +34,7 @@ export type {
   FileEdit,
   NewsItem,
   WhiteboardData,
+  KanbanTask,
   GameState,
   Session,
   ConversationEntry,
@@ -68,7 +69,7 @@ export interface Position {
 }
 
 /**
- * Whiteboard display mode index (0–10).
+ * Whiteboard display mode index (0–11).
  * Pure frontend concept — the backend has no equivalent.
  */
 export type WhiteboardMode =
@@ -82,7 +83,8 @@ export type WhiteboardMode =
   | 7 // Timeline
   | 8 // News Ticker
   | 9 // Coffee
-  | 10; // Heat Map
+  | 10 // Heat Map
+  | 11; // Kanban Board — hotkey K
 
 /**
  * Shape of the optional event detail payload carried in WebSocket events.
