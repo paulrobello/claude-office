@@ -12,7 +12,7 @@ function RoomCard({
 }: {
   room: RoomConfig;
   floor: FloorConfig;
-  onClick: () => void;
+  onClick: (origin: { x: number; y: number }) => void;
   sessionCount: number;
   isActive: boolean;
 }): React.ReactNode {
@@ -20,7 +20,7 @@ function RoomCard({
 
   return (
     <button
-      onClick={onClick}
+      onClick={(e) => onClick({ x: e.clientX, y: e.clientY })}
       data-tour-id={`room-${room.id}`}
       data-room-id={room.id}
       className="group flex flex-col rounded-lg overflow-hidden w-56 flex-shrink-0 transition-all duration-200"
@@ -186,7 +186,10 @@ export function FloorView(): React.ReactNode {
               key={room.id}
               room={room}
               floor={floor}
-              onClick={() => goToRoom(floor.id, room.id)}
+              onClick={(origin) => {
+                useNavigationStore.getState().setTransitionOrigin(origin);
+                goToRoom(floor.id, room.id);
+              }}
               sessionCount={stats.count}
               isActive={stats.active}
             />

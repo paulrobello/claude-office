@@ -10,7 +10,7 @@ function FloorRow({
   totalSessions,
 }: {
   floor: FloorConfig;
-  onClick: () => void;
+  onClick: (origin: { x: number; y: number }) => void;
   activeRooms: number;
   totalSessions: number;
 }): React.ReactNode {
@@ -19,7 +19,7 @@ function FloorRow({
 
   return (
     <button
-      onClick={onClick}
+      onClick={(e) => onClick({ x: e.clientX, y: e.clientY })}
       data-tour-id={`floor-${floor.id}`}
       data-floor-id={floor.id}
       className={`group flex items-stretch w-full rounded-lg border transition-all duration-200 ${
@@ -115,7 +115,10 @@ export function BuildingView(): React.ReactNode {
             <FloorRow
               key={floor.id}
               floor={floor}
-              onClick={() => goToFloor(floor.id)}
+              onClick={(origin) => {
+                useNavigationStore.getState().setTransitionOrigin(origin);
+                goToFloor(floor.id);
+              }}
               activeRooms={activeRooms}
               totalSessions={
                 floorSessions.filter((s) => s.status === "active").length

@@ -11,7 +11,10 @@ export function Breadcrumb(): React.ReactNode {
   return (
     <nav className="flex items-center gap-1.5 text-sm font-mono">
       <button
-        onClick={goToBuilding}
+        onClick={(e) => {
+          useNavigationStore.getState().setTransitionOrigin({ x: e.clientX, y: e.clientY });
+          goToBuilding();
+        }}
         data-tour-id="breadcrumb-building"
         className={`flex items-center gap-1 px-2 py-0.5 rounded transition-colors ${
           view === "building"
@@ -27,7 +30,10 @@ export function Breadcrumb(): React.ReactNode {
         <>
           <span className="text-slate-600">/</span>
           <button
-            onClick={() => goToFloor(floor.id)}
+            onClick={(e) => {
+              useNavigationStore.getState().setTransitionOrigin({ x: e.clientX, y: e.clientY });
+              goToFloor(floor.id);
+            }}
             className={`flex items-center gap-1 px-2 py-0.5 rounded transition-colors ${
               view === "floor"
                 ? "text-white bg-slate-800"
