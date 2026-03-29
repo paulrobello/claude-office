@@ -18,6 +18,7 @@ from typing import Any
 from sqlalchemy import delete, select
 
 from app.config import get_settings
+from app.core.beads_poller import get_beads_poller, has_beads, init_beads_poller
 from app.core.broadcast_service import broadcast_error, broadcast_event, broadcast_state
 from app.core.handlers import (
     enrich_agent_from_transcript,
@@ -34,7 +35,6 @@ from app.core.handlers import (
 )
 from app.core.jsonl_parser import get_last_assistant_response
 from app.core.state_machine import StateMachine
-from app.core.beads_poller import get_beads_poller, has_beads, init_beads_poller
 from app.core.task_file_poller import init_task_file_poller
 from app.core.task_persistence import load_tasks, save_tasks
 from app.core.transcript_poller import init_transcript_poller

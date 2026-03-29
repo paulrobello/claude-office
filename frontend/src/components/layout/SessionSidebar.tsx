@@ -11,7 +11,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { GitStatusPanel } from "@/components/game/GitStatusPanel";
 import type { Session } from "@/hooks/useSessions";
-import { useRef, useState, useCallback } from "react";
+import { useDragResize } from "@/hooks/useDragResize";
 
 // ============================================================================
 // CONSTANTS
@@ -21,8 +21,10 @@ const SIDEBAR_MIN_WIDTH = 180;
 const SIDEBAR_MAX_WIDTH = 500;
 const SIDEBAR_DEFAULT_WIDTH = 288; // equivalent to w-72
 const SESSIONS_MIN_HEIGHT = 80;
-const SESSIONS_MAX_HEIGHT = 800;
 const SESSIONS_DEFAULT_HEIGHT = 280;
+
+/** Max height is 70% of viewport to prevent overflow on smaller screens */
+const getMaxPanelHeight = () => Math.floor(window.innerHeight * 0.7);
 
 // ============================================================================
 // TYPES
@@ -56,69 +58,31 @@ export function SessionSidebar({
   onSessionSelect,
   onDeleteSession,
 }: SessionSidebarProps): React.ReactNode {
-  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
-  const [sessionsHeight, setSessionsHeight] = useState(SESSIONS_DEFAULT_HEIGHT);
-  const [isDragging, setIsDragging] = useState(false);
+  const {
+    size: sidebarWidth,
+    isDragging: isWidthDragging,
+    handleDragStart: handleWidthDragStart,
+  } = useDragResize({
+    initialSize: SIDEBAR_DEFAULT_WIDTH,
+    minSize: SIDEBAR_MIN_WIDTH,
+    maxSize: SIDEBAR_MAX_WIDTH,
+    direction: "horizontal",
+    edge: "right",
+  });
 
-  // ==== Horizontal resize (right edge) ========================================================================
-  const handleWidthDragStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      setIsDragging(true);
-      document.body.style.cursor = "ew-resize";
-      const startX = e.clientX;
-      const startWidth = sidebarWidth;
+  const {
+    size: sessionsHeight,
+    isDragging: isHeightDragging,
+    handleDragStart: handleHeightDragStart,
+  } = useDragResize({
+    initialSize: SESSIONS_DEFAULT_HEIGHT,
+    minSize: SESSIONS_MIN_HEIGHT,
+    maxSize: getMaxPanelHeight,
+    direction: "vertical",
+    edge: "down",
+  });
 
-      const onMouseMove = (ev: MouseEvent) => {
-        // Dragging right edge: moving right increases width
-        const newWidth = Math.min(
-          SIDEBAR_MAX_WIDTH,
-          Math.max(SIDEBAR_MIN_WIDTH, startWidth + (ev.clientX - startX)),
-        );
-        setSidebarWidth(newWidth);
-      };
-
-      const onMouseUp = () => {
-        setIsDragging(false);
-        document.body.style.cursor = "";
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-      };
-
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
-    },
-    [sidebarWidth],
-  );
-
-  // ==== Vertical resize (sessions ↕ events divider) ========================================================================
-  const handleHeightDragStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      setIsDragging(true);
-      document.body.style.cursor = "ns-resize";
-      const startY = e.clientY;
-      const startHeight = sessionsHeight;
-
-      const onMouseMove = (ev: MouseEvent) => {
-        const newHeight = Math.min(
-          SESSIONS_MAX_HEIGHT,
-          Math.max(SESSIONS_MIN_HEIGHT, startHeight + ev.clientY - startY),
-        );
-        setSessionsHeight(newHeight);
-      };
-
-      const onMouseUp = () => {
-        setIsDragging(false);
-        document.body.style.cursor = "";
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-      };
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
-    },
-    [sessionsHeight],
-  );
+  const isDragging = isWidthDragging || isHeightDragging;
 
   return (
     <aside
@@ -239,13 +203,13 @@ export function SessionSidebar({
             </div>
           </div>
 
-          {/* Vertical Resize Handle (sessions $ git status) */}
+          {/* Vertical Resize Handle (sessions ↕ git status) */}
           <div
             className="flex-shrink-0 h-3 cursor-ns-resize flex items-center justify-center group -my-1"
             onMouseDown={handleHeightDragStart}
             title="Drag to resize"
           >
-            <div className="w-10 h-1 rounded-full bg-slate-700 group-hover:bg-purple-500 transition-colors" />
+            <div className="w-10 h-1 rounded-full bg-slate-700 group-hover:bg-purple-500 group-active:bg-purple-400 transition-colors" />
           </div>
 
           {/* Git Status Panel */}
@@ -258,7 +222,7 @@ export function SessionSidebar({
       {/* Horizontal Resize Handle (right edge) */}
       {!isCollapsed && (
         <div
-          className="absolute right-0 top-0 w-1.5 h-full cursor-ew-resize z-10 hover:bg-purple-500/40 transition-colors"
+          className="absolute right-0 top-0 w-1.5 h-full cursor-ew-resize z-10 hover:bg-purple-500/40 active:bg-purple-500/60 transition-colors"
           onMouseDown={handleWidthDragStart}
           title="Drag to resize"
         />
