@@ -19,6 +19,7 @@ dependencies = [
     "rich>=14.3.3",
     "greenlet>=3.3.2",
     "anthropic>=0.86.0",
+    "tomli>=2.4.1",
 ]
 
 [project.optional-dependencies]
