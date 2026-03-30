@@ -47,6 +47,32 @@ body {
   }
 }
 
+@keyframes zoomInView {
+  from {
+    transform: scale(0.3);
+    opacity: 0;
+    filter: blur(4px);
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0px);
+  }
+}
+
+@keyframes zoomOutView {
+  from {
+    transform: scale(3);
+    opacity: 0;
+    filter: blur(4px);
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0px);
+  }
+}
+
 @layer utilities {
   /* PixiJS Canvas Scaling */
   .pixi-canvas-container canvas {

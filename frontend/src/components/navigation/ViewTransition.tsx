@@ -93,35 +93,6 @@ export function ViewTransition({ view, children }: ViewTransitionProps): ReactNo
       : {};
 
   return (
-    <>
-      {/* Global keyframes */}
-      <style jsx global>{`
-        @keyframes zoomInView {
-          from {
-            transform: scale(0.3);
-            opacity: 0;
-            filter: blur(4px);
-          }
-          to {
-            transform: scale(1);
-            opacity: 1;
-            filter: blur(0px);
-          }
-        }
-        @keyframes zoomOutView {
-          from {
-            transform: scale(3);
-            opacity: 0;
-            filter: blur(4px);
-          }
-          to {
-            transform: scale(1);
-            opacity: 1;
-            filter: blur(0px);
-          }
-        }
-      `}</style>
-
       <div className="relative flex-grow flex overflow-hidden min-h-0">
         {/* Outgoing view (during animation only) */}
         {phase === "animating" && outgoingView && (
@@ -138,6 +109,5 @@ export function ViewTransition({ view, children }: ViewTransitionProps): ReactNo
           {children(view)}
         </div>
       </div>
-    </>
   );
 }
