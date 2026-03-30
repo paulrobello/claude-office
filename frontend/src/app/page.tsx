@@ -427,17 +427,11 @@ export default function V2TestPage(): React.ReactNode {
               : undefined
           }
         >
-          <ViewTransition view={view}>
-            {(activeView) => (
-              <>
-                {activeView === "building" && <BuildingView />}
-                {/* Always mount FloorView when active to keep PixiJS alive */}
-                <div className={activeView === "floor" ? "contents" : "hidden"}>
-                  <FloorView />
-                </div>
-              </>
-            )}
-          </ViewTransition>
+          <ViewTransition
+            view={view}
+            buildingView={<BuildingView />}
+            floorView={<FloorView />}
+          />
         </div>
       )}
 
