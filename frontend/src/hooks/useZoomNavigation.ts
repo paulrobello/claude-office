@@ -27,6 +27,8 @@ export function useZoomNavigation(containerRef: React.RefObject<HTMLDivElement |
   const view = useNavigationStore((s) => s.view);
   const isTransitioning = useNavigationStore((s) => s.isTransitioning);
   const [zoom, setZoom] = useState<ZoomState>({ scale: 1, originX: 0, originY: 0 });
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
   const lastSnapTime = useRef(0);
 
   const handleWheel = useCallback(
@@ -45,25 +47,27 @@ export function useZoomNavigation(containerRef: React.RefObject<HTMLDivElement |
       const delta = e.ctrlKey ? -e.deltaY : e.deltaY;
       const zoomDelta = delta * ZOOM_SPEED;
 
-      setZoom((prev) => {
-        const newScale = Math.max(0.3, Math.min(4, prev.scale + zoomDelta));
+      // Compute new scale outside setState to avoid calling external
+      // store updates inside a React state updater (causes "cannot update
+      // a component while rendering a different component" error).
+      const prev = zoomRef.current;
+      const newScale = Math.max(0.3, Math.min(4, prev.scale + zoomDelta));
 
-        // Check for snap-in threshold (building → floor)
-        if (newScale >= SNAP_THRESHOLD) {
-          lastSnapTime.current = Date.now();
+      // Snap-in threshold (building → floor)
+      if (newScale >= SNAP_THRESHOLD) {
+        lastSnapTime.current = Date.now();
+        setZoom({ scale: 1, originX: 0, originY: 0 });
 
-          const target = findTargetUnderCursor(e.clientX, e.clientY);
-          if (target?.floorId) {
-            const store = useNavigationStore.getState();
-            store.setTransitionOrigin({ x: e.clientX, y: e.clientY });
-            store.goToFloor(target.floorId);
-          }
-
-          return { scale: 1, originX: 0, originY: 0 };
+        const target = findTargetUnderCursor(e.clientX, e.clientY);
+        if (target?.floorId) {
+          const store = useNavigationStore.getState();
+          store.setTransitionOrigin({ x: e.clientX, y: e.clientY });
+          store.goToFloor(target.floorId);
         }
+        return;
+      }
 
-        return { scale: newScale, originX: e.clientX, originY: e.clientY };
-      });
+      setZoom({ scale: newScale, originX: e.clientX, originY: e.clientY });
     },
     [view, isTransitioning],
   );
