@@ -224,6 +224,19 @@ export default function V2TestPage(): React.ReactNode {
     await handleDeleteSession(pending);
   };
 
+  const handleRenameSession = async (sessionId: string, displayName: string) => {
+    try {
+      await fetch(`http://localhost:8000/api/v1/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName }),
+      });
+      await fetchSessions();
+    } catch {
+      // Silently fail
+    }
+  };
+
   // ------------------------------------------------------------------
   // Render
   // ------------------------------------------------------------------
@@ -464,6 +477,7 @@ export default function V2TestPage(): React.ReactNode {
                 sessionId={sessionId}
                 onSessionSelect={handleSessionSelect}
                 onDeleteSession={handleDeleteSession}
+                onRenameSession={handleRenameSession}
               />
             }
           />

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef } from "react";
 import {
   History,
   Radio,
@@ -38,6 +39,7 @@ interface SessionSidebarProps {
   onToggleCollapsed: () => void;
   onSessionSelect: (id: string) => Promise<void>;
   onDeleteSession: (session: Session) => void;
+  onRenameSession: (sessionId: string, displayName: string) => Promise<void>;
 }
 
 // ============================================================================
@@ -57,7 +59,11 @@ export function SessionSidebar({
   onToggleCollapsed,
   onSessionSelect,
   onDeleteSession,
+  onRenameSession,
 }: SessionSidebarProps): React.ReactNode {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const editRef = useRef<HTMLInputElement>(null);
   const {
     size: sidebarWidth,
     isDragging: isWidthDragging,
@@ -165,13 +171,43 @@ export function SessionSidebar({
                               className="text-slate-500 flex-shrink-0"
                             />
                           )}
-                          <span
-                            className={`text-xs font-bold truncate flex-1 ${
-                              isActive ? "text-purple-300" : "text-slate-300"
-                            }`}
-                          >
-                            {session.projectName || "Unknown Project"}
-                          </span>
+                          {editingId === session.id ? (
+                            <input
+                              ref={editRef}
+                              type="text"
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              onBlur={() => {
+                                if (editName.trim() && editName !== (session.displayName || session.projectName)) {
+                                  onRenameSession(session.id, editName.trim());
+                                }
+                                setEditingId(null);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  (e.target as HTMLInputElement).blur();
+                                } else if (e.key === "Escape") {
+                                  setEditingId(null);
+                                }
+                              }}
+                              className="text-xs font-bold bg-transparent border-b border-purple-500 text-white focus:outline-none w-full"
+                              autoFocus
+                            />
+                          ) : (
+                            <span
+                              className={`text-xs font-bold truncate flex-1 ${
+                                isActive ? "text-purple-300" : "text-slate-300"
+                              }`}
+                              onDoubleClick={() => {
+                                setEditingId(session.id);
+                                setEditName(session.displayName || session.projectName || "");
+                                setTimeout(() => editRef.current?.select(), 50);
+                              }}
+                              title="Double-click to rename"
+                            >
+                              {session.displayName || session.projectName || "Unknown Project"}
+                            </span>
+                          )}
                           <button
                             type="button"
                             onClick={(e) => {

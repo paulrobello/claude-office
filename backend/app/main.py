@@ -50,6 +50,7 @@ async def _migrate_schema(conn) -> None:  # type: ignore[type-arg]
         ("team_name", "TEXT"),
         ("teammate_name", "TEXT"),
         ("is_lead", "INTEGER NOT NULL DEFAULT 0"),
+        ("display_name", "TEXT"),
     ]
     for col_name, col_def in new_columns:
         if col_name not in existing:

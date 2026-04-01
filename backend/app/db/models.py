@@ -16,6 +16,7 @@ class SessionRecord(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     project_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
     project_root: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)

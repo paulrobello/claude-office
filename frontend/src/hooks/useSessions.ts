@@ -15,6 +15,7 @@ import {
 export interface Session {
   id: string;
   projectName: string | null;
+  displayName: string | null;
   projectRoot: string | null;
   createdAt: string;
   updatedAt: string;

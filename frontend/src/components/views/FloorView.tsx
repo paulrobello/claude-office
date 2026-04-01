@@ -52,6 +52,7 @@ export interface FloorViewProps {
   sessionId: string;
   onSessionSelect: (id: string) => Promise<void>;
   onDeleteSession: (session: Session) => Promise<void>;
+  onRenameSession: (sessionId: string, displayName: string) => Promise<void>;
 }
 
 export function FloorView({
@@ -60,6 +61,7 @@ export function FloorView({
   sessionId,
   onSessionSelect,
   onDeleteSession,
+  onRenameSession,
 }: FloorViewProps): React.ReactNode {
   const { floorId, buildingConfig } = useNavigationStore();
   const floor = buildingConfig?.floors.find((f) => f.id === floorId);
@@ -81,6 +83,7 @@ export function FloorView({
         onToggleCollapsed={() => {}}
         onSessionSelect={onSessionSelect}
         onDeleteSession={onDeleteSession}
+        onRenameSession={onRenameSession}
       />
 
       <div className="flex-grow border border-slate-800 rounded-lg shadow-2xl bg-slate-900 overflow-hidden relative">

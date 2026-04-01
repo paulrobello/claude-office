@@ -47,6 +47,7 @@ class SessionSummary(TypedDict):
 
     id: str
     projectName: str | None
+    displayName: str | None
     projectRoot: str | None
     createdAt: str
     updatedAt: str
@@ -111,6 +112,7 @@ async def list_sessions(
                 {
                     "id": rec.id,
                     "projectName": rec.project_name,
+                    "displayName": rec.display_name,
                     "projectRoot": rec.project_root,
                     "createdAt": created_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     "updatedAt": updated_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
@@ -124,6 +126,26 @@ async def list_sessions(
     except Exception as e:
         logger.exception("Error in list_sessions: %s", e)
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.patch("/{session_id}")
+async def rename_session(
+    session_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: dict[str, Any] | None = None,
+) -> dict[str, str]:
+    """Rename a session's display name."""
+    if not body or "displayName" not in body:
+        raise HTTPException(status_code=400, detail="displayName required")
+
+    result = await db.execute(select(SessionRecord).where(SessionRecord.id == session_id))
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session.display_name = body["displayName"]
+    await db.commit()
+    return {"status": "ok"}
 
 
 @router.get("/{session_id}/replay")
