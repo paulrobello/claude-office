@@ -457,7 +457,15 @@ export default function V2TestPage(): React.ReactNode {
           <ViewTransition
             view={view}
             buildingView={<BuildingView />}
-            floorView={<FloorView />}
+            floorView={
+              <FloorView
+                sessions={sessions}
+                sessionsLoading={sessionsLoading}
+                sessionId={sessionId}
+                onSessionSelect={handleSessionSelect}
+                onDeleteSession={handleDeleteSession}
+              />
+            }
           />
         </div>
       )}
