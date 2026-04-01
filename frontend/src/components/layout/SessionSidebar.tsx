@@ -185,7 +185,7 @@ export function SessionSidebar({
                           </button>
                         </div>
                         <div className="text-[10px] text-slate-500 font-mono truncate mb-1">
-                          {session.id}
+                          {session.id.slice(0, 8)}
                         </div>
                         <div className="flex justify-between text-[10px] text-slate-500">
                           <span>{session.eventCount} events</span>
