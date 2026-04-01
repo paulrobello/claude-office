@@ -141,8 +141,7 @@ export default function V2TestPage(): React.ReactNode {
   // ------------------------------------------------------------------
   // WebSocket connection — reconnects when sessionId changes
   // ------------------------------------------------------------------
-  // Only connect at page level when in building view (FloorView manages its own WS)
-  useWebSocketEvents({ sessionId: view === "building" ? sessionId : "" });
+  useWebSocketEvents({ sessionId });
 
   // ------------------------------------------------------------------
   // One-time initialization effects

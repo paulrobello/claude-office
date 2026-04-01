@@ -2,11 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useNavigationStore } from "@/stores/navigationStore";
-import { useFloorSessions } from "@/hooks/useFloorSessions";
-import { useWebSocketEvents } from "@/hooks/useWebSocketEvents";
 import { useGameStore, selectAgents } from "@/stores/gameStore";
 import { useTourStore } from "@/stores/tourStore";
-import { SessionSidebar } from "@/components/layout/SessionSidebar";
 import { RightSidebar } from "@/components/layout/RightSidebar";
 
 const OfficeGame = dynamic(
@@ -51,12 +48,6 @@ export function FloorView(): React.ReactNode {
   const { floorId, buildingConfig } = useNavigationStore();
   const floor = buildingConfig?.floors.find((f) => f.id === floorId);
 
-  const { sessions, loading, sessionId, selectSession } =
-    useFloorSessions(floorId);
-
-  // Connect WebSocket to the floor
-  useWebSocketEvents({ sessionId });
-
   // Show elevator waiting indicator during tour when no agents yet
   const agents = useGameStore(selectAgents);
   const isTourActive = useTourStore((s) => s.isActive);
@@ -66,16 +57,6 @@ export function FloorView(): React.ReactNode {
 
   return (
     <div className="flex-grow flex gap-2 overflow-hidden min-h-0">
-      <SessionSidebar
-        sessions={sessions}
-        sessionsLoading={loading}
-        sessionId={sessionId}
-        isCollapsed={false}
-        onToggleCollapsed={() => {}}
-        onSessionSelect={async (id) => selectSession(id)}
-        onDeleteSession={() => {}}
-      />
-
       <div className="flex-grow border border-slate-800 rounded-lg shadow-2xl bg-slate-900 overflow-hidden relative">
         {/* Floor label overlay */}
         {floor && (
