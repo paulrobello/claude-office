@@ -11,7 +11,7 @@ export const locales: Record<Locale, string> = {
 };
 
 export function isLocale(value: string): value is Locale {
-  return value in locales;
+  return Object.hasOwn(locales, value);
 }
 
 const translations: Record<Locale, Record<TranslationKey, string>> = {
