@@ -41,6 +41,9 @@ import { BuildingView } from "@/components/views/BuildingView";
 import { FloorView } from "@/components/views/FloorView";
 import { TourOverlay } from "@/components/tour/TourOverlay";
 import { useTourStore } from "@/stores/tourStore";
+import { CommandBar } from "@/components/command/CommandBar";
+import { AttentionToasts } from "@/components/command/AttentionToasts";
+import { useAttentionStore, startAttentionEngine } from "@/stores/attentionStore";
 
 // ============================================================================
 // DYNAMIC IMPORT (mobile branch only — desktop uses FloorView)
@@ -126,6 +129,10 @@ export default function V2TestPage(): React.ReactNode {
   const isTourActive = useTourStore((s) => s.isActive);
   const loadTourSeen = useTourStore((s) => s.loadTourSeen);
 
+  const [isCommandBarOpen, setIsCommandBarOpen] = useState(false);
+  const attentionCount = useAttentionStore((s) => s.activeCount);
+  const highestUrgency = useAttentionStore((s) => s.highestUrgency);
+
   // ------------------------------------------------------------------
   // Floor configuration + navigation
   // ------------------------------------------------------------------
@@ -167,6 +174,21 @@ export default function V2TestPage(): React.ReactNode {
     loadTourSeen();
   }, [loadTourSeen]);
 
+  useEffect(() => {
+    startAttentionEngine();
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setIsCommandBarOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   // ------------------------------------------------------------------
   // Mobile breakpoint detection
   // ------------------------------------------------------------------
@@ -180,6 +202,8 @@ export default function V2TestPage(): React.ReactNode {
   // ------------------------------------------------------------------
   // Derived handlers
   // ------------------------------------------------------------------
+  const handleOpenCommandBar = () => setIsCommandBarOpen(true);
+
   const handleToggleDebug = () =>
     useGameStore.getState().setDebugMode(!debugMode);
 
@@ -367,6 +391,9 @@ export default function V2TestPage(): React.ReactNode {
             onOpenHelp={() => setIsHelpModalOpen(true)}
             onStartTour={handleStartTour}
             tourBounce={!hasSeenTour && !isTourActive}
+            onOpenCommandBar={handleOpenCommandBar}
+            attentionCount={attentionCount}
+            highestUrgency={highestUrgency}
           />
         )}
 
@@ -434,6 +461,15 @@ export default function V2TestPage(): React.ReactNode {
           />
         </div>
       )}
+
+      {/* Command bar */}
+      <CommandBar
+        isOpen={isCommandBarOpen}
+        onClose={() => setIsCommandBarOpen(false)}
+      />
+
+      {/* Attention toasts */}
+      <AttentionToasts onOpenCommandBar={handleOpenCommandBar} />
 
       {/* Tour overlay */}
       <TourOverlay />

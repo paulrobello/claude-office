@@ -9,6 +9,7 @@ import {
   HelpCircle,
   Settings,
   Compass,
+  Command,
 } from "lucide-react";
 
 // ============================================================================
@@ -27,6 +28,9 @@ interface HeaderControlsProps {
   onOpenHelp: () => void;
   onStartTour: () => void;
   tourBounce: boolean;
+  onOpenCommandBar: () => void;
+  attentionCount: number;
+  highestUrgency: "blocked" | "waiting" | "completed" | "idle" | null;
 }
 
 // ============================================================================
@@ -51,6 +55,9 @@ export function HeaderControls({
   onOpenHelp,
   onStartTour,
   tourBounce,
+  onOpenCommandBar,
+  attentionCount,
+  highestUrgency,
 }: HeaderControlsProps): React.ReactNode {
   return (
     <div className="flex gap-4 items-center">
@@ -97,6 +104,27 @@ export function HeaderControls({
       >
         <Settings size={14} />
         SETTINGS
+      </button>
+
+      <button
+        onClick={onOpenCommandBar}
+        className="relative flex items-center gap-2 px-3 py-1.5 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 border border-slate-500/30 rounded text-xs font-bold transition-colors"
+      >
+        <Command size={14} />
+        <span className="text-[10px] font-mono">⌘K</span>
+        {attentionCount > 0 && (
+          <span
+            className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold text-white ${
+              highestUrgency === "blocked"
+                ? "bg-rose-500"
+                : highestUrgency === "waiting"
+                  ? "bg-amber-500"
+                  : "bg-emerald-500"
+            }`}
+          >
+            {attentionCount}
+          </span>
+        )}
       </button>
 
       <button
