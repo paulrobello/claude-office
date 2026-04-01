@@ -61,7 +61,7 @@ export function RightSidebar(): React.ReactNode {
 
   return (
     <aside
-      className={`relative flex flex-col gap-2 flex-shrink-0 overflow-hidden ${
+      className={`relative flex flex-col gap-2 flex-shrink-0 h-full overflow-hidden ${
         isDragging ? "select-none" : ""
       }`}
       style={{ width: sidebarWidth }}
