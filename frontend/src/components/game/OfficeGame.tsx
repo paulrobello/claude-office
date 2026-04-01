@@ -345,6 +345,8 @@ export function OfficeGame(): ReactNode {
         initialScale={1}
         minScale={1}
         maxScale={3}
+        centerZoomedOut={false}
+        limitToBounds={false}
         wheel={{ step: 0.1 }}
         pinch={{ step: 5 }}
         doubleClick={{ mode: "reset" }}
