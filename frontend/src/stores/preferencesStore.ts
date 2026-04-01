@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { Locale } from "@/i18n";
+import { isLocale, type Locale } from "@/i18n";
 
 // ============================================================================
 // TYPES
@@ -99,7 +99,7 @@ export const usePreferencesStore = create<PreferencesState>()((set, get) => ({
           ? clockFormat
           : DEFAULT_CLOCK_FORMAT,
       autoFollowNewSessions,
-      language: language === "en" || language === "pt-BR" || language === "es" ? language : DEFAULT_LANGUAGE,
+      language: isLocale(language) ? language : DEFAULT_LANGUAGE,
       isLoaded: true,
     });
   },

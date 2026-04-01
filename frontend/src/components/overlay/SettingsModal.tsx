@@ -70,10 +70,13 @@ export default function SettingsModal({
           <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
             {t("settings.language")}
           </label>
-          <div className="flex gap-3">
+          <div className="flex gap-3" role="radiogroup" aria-label={t("settings.language")}>
             {(Object.entries(locales) as [Locale, string][]).map(([locale, label]) => (
               <button
                 key={locale}
+                type="button"
+                role="radio"
+                aria-checked={language === locale}
                 onClick={() => handleLanguageChange(locale)}
                 className={`flex-1 px-4 py-3 rounded-lg border text-sm font-bold transition-colors ${
                   language === locale

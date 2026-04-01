@@ -34,12 +34,20 @@ import Modal from "@/components/overlay/Modal";
 import SettingsModal from "@/components/overlay/SettingsModal";
 import { usePreferencesStore } from "@/stores/preferencesStore";
 import { useTranslation } from "@/hooks/useTranslation";
-import { getTranslation } from "@/i18n";
 import type { Session } from "@/hooks/useSessions";
 
 // ============================================================================
 // DYNAMIC IMPORT
 // ============================================================================
+
+function LoadingFallback() {
+  const { t } = useTranslation();
+  return (
+    <div className="w-full h-full bg-slate-900 animate-pulse flex items-center justify-center text-white font-mono text-center">
+      {t("app.initializingSystems")}
+    </div>
+  );
+}
 
 const OfficeGame = dynamic(
   () =>
@@ -48,14 +56,7 @@ const OfficeGame = dynamic(
     })),
   {
     ssr: false,
-    loading: () => {
-      const t = getTranslation(usePreferencesStore.getState().language);
-      return (
-        <div className="w-full h-full bg-slate-900 animate-pulse flex items-center justify-center text-white font-mono text-center">
-          {t("app.initializingSystems")}
-        </div>
-      );
-    },
+    loading: () => <LoadingFallback />,
   },
 );
 

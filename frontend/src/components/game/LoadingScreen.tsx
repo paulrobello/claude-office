@@ -5,13 +5,14 @@
  * Shows animated dots and a "Loading office..." message.
  */
 
+"use client";
+
 import { type ReactNode } from "react";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/constants/canvas";
-import { getTranslation } from "@/i18n";
-import { usePreferencesStore } from "@/stores/preferencesStore";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export function LoadingScreen(): ReactNode {
-  const t = getTranslation(usePreferencesStore.getState().language);
+  const { t } = useTranslation();
   return (
     <pixiContainer>
       {/* Dark background */}

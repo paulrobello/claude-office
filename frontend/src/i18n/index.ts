@@ -10,6 +10,10 @@ export const locales: Record<Locale, string> = {
   es: "Español",
 };
 
+export function isLocale(value: string): value is Locale {
+  return value in locales;
+}
+
 const translations: Record<Locale, Record<TranslationKey, string>> = {
   en,
   "pt-BR": ptBR,
@@ -23,7 +27,8 @@ export function getTranslation(locale: Locale) {
     let text = dict[key] ?? en[key] ?? key;
     if (params) {
       for (const [k, v] of Object.entries(params)) {
-        text = text.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
+        const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        text = text.replace(new RegExp(`\\{${escaped}\\}`, "g"), () => String(v));
       }
     }
     return text;
