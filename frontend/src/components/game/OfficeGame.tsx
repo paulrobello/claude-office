@@ -335,7 +335,7 @@ export function OfficeGame(): ReactNode {
     <div
       ref={containerRef}
       data-tour-id="game-canvas"
-      className="w-full h-full flex items-center justify-center overflow-hidden relative"
+      className="w-full h-full overflow-hidden relative"
       onClick={handleCanvasClick}
       onMouseMove={handleMouseMove}
       style={{ cursor: isOverCharacter ? "pointer" : "default" }}
@@ -354,9 +354,9 @@ export function OfficeGame(): ReactNode {
         <ZoomControls />
         <TransformComponent
           wrapperClass="w-full h-full"
-          contentClass="w-full h-full flex items-center justify-center"
+          contentClass="w-full h-full"
         >
-          <div className="pixi-canvas-container w-full h-full flex items-center justify-center">
+          <div className="pixi-canvas-container w-full h-full">
             <Application
               key={`pixi-app-${hmrVersion}`}
               width={CANVAS_WIDTH}

@@ -74,11 +74,13 @@ body {
 }
 
 @layer utilities {
-  /* PixiJS Canvas Scaling */
+  /* PixiJS Canvas Scaling — anchored to top-left to prevent drift from
+     flex centering recalculations during frequent WebSocket re-renders */
   .pixi-canvas-container canvas {
     width: 100% !important;
     height: 100% !important;
     object-fit: contain;
+    object-position: top left;
   }
 
   /* Custom Scrollbar Theme */
