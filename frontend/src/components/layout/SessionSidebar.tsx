@@ -95,7 +95,7 @@ export function SessionSidebar({
       className={`relative flex flex-col gap-1.5 flex-shrink-0 overflow-hidden ${
         isDragging ? "select-none" : "transition-all duration-300"
       }`}
-      style={{ width: isCollapsed ? 40 : sidebarWidth }}
+      style={{ width: isCollapsed ? 40 : sidebarWidth, maxHeight: "calc(100vh - 60px)" }}
     >
       {/* Collapse Toggle */}
       <button

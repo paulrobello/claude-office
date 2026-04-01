@@ -74,7 +74,7 @@ export function FloorView({
     isTourActive && tourStepIndex >= 2 && agents.size === 0;
 
   return (
-    <div className="flex-grow flex gap-2 overflow-hidden min-h-0">
+    <div className="flex-grow flex gap-2 overflow-hidden min-h-0" style={{ maxHeight: "calc(100vh - 60px)" }}>
       <SessionSidebar
         sessions={sessions}
         sessionsLoading={sessionsLoading}
