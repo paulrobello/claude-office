@@ -61,10 +61,10 @@ export function RightSidebar(): React.ReactNode {
 
   return (
     <aside
-      className={`relative flex flex-col gap-2 min-h-0 overflow-hidden ${
+      className={`relative flex flex-col gap-2 overflow-hidden ${
         isDragging ? "select-none" : ""
       }`}
-      style={{ width: sidebarWidth }}
+      style={{ width: sidebarWidth, maxHeight: "calc(100vh - 60px)" }}
     >
       {/* Horizontal Resize Handle (left edge) */}
       <div
