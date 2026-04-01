@@ -322,14 +322,24 @@ export function OfficeGame(): ReactNode {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [debugMode]);
 
-  // Reset the pan/zoom transform whenever the container is resized (e.g. sidebar
-  // open/close). Without this, react-zoom-pan-pinch keeps a stale translate that
-  // was calculated against the old container dimensions, which crops the scene.
+  // Reset the pan/zoom transform only on significant container size changes
+  // (e.g. sidebar open/close, window resize). Uses a threshold to ignore
+  // tiny layout reflows from event log updates which were causing the canvas
+  // to progressively shift downward.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+    let lastWidth = container.clientWidth;
+    let lastHeight = container.clientHeight;
     const observer = new ResizeObserver(() => {
-      transformRef.current?.resetTransform(0);
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      // Only reset if size changed by more than 20px in either dimension
+      if (Math.abs(w - lastWidth) > 20 || Math.abs(h - lastHeight) > 20) {
+        lastWidth = w;
+        lastHeight = h;
+        transformRef.current?.resetTransform(0);
+      }
     });
     observer.observe(container);
     return () => observer.disconnect();
