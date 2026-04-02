@@ -115,6 +115,101 @@ Panoptica shows every stage of this loop, for every product, for every team memb
 
 Panoptica is the visible, demonstrable layer. It's what you show investors, customers, and new hires. The building IS the product.
 
+## Layer 5: Human Testing Gate — "Travel the Journey"
+
+The orchestrators' most important job isn't dispatching agents or reviewing PRs. It's **being the user**.
+
+### The Principle
+
+> "We don't just map journeys. We travel them."
+
+When an agent creates a PR for LEX-38 (add rate limiting to auth), the feature isn't "done" when the PR is merged. It's done when a human:
+
+1. **Opens the app** as the journey's actor (paralegal, admin, client)
+2. **Walks the affected journey steps** manually — clicks the buttons, fills the forms, sees the results
+3. **Captures proof** — screenshot, screen recording, or a structured "journey test report"
+4. **Updates the journey step status** — from "implemented" to "verified" (or flags drift)
+5. **Closes the Linear issue** with the proof attached
+
+This is the human gate. No feature ships without a human having traveled the journey it affects.
+
+### Why This Matters Now
+
+Before AI agents, developers tested their own code because they wrote it — they understood the intent. Now agents write the code. The orchestrator who dispatched the agent might not even read the diff. The PR review catches code quality, but nobody catches "this doesn't actually work for the user."
+
+Scheduled testing time must be part of the weekly rhythm:
+- **Testing blocks** — dedicated time slots (e.g., Tuesday/Thursday afternoons) where orchestrators are users, not dispatchers
+- **Journey coverage** — track which journeys have been manually traveled this sprint, and which haven't
+- **Proof-of-closure** — every Linear issue requires a human verification artifact before it moves to "Done"
+
+### In Panoptica
+
+The Daily Ops Board shows a fourth implicit column: **VERIFY**. After DELIVER (PR merged), there's a verification queue:
+- "LEX-38 merged → needs journey verification by Aldo"
+- "REC-42 merged → auth journey has 3 steps to test"
+- Journey health dashboard shows "verified" vs "implemented-but-untested" steps
+
+## The Playbook: How Tesseron Works
+
+The Playbook is Panoptica's built-in teaching system. It's not documentation — it's an interactive, gamified experience that teaches the Tesseron methodology.
+
+### The Manifest
+
+The core rules of how Tesseron operates:
+
+**Planning**
+- Initiatives are thematic, not temporal (RECEPTHOR - V1 Launch, not "Sprint 47")
+- Minimum 3 projects to justify a new initiative
+- Overlap in planning, not in execution
+- Every issue has an owner (Cluster A = Seba, Cluster B = Aldo)
+
+**Execution**
+- Agents stop after opening a PR (human review gate)
+- Small, reviewable slices — multiple PRs, not one mega PR
+- Workdocs persist intent — artifacts over chat memory
+- No secrets in code or prompts
+
+**Review**
+- Review the PR that unblocks the most downstream work first
+- Pre-review with GitNexus agent catches obvious issues
+- Humans focus on architecture, product decisions, and journey alignment
+- Cross-product PRs require PM review
+
+**Testing**
+- We travel the journeys, we don't just map them
+- Every feature requires human verification with proof
+- Testing blocks are sacred weekly time
+- Journey step status moves to "verified" only after human travel
+
+**Coordination**
+- The Daily Ops Board replaces standups
+- Spikes are detected and handled in real-time, not in tomorrow's meeting
+- Dependency chains are visible — you never block someone without knowing it
+- Capacity is transparent — idle orchestrators pull work forward
+
+### Interactive Scenarios
+
+Using the simulation engine:
+- "A spike hits at 2pm" → teaches spike handling
+- "5 PRs pending, which first?" → teaches impact-based triage
+- "Agent blocked for 20 min" → teaches when to intervene vs wait
+- "Journey drift detected" → teaches alignment verification
+- "New feature merged — now what?" → teaches the testing gate
+
+### Progression System
+
+- **Observer** — watches the building, reads the manifest, completes tutorials
+- **Orchestrator** — can dispatch agents, review PRs, handle spikes
+- **Architect** — can modify journeys, restructure initiatives, train others
+
+### Living Nudges
+
+Panoptica observes your behavior and coaches in real-time:
+- "3 PRs pending > 1 hour. #138 unblocks 2 agents — review it first?"
+- "You haven't tested LEX-55 yet. The auth journey has 3 unverified steps."
+- "Aldo is idle. Consider assigning LEX-42."
+- "Great job — zero spikes today. All journey steps green."
+
 ## Priority Order
 
 1. Fix critical UX bugs (canvas drift ✅, sidebar overflow ✅, agent choreography)
