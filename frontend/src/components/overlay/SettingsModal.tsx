@@ -208,6 +208,7 @@ export default function SettingsModal({
           <div
             role="switch"
             aria-checked={autoFollowNewSessions}
+            aria-label={t("settings.autoFollow")}
             tabIndex={0}
             onClick={handleAutoFollowToggle}
             onKeyDown={(e) => {
