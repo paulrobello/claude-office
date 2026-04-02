@@ -114,7 +114,7 @@ export function useSessions(
     window.addEventListener("session-deleted", handleSessionDeleted);
     return () =>
       window.removeEventListener("session-deleted", handleSessionDeleted);
-  }, [fetchSessions, sessionId, showStatus]);
+  }, [fetchSessions, sessionId, showStatus, t]);
 
   // Auto-select most active session on initial mount only
   useEffect(() => {
@@ -141,7 +141,7 @@ export function useSessions(
         );
       }
     }
-  }, [sessions, sessionId, showStatus]);
+  }, [sessions, sessionId, showStatus, t]);
 
   // Auto-follow new sessions in the current project
   useEffect(() => {
@@ -178,7 +178,7 @@ export function useSessions(
         "info",
       );
     }
-  }, [sessions, sessionId, autoFollowNewSessions, showStatus]);
+  }, [sessions, sessionId, autoFollowNewSessions, showStatus, t]);
 
   return {
     sessions,
