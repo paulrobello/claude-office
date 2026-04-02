@@ -4,7 +4,6 @@ const es: Record<TranslationKey, string> = {
   // App
   "app.title": "Visualizador de Oficina",
   "app.initializingSystems": "Inicializando sistemas...",
-  "app.version": "v0.12.0",
 
   // Header Controls
   "header.simulate": "SIMULAR",
@@ -92,7 +91,7 @@ const es: Record<TranslationKey, string> = {
   "git.noSession": "No hay sesión seleccionada",
   "git.noRepo": "No se detectó repositorio git",
   "git.changedFiles": "Archivos modificados",
-  "git.staged": "staged",
+  "git.staged": "preparado",
   "git.recentCommits": "Commits recientes",
   "git.noCommits": "No se encontraron commits",
   "git.modified": "modificado",

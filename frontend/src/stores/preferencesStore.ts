@@ -87,7 +87,7 @@ export const usePreferencesStore = create<PreferencesState>()((set, get) => ({
       autoFollowRaw === undefined
         ? DEFAULT_AUTO_FOLLOW_NEW_SESSIONS
         : autoFollowRaw === "true";
-    const language = (prefs.language as Locale) || DEFAULT_LANGUAGE;
+    const language = prefs.language || DEFAULT_LANGUAGE;
 
     set({
       clockType:

@@ -2,7 +2,6 @@ const en = {
   // App
   "app.title": "Office Visualizer",
   "app.initializingSystems": "Initializing Systems...",
-  "app.version": "v0.12.0",
 
   // Header Controls
   "header.simulate": "SIMULATE",

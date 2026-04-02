@@ -4,7 +4,6 @@ const ptBR: Record<TranslationKey, string> = {
   // App
   "app.title": "Visualizador do Escritório",
   "app.initializingSystems": "Inicializando Sistemas...",
-  "app.version": "v0.12.0",
 
   // Header Controls
   "header.simulate": "SIMULAR",
@@ -92,7 +91,7 @@ const ptBR: Record<TranslationKey, string> = {
   "git.noSession": "Nenhuma sessão selecionada",
   "git.noRepo": "Nenhum repositório git detectado",
   "git.changedFiles": "Arquivos Alterados",
-  "git.staged": "staged",
+  "git.staged": "preparado",
   "git.recentCommits": "Commits Recentes",
   "git.noCommits": "Nenhum commit encontrado",
   "git.modified": "modificado",

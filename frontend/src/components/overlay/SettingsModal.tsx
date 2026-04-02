@@ -95,8 +95,11 @@ export default function SettingsModal({
           <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
             {t("settings.clockType")}
           </label>
-          <div className="flex gap-3">
+          <div className="flex gap-3" role="radiogroup" aria-label={t("settings.clockType")}>
             <button
+              type="button"
+              role="radio"
+              aria-checked={clockType === "analog"}
               onClick={() => handleClockTypeChange("analog")}
               className={`flex-1 px-4 py-3 rounded-lg border text-sm font-bold transition-colors ${
                 clockType === "analog"
@@ -107,6 +110,9 @@ export default function SettingsModal({
               {t("settings.analog")}
             </button>
             <button
+              type="button"
+              role="radio"
+              aria-checked={clockType === "digital"}
               onClick={() => handleClockTypeChange("digital")}
               className={`flex-1 px-4 py-3 rounded-lg border text-sm font-bold transition-colors ${
                 clockType === "digital"
@@ -125,8 +131,11 @@ export default function SettingsModal({
             <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
               {t("settings.timeFormat")}
             </label>
-            <div className="flex gap-3">
+            <div className="flex gap-3" role="radiogroup" aria-label={t("settings.timeFormat")}>
               <button
+                type="button"
+                role="radio"
+                aria-checked={clockFormat === "12h"}
                 onClick={() => handleClockFormatChange("12h")}
                 className={`flex-1 px-4 py-3 rounded-lg border text-sm font-bold transition-colors ${
                   clockFormat === "12h"
@@ -137,6 +146,9 @@ export default function SettingsModal({
                 {t("settings.12hour")}
               </button>
               <button
+                type="button"
+                role="radio"
+                aria-checked={clockFormat === "24h"}
                 onClick={() => handleClockFormatChange("24h")}
                 className={`flex-1 px-4 py-3 rounded-lg border text-sm font-bold transition-colors ${
                   clockFormat === "24h"

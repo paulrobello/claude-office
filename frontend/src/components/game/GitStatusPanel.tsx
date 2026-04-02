@@ -20,6 +20,7 @@ import {
   FileQuestion,
 } from "lucide-react";
 import { FileStatus } from "@/types";
+import { useCallback } from "react";
 
 // Check if sessionId represents a real session (not the placeholder)
 const isRealSession = (sessionId: string) => sessionId !== "None";
@@ -42,7 +43,7 @@ const getStatusIcon = (status: FileStatus) => {
 export function GitStatusPanel() {
   const { t } = useTranslation();
 
-  const getStatusLabel = (status: FileStatus) => {
+  const getStatusLabel = useCallback((status: FileStatus) => {
     switch (status) {
       case "M":
         return t("git.modified");
@@ -61,7 +62,7 @@ export function GitStatusPanel() {
       default:
         return status;
     }
-  };
+  }, [t]);
   const gitStatus = useGameStore(selectGitStatus);
   const sessionId = useGameStore((state) => state.sessionId);
   const isConnected = useGameStore((state) => state.isConnected);
