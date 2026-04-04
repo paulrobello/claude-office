@@ -1,0 +1,27 @@
+[package]
+name = "panoptica-tui"
+version = "0.1.0"
+edition = "2021"
+description = "Terminal companion for Panoptica agent visualization"
+license = "UNLICENSED"
+
+[[bin]]
+name = "panoptica"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = "0.25"
+crossterm = "0.27"
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = "0.21"
+futures-util = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.11", features = ["json"], default-features = false, optional = false }
+clap = { version = "4", features = ["derive"] }
+chrono = "0.4"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
