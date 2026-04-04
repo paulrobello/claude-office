@@ -2,6 +2,7 @@ import { app, BrowserWindow, Tray, Menu, nativeImage, shell, Notification, type 
 import path from "path";
 import { BackendProcess, setQuitting } from "./backend";
 import { createStore, type AppStore } from "./store";
+import { NotificationManager } from "./notifications";
 
 // Track quit state to differentiate close vs minimize-to-tray
 let isQuitting = false;
@@ -13,6 +14,7 @@ const SESSIONS_URL = "http://localhost:8000/api/v1/sessions";
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let backend: BackendProcess | null = null;
+let notifications: NotificationManager | null = null;
 let store: AppStore;
 
 function createWindow(): BrowserWindow {
@@ -114,6 +116,30 @@ function createTray(): Tray {
       },
       { type: "separator" },
       {
+        label: "Notifications",
+        submenu: [
+          {
+            label: "Blocked only",
+            type: "radio",
+            checked: store.get("notificationThreshold", "blocked") === "blocked",
+            click: () => store.set("notificationThreshold", "blocked"),
+          },
+          {
+            label: "Blocked + Waiting",
+            type: "radio",
+            checked: store.get("notificationThreshold", "blocked") === "waiting",
+            click: () => store.set("notificationThreshold", "waiting"),
+          },
+          {
+            label: "All events",
+            type: "radio",
+            checked: store.get("notificationThreshold", "blocked") === "info",
+            click: () => store.set("notificationThreshold", "info"),
+          },
+        ],
+      },
+      { type: "separator" },
+      {
         label: "Open in Browser",
         click: () => shell.openExternal(FRONTEND_URL),
       },
@@ -181,12 +207,25 @@ app.whenReady().then(async () => {
     }
   }
 
-  mainWindow = createWindow();
+  // Check for headless mode (--headless flag or stored preference)
+  const headlessArg = process.argv.includes("--headless");
+  const headlessMode = headlessArg || store.get("headlessMode", false);
+
+  // Always create the tray
   tray = createTray();
 
-  // Apply stored preferences
-  if (store.get("alwaysOnTop", false)) {
-    mainWindow.setAlwaysOnTop(true);
+  // Start notification manager (works in both windowed and headless mode)
+  notifications = new NotificationManager(store, "ws://localhost:8000");
+  notifications.start();
+
+  if (!headlessMode) {
+    mainWindow = createWindow();
+    notifications.setMainWindow(mainWindow);
+
+    // Apply stored preferences
+    if (store.get("alwaysOnTop", false)) {
+      mainWindow.setAlwaysOnTop(true);
+    }
   }
 
   // Periodic session count update for tray tooltip
@@ -216,6 +255,7 @@ app.whenReady().then(async () => {
 app.on("before-quit", () => {
   isQuitting = true;
   setQuitting(true);
+  notifications?.stop();
   backend?.stop();
 });
 

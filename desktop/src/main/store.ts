@@ -12,6 +12,8 @@ interface StoreSchema {
   alwaysOnTop: boolean;
   minimizeToTray: boolean;
   lastSessionId: string | null;
+  headlessMode: boolean;
+  notificationThreshold: "blocked" | "waiting" | "completed" | "info";
 }
 
 // electron-store extends Conf which provides get/set — type assertion needed
@@ -29,6 +31,8 @@ export function createStore(): AppStore {
       alwaysOnTop: false,
       minimizeToTray: true,
       lastSessionId: null,
+      headlessMode: false,
+      notificationThreshold: "blocked",
     },
   }) as AppStore;
 }
