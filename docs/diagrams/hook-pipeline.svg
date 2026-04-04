@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1271.05 431.6" width="1271.05" height="431.6" style="--bg:#0a0a0a;--fg:#e0e0e0;--accent:#7aa2f7;--muted:#565f89;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<g class="subgraph" data-id="Input" data-label="Input">
+  <rect x="161.525" y="40" width="167.316" height="226.70000000000002" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="161.525" y="40" width="167.316" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="173.525" y="54" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Input</text>
+</g>
+<g class="subgraph" data-id="Detection" data-label="Detection">
+  <rect x="40" y="294.70000000000005" width="312.841" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="40" y="294.70000000000005" width="312.841" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="52" y="308.70000000000005" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Detection</text>
+</g>
+<g class="subgraph" data-id="Strategy" data-label="Strategy">
+  <rect x="388.841" y="87.7125" width="456.77099999999996" height="161.8" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="388.841" y="87.7125" width="456.77099999999996" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="400.841" y="101.7125" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Strategy</text>
+</g>
+<g class="subgraph" data-id="Output" data-label="Output">
+  <rect x="905.612" y="120.1625" width="325.438" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="905.612" y="120.1625" width="325.438" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="917.612" y="134.1625" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Output</text>
+</g>
+<polyline class="edge" data-from="Stdin" data-to="S1" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="304.3195,167.35000000000002 380.28875,167.35000000000002 380.28875,174.53750000000002 428.841,174.53750000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Env" data-to="S1" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="293.94550000000004,232.25 380.28875,232.25 380.28875,174.53750000000002 428.841,174.53750000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Config" data-to="S1" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="331.7365,102.45 380.28875,102.45 380.28875,174.53750000000002 428.841,174.53750000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Tux" data-to="S3" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="325.8085,357.15000000000003 370.841,357.15000000000003 370.841,225.2125 643.476,225.2125 643.476,221.21250000000003 685.5274999999999,221.21250000000003" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="S2" data-to="POST" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="835.6634999999999,150.16250000000002 878.6377499999999,150.16250000000002 878.6377499999999,182.6125 921.612,182.6125" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="S3" data-to="POST" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="799.3544999999999,215.0625 878.6377499999999,215.0625 878.6377499999999,182.6125 921.612,182.6125" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Git" data-to="Tux" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="159.453,357.15000000000003 196.4205,357.15000000000003" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="S1" data-to="S2" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="yes" points="556.0060000000001,168.38750000000002 568.0060000000001,168.38750000000002 568.0060000000001,150.16250000000002 685.5274999999999,150.16250000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="S1" data-to="S3" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="no" points="556.0060000000001,180.6875 568.0060000000001,180.6875 568.0060000000001,203.91250000000002 643.476,203.91250000000002 643.476,208.91250000000002 685.5274999999999,208.91250000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="POST" data-to="Backend" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="1036.9209999999998,182.6125 1084.9209999999998,182.6125" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="S1" data-to="S2" data-label="yes">
+  <rect x="600.006" y="134.1625" width="35.47" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="617.741" y="149.3125" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">yes</text>
+</g>
+<g class="edge-label" data-from="S1" data-to="S3" data-label="no">
+  <rect x="602.976" y="187.9125" width="29.53" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="617.741" y="203.0625" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">no</text>
+</g>
+<g class="node" data-id="Stdin" data-label="stdin JSON" data-shape="rectangle">
+  <rect x="196.4205" y="148.9" width="107.899" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="250.37" y="167.35000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">stdin JSON</text>
+</g>
+<g class="node" data-id="Env" data-label="Env Vars" data-shape="rectangle">
+  <rect x="196.4205" y="213.8" width="97.525" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="245.183" y="232.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Env Vars</text>
+</g>
+<g class="node" data-id="Config" data-label="~/.claude/config" data-shape="rectangle">
+  <rect x="196.4205" y="84" width="135.316" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="264.0785" y="102.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">~/.claude/config</text>
+</g>
+<g class="node" data-id="Git" data-label="Git Branch" data-shape="rectangle">
+  <rect x="56" y="338.70000000000005" width="103.453" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="107.7265" y="357.15000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Git Branch</text>
+</g>
+<g class="node" data-id="Tux" data-label="Tux Workdoc?" data-shape="rectangle">
+  <rect x="196.4205" y="338.70000000000005" width="129.388" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="261.1145" y="357.15000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Tux Workdoc?</text>
+</g>
+<g class="node" data-id="S1" data-label="CLI Available?" data-shape="rectangle">
+  <rect x="428.841" y="156.0875" width="127.165" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="492.4235" y="174.53750000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">CLI Available?</text>
+</g>
+<g class="node" data-id="S2" data-label="claude-office-hook" data-shape="rectangle">
+  <rect x="685.5274999999999" y="131.7125" width="150.136" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="760.5954999999999" y="150.16250000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">claude-office-hook</text>
+</g>
+<g class="node" data-id="S3" data-label="curl fallback" data-shape="rectangle">
+  <rect x="685.5274999999999" y="196.6125" width="113.827" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="742.4409999999999" y="215.0625" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">curl fallback</text>
+</g>
+<g class="node" data-id="POST" data-label="HTTP POST" data-shape="rectangle">
+  <rect x="921.612" y="164.1625" width="115.30899999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="979.2665" y="182.6125" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">HTTP POST</text>
+</g>
+<g class="node" data-id="Backend" data-label="Backend :3400" data-shape="rectangle">
+  <rect x="1084.9209999999998" y="164.1625" width="130.12900000000002" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="1149.9854999999998" y="182.6125" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Backend :3400</text>
+</g>
+</svg>

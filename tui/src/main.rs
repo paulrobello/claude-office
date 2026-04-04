@@ -52,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn list_sessions() -> Result<(), Box<dyn std::error::Error>> {
-    let url = "http://localhost:8000/api/v1/sessions";
+    let url = "http://localhost:3400/api/v1/sessions";
     let resp = reqwest::get(url).await?;
     let sessions: Vec<serde_json::Value> = resp.json().await?;
 
@@ -61,21 +61,24 @@ async fn list_sessions() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    println!("{:<40} {:<20} {:<10}", "Session ID", "Project", "Events");
-    println!("{}", "-".repeat(70));
+    println!("{:<40} {:<20} {:>6}  {}", "Session ID", "Name", "Events", "Status");
+    println!("{}", "-".repeat(78));
     for s in &sessions {
         let id = s["id"].as_str().unwrap_or("?");
-        let project = s["project_name"].as_str().unwrap_or("unknown");
-        let events = s["event_count"].as_u64().unwrap_or(0);
+        let display = s["displayName"].as_str();
+        let project = s["projectName"].as_str().unwrap_or("unknown");
+        let name = display.unwrap_or(project);
+        let events = s["eventCount"].as_u64().unwrap_or(0);
+        let status = s["status"].as_str().unwrap_or("");
         let short_id = if id.len() > 38 { &id[..38] } else { id };
-        println!("{:<40} {:<20} {:<10}", short_id, project, events);
+        println!("{:<40} {:<20} {:>6}  {}", short_id, name, events, status);
     }
 
     Ok(())
 }
 
 async fn discover_session() -> Result<String, Box<dyn std::error::Error>> {
-    let url = "http://localhost:8000/api/v1/sessions";
+    let url = "http://localhost:3400/api/v1/sessions";
     let resp = reqwest::get(url).await?;
     let sessions: Vec<serde_json::Value> = resp.json().await?;
 

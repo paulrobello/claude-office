@@ -90,6 +90,32 @@ def derive_git_root(working_dir: str) -> str | None:
     return None
 
 
+def _derive_display_name(
+    working_dir: str | None, project_root: str | None
+) -> str | None:
+    """Derive a human-friendly display name for a session.
+
+    Uses the relative path from the git root to the working directory,
+    or falls back to the deepest directory name.
+    Examples:
+        /Users/m/dev/tesseron/panoptica → "panoptica"
+        /Users/m/dev/tesseron           → "tesseron"
+        /Users/m/dev/tesseron/lexio/backend → "lexio/backend"
+    """
+    if not working_dir:
+        return None
+
+    try:
+        cwd = Path(working_dir).resolve()
+        if project_root:
+            root = Path(project_root).resolve()
+            if cwd != root and str(cwd).startswith(str(root)):
+                return str(cwd.relative_to(root))
+        return cwd.name
+    except (OSError, ValueError):
+        return None
+
+
 async def _find_lead_session(sess: Any, team_name: str) -> "SessionRecord | None":
     """Find the lead session for a team."""
     result = await sess.execute(
@@ -602,10 +628,14 @@ class EventProcessor:
                 working_dir=working_dir,
             )
 
+            # Derive a human-friendly display name from the working directory
+            display_name = _derive_display_name(source_dir, project_root)
+
             if not session_rec:
                 session_rec = SessionRecord(
                     id=event.session_id,
                     project_name=project_name,
+                    display_name=display_name,
                     project_root=project_root,
                     floor_id=room_assignment.floor_id if room_assignment else None,
                     room_id=room_assignment.room_id if room_assignment else None,
@@ -639,6 +669,8 @@ class EventProcessor:
                         session_rec.project_name = project_name
                     if project_root:
                         session_rec.project_root = project_root
+                    if display_name:
+                        session_rec.display_name = display_name
                     if room_assignment:
                         session_rec.floor_id = room_assignment.floor_id
                         session_rec.room_id = room_assignment.room_id

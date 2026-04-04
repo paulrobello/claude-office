@@ -15,7 +15,7 @@ pub struct AgentEvent {
 /// Connect to the Panoptica WebSocket and forward parsed events into `tx`.
 /// Reconnects automatically on disconnect.
 pub async fn connect(session_id: &str, tx: mpsc::UnboundedSender<AgentEvent>) {
-    let url = format!("ws://localhost:8000/ws/session/{session_id}");
+    let url = format!("ws://localhost:3400/ws/session/{session_id}");
 
     loop {
         match connect_async(&url).await {

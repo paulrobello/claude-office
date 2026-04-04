@@ -602,6 +602,7 @@ This produces sharper text than rendering at native size. Apply to all in-scene 
 
 ## Related Documentation
 
+- [How It Works](HOW_IT_WORKS.md) - End-to-end system overview with architecture diagrams
 - [README.md](../README.md) - Project overview and quick start
 - [CLAUDE.md](../CLAUDE.md) - AI assistant instructions and commands
 - [WHITEBOARD.md](WHITEBOARD.md) - Whiteboard multi-mode display documentation

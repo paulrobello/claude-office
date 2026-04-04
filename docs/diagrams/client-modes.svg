@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 878.636 739.4000000000001" width="878.636" height="739.4000000000001" style="--bg:#0a0a0a;--fg:#e0e0e0;--accent:#7aa2f7;--muted:#565f89;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<g class="subgraph" data-id="Backend" data-label="Panoptica Backend :3400">
+  <rect x="450.3235" y="40" width="269.87" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="450.3235" y="40" width="269.87" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="462.3235" y="54" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Panoptica Backend :3400</text>
+</g>
+<g class="subgraph" data-id="Mode1" data-label="Mode 1: Browser Window">
+  <rect x="40" y="172.9" width="162.12900000000002" height="266.70000000000005" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="40" y="172.9" width="162.12900000000002" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="52" y="186.9" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Mode 1: Browser Window</text>
+</g>
+<g class="subgraph" data-id="Mode2" data-label="Mode 2: Electron Desktop">
+  <rect x="230.12900000000002" y="275.80000000000007" width="414.26599999999996" height="181.8" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="230.12900000000002" y="275.80000000000007" width="414.26599999999996" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="242.12900000000002" y="289.80000000000007" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Mode 2: Electron Desktop</text>
+</g>
+<g class="subgraph" data-id="Mode3" data-label="Mode 3: Terminal TUI">
+  <rect x="672.395" y="196.90000000000006" width="156.20099999999996" height="266.70000000000005" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="672.395" y="196.90000000000006" width="156.20099999999996" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="684.395" y="210.90000000000006" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Mode 3: Terminal TUI</text>
+</g>
+<g class="subgraph" data-id="Mode4" data-label="Mode 4: Notifications Only">
+  <rect x="626.1344333333334" y="517.6000000000001" width="208.55325" height="181.8" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="626.1344333333334" y="517.6000000000001" width="208.55325" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="638.1344333333334" y="531.6000000000001" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Mode 4: Notifications Only</text>
+</g>
+<polyline class="edge" data-from="WS" data-to="Zustand" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="649.503,120.9 649.503,174.90000000000003 121.06450000000001,174.90000000000003 121.06450000000001,228.90000000000003" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="WS" data-to="NM" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="649.503,120.9 649.503,174.90000000000003 548.5105,174.90000000000003 548.5105,313.80000000000007" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="WS" data-to="Tokio" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="649.503,120.9 649.503,174.90000000000003 750.4955,174.90000000000003 750.4955,228.90000000000003" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="WS" data-to="Headless" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="649.503,120.9 649.503,174.90000000000003 710.9039333333334,174.90000000000003 710.9039333333334,561.6000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="NM" data-to="OSNotify" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="548.5105,350.70000000000005 548.5105,374.70000000000005 750.2886833333333,374.70000000000005 750.2886833333333,646.5000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Zustand" data-to="Next" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="121.06450000000001,265.80000000000007 121.06450000000001,313.80000000000007" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Next" data-to="Pixi" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="121.06450000000001,350.7000000000001 121.06450000000001,398.70000000000005" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="NM" data-to="BW" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="548.5105,350.70000000000005 548.5105,374.70000000000005 460.4305,374.70000000000005 460.4305,398.70000000000005" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Main" data-to="Tray" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="370.8924166666667,350.70000000000005 370.8924166666667,374.70000000000005 304.5245,374.70000000000005 304.5245,398.70000000000005" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Main" data-to="BW" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="370.8924166666667,350.70000000000005 370.8924166666667,374.70000000000005 460.4305,374.70000000000005 460.4305,398.70000000000005" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Tokio" data-to="Ratatui" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="750.4955,265.80000000000007 750.4955,313.80000000000007" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Ratatui" data-to="Crossterm" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="750.4955,350.70000000000005 750.4955,398.70000000000005" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Headless" data-to="OSNotify" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="710.9039333333334,598.5000000000001 710.9039333333334,610.5000000000001 727.4890166666667,610.5000000000001 727.4890166666667,646.5000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="node" data-id="API" data-label="REST API" data-shape="rectangle">
+  <rect x="466.3235" y="84" width="100.489" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="516.568" y="102.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">REST API</text>
+</g>
+<g class="node" data-id="WS" data-label="WebSocket" data-shape="rectangle">
+  <rect x="594.8125" y="84" width="109.381" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="649.503" y="102.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">WebSocket</text>
+</g>
+<g class="node" data-id="Next" data-label="Next.js :3401" data-shape="rectangle">
+  <rect x="64.892" y="313.80000000000007" width="112.34500000000001" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="121.06450000000001" y="332.25000000000006" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Next.js :3401</text>
+</g>
+<g class="node" data-id="Pixi" data-label="PixiJS Canvas" data-shape="rectangle">
+  <rect x="56" y="398.70000000000005" width="130.12900000000002" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="121.06450000000001" y="417.15000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">PixiJS Canvas</text>
+</g>
+<g class="node" data-id="Zustand" data-label="Zustand Store" data-shape="rectangle">
+  <rect x="58.22300000000001" y="228.90000000000003" width="125.68299999999999" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="121.06450000000001" y="247.35000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Zustand Store</text>
+</g>
+<g class="node" data-id="Main" data-label="Main Process" data-shape="rectangle">
+  <rect x="308.4214166666667" y="313.80000000000007" width="124.942" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="370.8924166666667" y="332.25000000000006" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Main Process</text>
+</g>
+<g class="node" data-id="Tray" data-label="System Tray" data-shape="rectangle">
+  <rect x="246.12900000000002" y="398.70000000000005" width="116.79099999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="304.5245" y="417.15000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">System Tray</text>
+</g>
+<g class="node" data-id="BW" data-label="BrowserWindow" data-shape="rectangle">
+  <rect x="390.92" y="398.70000000000005" width="139.021" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="460.4305" y="417.15000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">BrowserWindow</text>
+</g>
+<g class="node" data-id="NM" data-label="NotificationManager" data-shape="rectangle">
+  <rect x="468.626" y="313.80000000000007" width="159.769" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="548.5105" y="332.25000000000006" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">NotificationManager</text>
+</g>
+<g class="node" data-id="Ratatui" data-label="Ratatui" data-shape="rectangle">
+  <rect x="709.5135" y="313.80000000000007" width="81.964" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="750.4955" y="332.25000000000006" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Ratatui</text>
+</g>
+<g class="node" data-id="Crossterm" data-label="Crossterm" data-shape="rectangle">
+  <rect x="698.3985" y="398.70000000000005" width="104.194" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="750.4955" y="417.15000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Crossterm</text>
+</g>
+<g class="node" data-id="Tokio" data-label="Tokio Runtime" data-shape="rectangle">
+  <rect x="688.395" y="228.90000000000003" width="124.20099999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="750.4955" y="247.35000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Tokio Runtime</text>
+</g>
+<g class="node" data-id="Headless" data-label="--headless mode" data-shape="rectangle">
+  <rect x="642.1344333333334" y="561.6000000000001" width="137.539" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="710.9039333333334" y="580.0500000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">--headless mode</text>
+</g>
+<g class="node" data-id="OSNotify" data-label="Native OS Alerts" data-shape="rectangle">
+  <rect x="681.8896833333333" y="646.5000000000001" width="136.798" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="750.2886833333333" y="664.9500000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Native OS Alerts</text>
+</g>
+</svg>

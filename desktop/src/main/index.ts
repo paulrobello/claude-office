@@ -8,8 +8,8 @@ import { NotificationManager } from "./notifications";
 let isQuitting = false;
 
 const FRONTEND_URL = "http://localhost:3401";
-const BACKEND_HEALTH_URL = "http://localhost:8000/health";
-const SESSIONS_URL = "http://localhost:8000/api/v1/sessions";
+const BACKEND_HEALTH_URL = "http://localhost:3400/health";
+const SESSIONS_URL = "http://localhost:3400/api/v1/sessions";
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;

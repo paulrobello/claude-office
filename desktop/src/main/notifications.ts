@@ -93,7 +93,7 @@ export class NotificationManager {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private backendUrl: string;
 
-  constructor(store: AppStore, backendUrl: string = "ws://localhost:8000") {
+  constructor(store: AppStore, backendUrl: string = "ws://localhost:3400") {
     this.store = store;
     this.backendUrl = backendUrl;
     this.batcher = new NotificationBatcher((events) => this.sendBatchedNotification(events));

@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 713.5519999999999 1052.9" width="713.5519999999999" height="1052.9" style="--bg:#0a0a0a;--fg:#e0e0e0;--accent:#7aa2f7;--muted:#565f89;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<g class="subgraph" data-id="CC" data-label="Claude Code Session">
+  <rect x="289.97574999999995" y="40" width="169.539" height="181.8" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="289.97574999999995" y="40" width="169.539" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="301.97574999999995" y="54" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Claude Code Session</text>
+</g>
+<g class="subgraph" data-id="Plugin" data-label="tesseron-tools Plugin">
+  <rect x="125.9187499999999" y="281.8" width="340.26500000000004" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="125.9187499999999" y="281.8" width="340.26500000000004" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="137.9187499999999" y="295.8" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">tesseron-tools Plugin</text>
+</g>
+<g class="subgraph" data-id="Backend" data-label="FastAPI Backend :3400">
+  <rect x="165.37699999999992" y="507" width="277.28" height="280.70000000000005" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="165.37699999999992" y="507" width="277.28" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="177.37699999999992" y="521" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">FastAPI Backend :3400</text>
+</g>
+<g class="subgraph" data-id="Clients" data-label="Visualization Clients">
+  <rect x="40" y="916" width="633.5519999999999" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="40" y="916" width="633.5519999999999" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="52" y="930" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Visualization Clients</text>
+</g>
+<polyline class="edge" data-from="Hooks" data-to="HookSh" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="374.74524999999994,205.8 374.74524999999994,325.79999999999995" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="HookSh" data-to="API" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="HTTP POST" points="374.74524999999994,362.70000000000005 374.74524999999994,420.70000000000005 350.4248499999999,420.70000000000005 350.4248499999999,489.00000000000006 307.4271666666666,489.00000000000006 307.4271666666666,551" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Skill" data-to="API" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="curl" points="206.61274999999992,362.70000000000005 206.61274999999992,420.70000000000005 230.9331499999999,420.70000000000005 230.9331499999999,489.00000000000006 273.9308333333332,489.00000000000006 273.9308333333333,551" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="WS" data-to="Browser" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="WebSocket" points="318.4041999999999,763.3 318.40419999999995,817.7 161.16549999999998,817.7 161.16549999999998,898 118.10050000000001,898 118.10049999999998,960" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="WS" data-to="Electron" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="WebSocket" points="345.4673999999999,763.3 345.4673999999999,829.7 279.93449999999996,829.7 279.93449999999996,960" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="WS" data-to="TUI" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="WebSocket" points="372.5305999999999,763.3 372.53059999999994,829.7 438.06349999999986,829.7 438.06349999999986,960" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="WS" data-to="Notify" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="WebSocket" points="399.5937999999999,763.3 399.5937999999999,817.7 552.3865,817.7 552.3865,898 591.0055,898 591.0055,960" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="CLI" data-to="Hooks" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="374.74524999999994,120.9 374.74524999999994,168.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="API" data-to="SM" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="290.6789999999999,587.9 290.6789999999999,635.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SM" data-to="DB" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="290.6789999999999,672.8 290.6789999999999,699.5999999999999 222.35899999999992,699.5999999999999 222.35899999999992,726.4" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SM" data-to="WS" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="290.6789999999999,672.8 290.6789999999999,699.5999999999999 358.9989999999999,699.5999999999999 358.9989999999999,726.4" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="HookSh" data-to="API" data-label="HTTP POST">
+  <rect x="311.9248499999999" y="427.70000000000005" width="76.45599999999999" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="350.1528499999999" y="442.85" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">HTTP POST</text>
+</g>
+<g class="edge-label" data-from="Skill" data-to="API" data-label="curl">
+  <rect x="212.4331499999999" y="427.70000000000005" width="36.658" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="230.7621499999999" y="442.85" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">curl</text>
+</g>
+<g class="edge-label" data-from="WS" data-to="Browser" data-label="WebSocket">
+  <rect x="125.16549999999998" y="836.7" width="71.70400000000001" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="161.01749999999998" y="851.85" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">WebSocket</text>
+</g>
+<g class="edge-label" data-from="WS" data-to="Electron" data-label="WebSocket">
+  <rect x="243.93449999999993" y="836.7" width="71.70400000000001" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="279.78649999999993" y="851.85" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">WebSocket</text>
+</g>
+<g class="edge-label" data-from="WS" data-to="TUI" data-label="WebSocket">
+  <rect x="402.06349999999986" y="836.7" width="71.70400000000001" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="437.91549999999984" y="851.85" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">WebSocket</text>
+</g>
+<g class="edge-label" data-from="WS" data-to="Notify" data-label="WebSocket">
+  <rect x="516.3865" y="836.7" width="71.70400000000001" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="552.2384999999999" y="851.85" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">WebSocket</text>
+</g>
+<g class="node" data-id="CLI" data-label="Claude CLI" data-shape="rectangle">
+  <rect x="321.5367499999999" y="84" width="106.41699999999999" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="374.74524999999994" y="102.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Claude CLI</text>
+</g>
+<g class="node" data-id="Hooks" data-label="Lifecycle Hooks" data-shape="rectangle">
+  <rect x="305.97574999999995" y="168.9" width="137.539" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="374.74524999999994" y="187.35000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Lifecycle Hooks</text>
+</g>
+<g class="node" data-id="HookSh" data-label="panoptica-hook.sh" data-shape="rectangle">
+  <rect x="299.30674999999997" y="325.8" width="150.877" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="374.74524999999994" y="344.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">panoptica-hook.sh</text>
+</g>
+<g class="node" data-id="Skill" data-label="/panoptica skill" data-shape="rectangle">
+  <rect x="141.9187499999999" y="325.8" width="129.38800000000003" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="206.61274999999992" y="344.25" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">/panoptica skill</text>
+</g>
+<g class="node" data-id="API" data-label="REST API" data-shape="rectangle">
+  <rect x="240.43449999999993" y="551" width="100.489" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="290.6789999999999" y="569.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">REST API</text>
+</g>
+<g class="node" data-id="SM" data-label="State Machine" data-shape="rectangle">
+  <rect x="228.2079999999999" y="635.9" width="124.94200000000001" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="290.6789999999999" y="654.35" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">State Machine</text>
+</g>
+<g class="node" data-id="WS" data-label="WebSocket Hub" data-shape="rectangle">
+  <rect x="291.3409999999999" y="726.4" width="135.31599999999997" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="358.9989999999999" y="744.85" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">WebSocket Hub</text>
+</g>
+<g class="node" data-id="DB" data-label="SQLite" data-shape="cylinder">
+  <rect x="181.37699999999992" y="733.4" width="81.964" height="36.900000000000006" fill="var(--_node-fill)" stroke="none" />
+  <line x1="181.37699999999992" y1="733.4" x2="181.37699999999992" y2="770.3" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <line x1="263.3409999999999" y1="733.4" x2="263.3409999999999" y2="770.3" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="222.35899999999992" cy="770.3" rx="40.982" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <ellipse cx="222.35899999999992" cy="733.4" rx="40.982" ry="7" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="222.35899999999992" y="751.85" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">SQLite</text>
+</g>
+<g class="node" data-id="Browser" data-label="Browser :3401" data-shape="rectangle">
+  <rect x="56" y="960" width="124.20099999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="118.10049999999998" y="978.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Browser :3401</text>
+</g>
+<g class="node" data-id="Electron" data-label="Electron Desktop" data-shape="rectangle">
+  <rect x="208.20099999999996" y="960" width="143.46699999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="279.93449999999996" y="978.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Electron Desktop</text>
+</g>
+<g class="node" data-id="TUI" data-label="Terminal TUI" data-shape="rectangle">
+  <rect x="379.6679999999999" y="960" width="116.79099999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="438.06349999999986" y="978.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Terminal TUI</text>
+</g>
+<g class="node" data-id="Notify" data-label="OS Notifications" data-shape="rectangle">
+  <rect x="524.459" y="960" width="133.09300000000002" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="591.0055" y="978.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">OS Notifications</text>
+</g>
+</svg>

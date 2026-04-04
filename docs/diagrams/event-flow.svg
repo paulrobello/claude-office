@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1139.1734999999999 960" width="1139.1734999999999" height="960" style="--bg:#0a0a0a;--fg:#e0e0e0;--accent:#7aa2f7;--muted:#565f89;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="seq-arrow" markerWidth="8" markerHeight="5" refX="8" refY="2.5" orient="auto-start-reverse">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" />
+  </marker>
+  <marker id="seq-arrow-open" markerWidth="8" markerHeight="5" refX="8" refY="2.5" orient="auto-start-reverse">
+    <polyline points="0 0, 8 2.5, 0 5" fill="none" stroke="var(--_arrow)" stroke-width="1" />
+  </marker>
+</defs>
+<line class="lifeline" data-actor="CC" x1="84.3955" y1="70" x2="84.3955" y2="930" stroke="var(--_line)" stroke-width="0.75" stroke-dasharray="6 4" />
+<line class="lifeline" data-actor="Hook" x1="230.96349999999998" y1="70" x2="230.96349999999998" y2="930" stroke="var(--_line)" stroke-width="0.75" stroke-dasharray="6 4" />
+<line class="lifeline" data-actor="API" x1="378.2725" y1="70" x2="378.2725" y2="930" stroke="var(--_line)" stroke-width="0.75" stroke-dasharray="6 4" />
+<line class="lifeline" data-actor="SM" x1="531.88" y1="70" x2="531.88" y2="930" stroke="var(--_line)" stroke-width="0.75" stroke-dasharray="6 4" />
+<line class="lifeline" data-actor="DB" x1="671.88" y1="70" x2="671.88" y2="930" stroke="var(--_line)" stroke-width="0.75" stroke-dasharray="6 4" />
+<line class="lifeline" data-actor="WS" x1="811.88" y1="70" x2="811.88" y2="930" stroke="var(--_line)" stroke-width="0.75" stroke-dasharray="6 4" />
+<line class="lifeline" data-actor="UI" x1="1005.872" y1="70" x2="1005.872" y2="930" stroke="var(--_line)" stroke-width="0.75" stroke-dasharray="6 4" />
+<g class="message" data-from="CC" data-to="Hook" data-label="SessionStart (stdin JSON)" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="84.3955" y1="90" x2="230.96349999999998" y2="90" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="157.6795" y="80" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">SessionStart (stdin JSON)</text>
+</g>
+<g class="message" data-from="Hook" data-to="API" data-label="POST /api/v1/events" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="230.96349999999998" y1="130" x2="378.2725" y2="130" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="304.618" y="120" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">POST /api/v1/events</text>
+</g>
+<g class="message" data-from="API" data-to="SM" data-label="process_event()" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="378.2725" y1="170" x2="531.88" y2="170" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="455.07624999999996" y="160" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">process_event()</text>
+</g>
+<g class="message" data-from="SM" data-to="DB" data-label="persist session + event" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="531.88" y1="210" x2="671.88" y2="210" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="601.88" y="200" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">persist session + event</text>
+</g>
+<g class="message" data-from="SM" data-to="WS" data-label="broadcast state" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="531.88" y1="250" x2="811.88" y2="250" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="671.88" y="240" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">broadcast state</text>
+</g>
+<g class="message" data-from="WS" data-to="UI" data-label="real-time update" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="811.88" y1="290" x2="1005.872" y2="290" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="908.876" y="280" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">real-time update</text>
+</g>
+<g class="message" data-from="CC" data-to="Hook" data-label="PreToolUse" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="84.3955" y1="330" x2="230.96349999999998" y2="330" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="157.6795" y="320" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">PreToolUse</text>
+</g>
+<g class="message" data-from="Hook" data-to="API" data-label="POST /api/v1/events" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="230.96349999999998" y1="370" x2="378.2725" y2="370" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="304.618" y="360" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">POST /api/v1/events</text>
+</g>
+<g class="message" data-from="API" data-to="SM" data-label="update agent status" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="378.2725" y1="410" x2="531.88" y2="410" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="455.07624999999996" y="400" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">update agent status</text>
+</g>
+<g class="message" data-from="SM" data-to="WS" data-label="broadcast" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="531.88" y1="450" x2="811.88" y2="450" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="671.88" y="440" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">broadcast</text>
+</g>
+<g class="message" data-from="WS" data-to="UI" data-label="agent now &quot;active&quot;" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="811.88" y1="490" x2="1005.872" y2="490" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="908.876" y="480" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">agent now &quot;active&quot;</text>
+</g>
+<g class="message" data-from="CC" data-to="Hook" data-label="SubagentStart" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="84.3955" y1="530" x2="230.96349999999998" y2="530" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="157.6795" y="520" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">SubagentStart</text>
+</g>
+<g class="message" data-from="Hook" data-to="API" data-label="POST /api/v1/events" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="230.96349999999998" y1="570" x2="378.2725" y2="570" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="304.618" y="560" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">POST /api/v1/events</text>
+</g>
+<g class="message" data-from="API" data-to="SM" data-label="spawn agent" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="378.2725" y1="610" x2="531.88" y2="610" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="455.07624999999996" y="600" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">spawn agent</text>
+</g>
+<g class="message" data-from="SM" data-to="WS" data-label="broadcast" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="531.88" y1="650" x2="811.88" y2="650" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="671.88" y="640" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">broadcast</text>
+</g>
+<g class="message" data-from="WS" data-to="UI" data-label="new agent appears" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="811.88" y1="690" x2="1005.872" y2="690" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="908.876" y="680" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">new agent appears</text>
+</g>
+<g class="message" data-from="CC" data-to="Hook" data-label="Stop" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="84.3955" y1="730" x2="230.96349999999998" y2="730" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="157.6795" y="720" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">Stop</text>
+</g>
+<g class="message" data-from="Hook" data-to="API" data-label="POST /api/v1/events" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="230.96349999999998" y1="770" x2="378.2725" y2="770" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="304.618" y="760" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">POST /api/v1/events</text>
+</g>
+<g class="message" data-from="API" data-to="SM" data-label="mark completed" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="378.2725" y1="810" x2="531.88" y2="810" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="455.07624999999996" y="800" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">mark completed</text>
+</g>
+<g class="message" data-from="SM" data-to="WS" data-label="broadcast" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="531.88" y1="850" x2="811.88" y2="850" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="671.88" y="840" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">broadcast</text>
+</g>
+<g class="message" data-from="WS" data-to="UI" data-label="session ends" data-line-style="solid" data-arrow-head="filled" data-self="false">
+  <line x1="811.88" y1="890" x2="1005.872" y2="890" stroke="var(--_line)" stroke-width="1" marker-end="url(#seq-arrow)" />
+  <text x="908.876" y="880" font-size="11" text-anchor="middle" font-weight="400" fill="var(--_text-muted)" dy="3.8499999999999996">session ends</text>
+</g>
+<g class="actor" data-id="CC" data-label="Claude Code" data-type="participant">
+  <rect x="30.000000000000007" y="30" width="108.79099999999998" height="40" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="84.3955" y="50" font-size="13" text-anchor="middle" font-weight="500" fill="var(--_text)" dy="4.55">Claude Code</text>
+</g>
+<g class="actor" data-id="Hook" data-label="Plugin Hook" data-type="participant">
+  <rect x="178.791" y="30" width="104.345" height="40" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="230.96349999999998" y="50" font-size="13" text-anchor="middle" font-weight="500" fill="var(--_text)" dy="4.55">Plugin Hook</text>
+</g>
+<g class="actor" data-id="API" data-label="Backend API" data-type="participant">
+  <rect x="323.13599999999997" y="30" width="110.27299999999998" height="40" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="378.2725" y="50" font-size="13" text-anchor="middle" font-weight="500" fill="var(--_text)" dy="4.55">Backend API</text>
+</g>
+<g class="actor" data-id="SM" data-label="State Machine" data-type="participant">
+  <rect x="473.409" y="30" width="116.94200000000001" height="40" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="531.88" y="50" font-size="13" text-anchor="middle" font-weight="500" fill="var(--_text)" dy="4.55">State Machine</text>
+</g>
+<g class="actor" data-id="DB" data-label="SQLite" data-type="participant">
+  <rect x="631.88" y="30" width="80" height="40" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="671.88" y="50" font-size="13" text-anchor="middle" font-weight="500" fill="var(--_text)" dy="4.55">SQLite</text>
+</g>
+<g class="actor" data-id="WS" data-label="WebSocket" data-type="participant">
+  <rect x="761.1895" y="30" width="101.381" height="40" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="811.88" y="50" font-size="13" text-anchor="middle" font-weight="500" fill="var(--_text)" dy="4.55">WebSocket</text>
+</g>
+<g class="actor" data-id="UI" data-label="Client (Browser/TUI/Electron)" data-type="participant">
+  <rect x="902.5705" y="30" width="206.60299999999995" height="40" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="1005.872" y="50" font-size="13" text-anchor="middle" font-weight="500" fill="var(--_text)" dy="4.55">Client (Browser/TUI/Electron)</text>
+</g>
+</svg>
