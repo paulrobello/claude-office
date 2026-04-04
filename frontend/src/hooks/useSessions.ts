@@ -15,11 +15,14 @@ import {
 export interface Session {
   id: string;
   projectName: string | null;
+  displayName: string | null;
   projectRoot: string | null;
   createdAt: string;
   updatedAt: string;
   status: string;
   eventCount: number;
+  floorId: string | null;
+  roomId: string | null;
 }
 
 // ============================================================================
@@ -127,8 +130,8 @@ export function useSessions(
       if (activeSession) {
         setSessionId(activeSession.id);
         showStatus(
-          `Connected to ${activeSession.projectName || activeSession.id.slice(0, 8)}`,
-          "info",
+          activeSession.projectName || activeSession.id.slice(0, 8),
+          "success",
         );
       }
     }

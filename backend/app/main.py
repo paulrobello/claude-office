@@ -9,8 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from rich.logging import RichHandler
+from sqlalchemy import text
 
-from app.api.routes import events, preferences, sessions
+from app.api.routes import events, floors, preferences, sessions
 from app.api.websocket import manager
 from app.config import get_settings
 from app.core.event_processor import event_processor
@@ -28,6 +29,37 @@ logging.basicConfig(
 settings = get_settings()
 
 
+async def _migrate_schema(conn) -> None:  # type: ignore[type-arg]
+    """Add any columns missing from the sessions table.
+
+    SQLAlchemy's ``create_all`` creates tables but never alters existing ones.
+    This function handles incremental column additions so development databases
+    automatically stay in sync with the model without a full reset.
+    """
+    # Only SQLite needs this; other backends use Alembic migrations.
+    dialect = conn.dialect.name if hasattr(conn, "dialect") else ""
+    if dialect != "sqlite":
+        return
+
+    result = await conn.execute(text("PRAGMA table_info(sessions)"))
+    existing: set[str] = {row[1] for row in result.fetchall()}
+
+    new_columns = [
+        ("floor_id", "TEXT"),
+        ("room_id", "TEXT"),
+        ("team_name", "TEXT"),
+        ("teammate_name", "TEXT"),
+        ("is_lead", "INTEGER NOT NULL DEFAULT 0"),
+        ("display_name", "TEXT"),
+    ]
+    for col_name, col_def in new_columns:
+        if col_name not in existing:
+            await conn.execute(
+                text(f"ALTER TABLE sessions ADD COLUMN {col_name} {col_def}")
+            )
+            logging.getLogger(__name__).info("DB migration: added column sessions.%s", col_name)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Manage application startup and shutdown lifecycle."""
@@ -35,6 +67,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _migrate_schema(conn)
 
     git_service.start()
 
@@ -62,6 +95,7 @@ app.add_middleware(
 app.include_router(events.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(preferences.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(sessions.router, prefix=f"{settings.API_V1_STR}")
+app.include_router(floors.router, prefix=f"{settings.API_V1_STR}")
 
 
 @app.get("/health")
@@ -114,6 +148,34 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
             await websocket.receive_text()
     except WebSocketDisconnect:
         await manager.disconnect(websocket, session_id)
+
+
+@app.websocket("/ws/room/{room_id}")
+async def websocket_room_endpoint(websocket: WebSocket, room_id: str) -> None:
+    """Room-level WebSocket: sends merged GameState for all sessions in a room."""
+    await manager.connect_room(websocket, room_id)
+
+    # Send current merged state immediately if available
+    orch = event_processor.orchestrators.get(room_id)
+    if orch:
+        merged = orch.merge()
+        if merged:
+            await manager.send_personal_message(
+                {
+                    "type": "state_update",
+                    "timestamp": merged.last_updated.isoformat(),
+                    "state": merged.model_dump(mode="json", by_alias=True),
+                },
+                websocket,
+            )
+
+    try:
+        while True:
+            await websocket.receive_text()
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
+        await manager.disconnect_room(websocket, room_id)
 
 
 if STATIC_DIR.exists():

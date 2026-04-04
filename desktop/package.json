@@ -1,0 +1,59 @@
+{
+  "name": "panoptica-desktop",
+  "version": "0.1.0",
+  "description": "Panoptica — Claude Agent Visualization Desktop App",
+  "main": "dist/main/index.js",
+  "author": {
+    "name": "Tesseron Chile",
+    "email": "dev@tesseron.cl"
+  },
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "tsx src/main/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "electron dist/main/index.js",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:all": "npm run build && electron-builder --mac --linux"
+  },
+  "dependencies": {
+    "electron-store": "^10.0.0",
+    "electron-updater": "^6.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "build": {
+    "appId": "cl.tesseron.panoptica",
+    "productName": "Panoptica",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "resources/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64", "x64"]
+        }
+      ],
+      "icon": "resources/icon.icns"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Development",
+      "icon": "resources/icon.png"
+    }
+  }
+}

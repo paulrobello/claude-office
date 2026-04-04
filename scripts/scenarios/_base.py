@@ -35,6 +35,9 @@ AGENT_NAMES = [
     "Code Sage",
     "Test Wizard",
     "Lint Master",
+    "Profiler",
+    "Linter",
+    "Deployer",
 ]
 
 # Realistic task descriptions for marquee display
@@ -51,7 +54,34 @@ TASK_DESCRIPTIONS = [
     "Create database migration scripts for new user preferences schema",
     "Implement rate limiting middleware to prevent API abuse",
     "Add observability with structured logging and OpenTelemetry traces",
+    "Extract reusable components from legacy monolith into shared library",
+    "Fix race condition in concurrent request handler under high load",
+    "Add cache invalidation logic for stale user session tokens",
 ]
+
+# Realistic file paths for tool use events
+FILE_PATHS = [
+    "src/auth/login.py",
+    "src/api/handlers.py",
+    "src/db/queries.py",
+    "tests/test_api.py",
+    "config/settings.yaml",
+    "src/utils/helpers.ts",
+    "src/components/Auth.tsx",
+    "src/middleware/rate_limit.py",
+    "migrations/0042_add_user_prefs.sql",
+    "docs/api-reference.md",
+    "src/services/payments.py",
+    "tests/e2e/checkout.spec.ts",
+    "src/models/user.py",
+    "src/cache/session_cache.py",
+    "scripts/deploy.sh",
+]
+
+# Tools with realistic distribution
+TOOLS_HEAVY = ["Read", "Read", "Grep", "Glob", "Bash"]  # more frequent
+TOOLS_WRITE = ["Edit", "Write", "Bash"]
+TOOLS_ALL = ["Read", "Edit", "Bash", "Glob", "Grep", "Write", "WebSearch"]
 
 
 @dataclass
@@ -64,10 +94,14 @@ class SimulationContext:
     Args:
         session_id: The session identifier sent with every event.
         verbose: When True, print progress messages to stdout.
+        team_name: Optional team name for Agent Teams scenarios.
+        teammate_name: Optional teammate name (None = lead session).
     """
 
     session_id: str = "sim_session_123"
     verbose: bool = True
+    team_name: str | None = None
+    teammate_name: str | None = None
 
     # Token counters (protected by ``lock``)
     input_tokens: int = 0
@@ -88,6 +122,32 @@ class SimulationContext:
         self.compaction_triggered = False
         self.compaction_in_progress = False
 
+    def fork(
+        self,
+        session_id: str,
+        team_name: str | None = None,
+        teammate_name: str | None = None,
+    ) -> "SimulationContext":
+        """Create a new context with a different session_id (and optional team fields).
+
+        Token counters are NOT shared — each forked context tracks its own
+        context window independently.  The verbose flag IS inherited.
+
+        Args:
+            session_id: Session ID for the new context.
+            team_name: Team name for Agent Teams events (optional).
+            teammate_name: Teammate identifier (None = lead session).
+
+        Returns:
+            A new SimulationContext for the given session.
+        """
+        return SimulationContext(
+            session_id=session_id,
+            verbose=self.verbose,
+            team_name=team_name,
+            teammate_name=teammate_name,
+        )
+
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
@@ -100,21 +160,56 @@ class SimulationContext:
     def send_event(self, event_type: str, data: dict | None = None) -> None:
         """POST an event to the backend API.
 
+        Team fields (team_name, teammate_name) are automatically injected
+        when set on this context.
+
         Args:
             event_type: The event type string (e.g. ``"session_start"``).
             data: Optional event-specific payload dict.
         """
+        merged: dict = {}
+        # Inject team fields if this context belongs to a team session
+        if self.team_name:
+            merged["team_name"] = self.team_name
+        if self.teammate_name:
+            merged["teammate_name"] = self.teammate_name
+        if data:
+            merged.update(data)
+
         payload = {
             "event_type": event_type,
             "session_id": self.session_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "data": data or {},
+            "data": merged,
         }
         try:
             response = requests.post(API_URL, json=payload, timeout=10)
             response.raise_for_status()
         except Exception as e:
             self.log(f"Error sending {event_type}: {e}")
+
+    def send_task_created(self, task_id: str, subject: str) -> None:
+        """Send a task_created event for the kanban board.
+
+        Args:
+            task_id: Unique task identifier (e.g. "task-001").
+            subject: Task subject text, optionally including a Linear badge
+                     like "[REC-42] Fix login timeout".
+        """
+        self.send_event("task_created", {"id": task_id, "content": subject})
+
+    def send_task_completed(self, task_id: str, subject: str = "") -> None:
+        """Send a task_completed event for the kanban board.
+
+        Args:
+            task_id: The task ID to mark completed.
+            subject: Optional subject (used if task was never created).
+        """
+        self.send_event("task_completed", {"id": task_id, "content": subject})
+
+    def send_teammate_idle(self) -> None:
+        """Send a teammate_idle event (teammate finished its turn)."""
+        self.send_event("teammate_idle", {})
 
     def increment_context(self, input_delta: int = 0, output_delta: int = 0) -> dict[str, int]:
         """Thread-safely increment token counters and return current values.

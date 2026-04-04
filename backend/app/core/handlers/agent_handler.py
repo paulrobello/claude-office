@@ -239,8 +239,20 @@ async def handle_agent_update(
 
     agent_id = event.data.agent_id
     if agent_id in sm.agents and event.data.bubble_content:
-        sm.agents[agent_id].bubble = event.data.bubble_content
-        logger.debug(f"Updated agent {agent_id} bubble: {event.data.bubble_content.text[:50]}...")
+        bubble = event.data.bubble_content
+        # Summarize long bubble text using AI if available
+        summary_svc = get_summary_service()
+        if summary_svc.enabled and bubble.text and len(bubble.text) > 60:
+            summarized = await summary_svc.summarize_bubble_text(
+                bubble.text, bubble.type
+            )
+            bubble = BubbleContent(
+                type=bubble.type,
+                text=summarized,
+                icon=bubble.icon,
+            )
+        sm.agents[agent_id].bubble = bubble
+        logger.debug(f"Updated agent {agent_id} bubble: {bubble.text[:50]}...")
         await broadcast_state(event.session_id, sm)
 
 

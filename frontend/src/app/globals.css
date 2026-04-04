@@ -10,6 +10,8 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --animate-tour-ring: tour-ring-pulse 1.5s ease-in-out infinite;
+  --animate-slide-up: slide-up 300ms ease-out forwards;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -25,12 +27,60 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+@keyframes tour-ring-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.6), 0 0 20px 4px rgba(249, 115, 22, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(249, 115, 22, 0.4), 0 0 30px 8px rgba(249, 115, 22, 0.3);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes zoomInView {
+  from {
+    transform: scale(0.3);
+    opacity: 0;
+    filter: blur(4px);
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0px);
+  }
+}
+
+@keyframes zoomOutView {
+  from {
+    transform: scale(3);
+    opacity: 0;
+    filter: blur(4px);
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0px);
+  }
+}
+
 @layer utilities {
-  /* PixiJS Canvas Scaling */
+  /* PixiJS Canvas Scaling — anchored to top-left to prevent drift from
+     flex centering recalculations during frequent WebSocket re-renders */
   .pixi-canvas-container canvas {
     width: 100% !important;
     height: 100% !important;
     object-fit: contain;
+    object-position: top left;
   }
 
   /* Custom Scrollbar Theme */

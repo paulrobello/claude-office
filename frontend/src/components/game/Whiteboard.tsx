@@ -3,8 +3,8 @@
 /**
  * Whiteboard - Office whiteboard display with multiple modes.
  *
- * Click anywhere on the whiteboard to cycle through 11 display modes.
- * Keyboard shortcuts: 0-9 jump to that mode, T = Todo, B = Background Tasks
+ * Click anywhere on the whiteboard to cycle through 12 display modes.
+ * Keyboard shortcuts: 0-9 jump to that mode, T = Todo, B = Background Tasks, K = Kanban
  *
  * 0: Todo List (default)
  * 1: Remote Workers (background task status)
@@ -16,7 +16,8 @@
  * 7: Timeline (agent lifespans)
  * 8: News Ticker (scrolling headlines)
  * 9: Coffee (coffee cup tracker)
- * 10: Heat Map (file edit frequency) - click to reach from mode 9
+ * 10: Heat Map (file edit frequency)
+ * 11: Kanban Board (team task board) - hotkey K
  */
 
 import { Graphics } from "pixi.js";
@@ -34,6 +35,7 @@ import { TimelineMode } from "./whiteboard/TimelineMode";
 import { NewsTickerMode } from "./whiteboard/NewsTickerMode";
 import { CoffeeMode } from "./whiteboard/CoffeeMode";
 import { HeatMapMode } from "./whiteboard/HeatMapMode";
+import { KanbanMode } from "./whiteboard/KanbanMode";
 import { MODE_INFO } from "./whiteboard/WhiteboardModeRegistry";
 
 // ============================================================================
@@ -109,10 +111,10 @@ function WhiteboardFrame({
 
       {/* Mode indicator dots */}
       <pixiContainer x={165} y={193}>
-        {Array.from({ length: 11 }).map((_, i) => (
+        {Array.from({ length: 12 }).map((_, i) => (
           <pixiGraphics
             key={i}
-            x={(i - 5) * 10}
+            x={(i - 5.5) * 10}
             draw={(g: Graphics) => {
               g.clear();
               g.circle(0, 0, i === mode ? 4 : 2);
@@ -171,6 +173,9 @@ export function Whiteboard({ todos }: WhiteboardProps): ReactNode {
         case "b":
           setMode(1);
           break;
+        case "k":
+          setMode(11);
+          break;
       }
     };
 
@@ -223,6 +228,8 @@ export function Whiteboard({ todos }: WhiteboardProps): ReactNode {
         return <CoffeeMode data={whiteboardData} />;
       case 10:
         return <HeatMapMode data={whiteboardData} />;
+      case 11:
+        return <KanbanMode data={whiteboardData} />;
       default:
         return <TodoListMode todos={todos} />;
     }

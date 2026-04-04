@@ -8,7 +8,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useWebSocketEvents } from "@/hooks/useWebSocketEvents";
 import { useSessions } from "@/hooks/useSessions";
 import { useSessionSwitch } from "@/hooks/useSessionSwitch";
@@ -21,10 +21,8 @@ import {
 } from "@/stores/gameStore";
 import { useShallow } from "zustand/react/shallow";
 import { Menu, X } from "lucide-react";
-import { SessionSidebar } from "@/components/layout/SessionSidebar";
 import { MobileDrawer } from "@/components/layout/MobileDrawer";
 import { MobileAgentActivity } from "@/components/layout/MobileAgentActivity";
-import { RightSidebar } from "@/components/layout/RightSidebar";
 import { HeaderControls } from "@/components/layout/HeaderControls";
 import {
   StatusToast,
@@ -34,9 +32,21 @@ import Modal from "@/components/overlay/Modal";
 import SettingsModal from "@/components/overlay/SettingsModal";
 import { usePreferencesStore } from "@/stores/preferencesStore";
 import type { Session } from "@/hooks/useSessions";
+import { useFloorConfig } from "@/hooks/useFloorConfig";
+import { useNavigationStore } from "@/stores/navigationStore";
+import { useZoomNavigation } from "@/hooks/useZoomNavigation";
+import { Breadcrumb } from "@/components/navigation/Breadcrumb";
+import { ViewTransition } from "@/components/navigation/ViewTransition";
+import { BuildingView } from "@/components/views/BuildingView";
+import { FloorView } from "@/components/views/FloorView";
+import { TourOverlay } from "@/components/tour/TourOverlay";
+import { useTourStore } from "@/stores/tourStore";
+import { CommandBar } from "@/components/command/CommandBar";
+import { AttentionToasts } from "@/components/command/AttentionToasts";
+import { useAttentionStore, startAttentionEngine } from "@/stores/attentionStore";
 
 // ============================================================================
-// DYNAMIC IMPORT
+// DYNAMIC IMPORT (mobile branch only — desktop uses FloorView)
 // ============================================================================
 
 const OfficeGame = dynamic(
@@ -68,7 +78,6 @@ export default function V2TestPage(): React.ReactNode {
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
     null,
   );
-  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState<boolean | null>(
@@ -115,6 +124,26 @@ export default function V2TestPage(): React.ReactNode {
     (state) => state.loadPersistedDebugSettings,
   );
   const loadPreferences = usePreferencesStore((s) => s.loadPreferences);
+  const startTour = useTourStore((s) => s.startTour);
+  const hasSeenTour = useTourStore((s) => s.hasSeenTour);
+  const isTourActive = useTourStore((s) => s.isActive);
+  const loadTourSeen = useTourStore((s) => s.loadTourSeen);
+
+  const [isCommandBarOpen, setIsCommandBarOpen] = useState(false);
+  const attentionCount = useAttentionStore((s) => s.activeCount);
+  const highestUrgency = useAttentionStore((s) => s.highestUrgency);
+
+  // ------------------------------------------------------------------
+  // Floor configuration + navigation
+  // ------------------------------------------------------------------
+  useFloorConfig();
+  const view = useNavigationStore((s) => s.view);
+
+  // ------------------------------------------------------------------
+  // Zoom navigation (scroll/pinch between views)
+  // ------------------------------------------------------------------
+  const mainContentRef = useRef<HTMLDivElement>(null);
+  const zoomState = useZoomNavigation(mainContentRef);
 
   // ------------------------------------------------------------------
   // WebSocket connection — reconnects when sessionId changes
@@ -141,6 +170,25 @@ export default function V2TestPage(): React.ReactNode {
     loadPreferences();
   }, [loadPreferences]);
 
+  useEffect(() => {
+    loadTourSeen();
+  }, [loadTourSeen]);
+
+  useEffect(() => {
+    startAttentionEngine();
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setIsCommandBarOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   // ------------------------------------------------------------------
   // Mobile breakpoint detection
   // ------------------------------------------------------------------
@@ -154,8 +202,15 @@ export default function V2TestPage(): React.ReactNode {
   // ------------------------------------------------------------------
   // Derived handlers
   // ------------------------------------------------------------------
+  const handleOpenCommandBar = () => setIsCommandBarOpen(true);
+
   const handleToggleDebug = () =>
     useGameStore.getState().setDebugMode(!debugMode);
+
+  const handleStartTour = () => {
+    useNavigationStore.getState().goToBuilding();
+    startTour();
+  };
 
   const handleConfirmClearDB = async () => {
     setIsClearModalOpen(false);
@@ -167,6 +222,19 @@ export default function V2TestPage(): React.ReactNode {
     const pending = sessionPendingDelete;
     setSessionPendingDelete(null);
     await handleDeleteSession(pending);
+  };
+
+  const handleRenameSession = async (sessionId: string, displayName: string) => {
+    try {
+      await fetch(`http://localhost:8000/api/v1/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName }),
+      });
+      await fetchSessions();
+    } catch {
+      // Silently fail
+    }
   };
 
   // ------------------------------------------------------------------
@@ -299,25 +367,29 @@ export default function V2TestPage(): React.ReactNode {
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           )}
-          <h1
-            className={`font-bold text-white tracking-tight flex items-center gap-2 ${
-              isMobile ? "text-lg" : "text-2xl"
-            }`}
-          >
-            <span className="text-orange-500">Claude</span>{" "}
-            {!isMobile && "Office Visualizer"}
+          <div className="flex items-center gap-3">
+            <h1
+              className={`font-bold text-white tracking-tight flex items-center gap-2 ${
+                isMobile ? "text-lg" : "text-2xl"
+              }`}
+            >
+              <span className="text-orange-500">Claude</span>{" "}
+              {!isMobile && "Office Visualizer"}
+              {!isMobile && (
+                <span className="text-xs font-mono font-normal px-2 py-0.5 bg-slate-800 rounded text-slate-400 border border-slate-700">
+                  v0.11.0
+                </span>
+              )}
+            </h1>
             {!isMobile && (
-              <span className="text-xs font-mono font-normal px-2 py-0.5 bg-slate-800 rounded text-slate-400 border border-slate-700">
-                v0.11.0
-              </span>
+              <div className="border-l border-slate-800 pl-3">
+                <Breadcrumb />
+              </div>
             )}
-          </h1>
+          </div>
         </div>
 
-        {/* Centered status toast */}
-        <div className="absolute left-1/3 -translate-x-1/2 flex items-center pointer-events-none">
-          <StatusToast message={statusMessage} />
-        </div>
+        {/* Status toast — rendered outside header flow to avoid overlap */}
 
         {!isMobile && (
           <HeaderControls
@@ -330,6 +402,11 @@ export default function V2TestPage(): React.ReactNode {
             onToggleDebug={handleToggleDebug}
             onOpenSettings={() => setIsSettingsModalOpen(true)}
             onOpenHelp={() => setIsHelpModalOpen(true)}
+            onStartTour={handleStartTour}
+            tourBounce={!hasSeenTour && !isTourActive}
+            onOpenCommandBar={handleOpenCommandBar}
+            attentionCount={attentionCount}
+            highestUrgency={highestUrgency}
           />
         )}
 
@@ -376,26 +453,53 @@ export default function V2TestPage(): React.ReactNode {
           <MobileAgentActivity agents={agents} boss={boss} />
         </div>
       ) : (
-        <div className="flex-grow flex gap-2 overflow-hidden min-h-0">
-          <SessionSidebar
-            sessions={sessions}
-            sessionsLoading={sessionsLoading}
-            sessionId={sessionId}
-            isCollapsed={leftSidebarCollapsed}
-            onToggleCollapsed={() =>
-              setLeftSidebarCollapsed(!leftSidebarCollapsed)
+        <div
+          ref={mainContentRef}
+          className="flex-grow overflow-hidden min-h-0"
+          style={
+            zoomState.scale !== 1
+              ? {
+                  transform: `scale(${zoomState.scale})`,
+                  transformOrigin: `${zoomState.originX}px ${zoomState.originY}px`,
+                  filter: `blur(${Math.min((zoomState.scale - 1) * 1.5, 3)}px)`,
+                  transition: "filter 100ms ease-out",
+                }
+              : undefined
+          }
+        >
+          <ViewTransition
+            view={view}
+            buildingView={<BuildingView />}
+            floorView={
+              <FloorView
+                sessions={sessions}
+                sessionsLoading={sessionsLoading}
+                sessionId={sessionId}
+                onSessionSelect={handleSessionSelect}
+                onDeleteSession={handleDeleteSession}
+                onRenameSession={handleRenameSession}
+              />
             }
-            onSessionSelect={handleSessionSelect}
-            onDeleteSession={setSessionPendingDelete}
           />
-
-          <div className="flex-grow border border-slate-800 rounded-lg shadow-2xl bg-slate-900 overflow-hidden relative">
-            <OfficeGame />
-          </div>
-
-          <RightSidebar />
         </div>
       )}
+
+      {/* Command bar */}
+      <CommandBar
+        isOpen={isCommandBarOpen}
+        onClose={() => setIsCommandBarOpen(false)}
+      />
+
+      {/* Attention toasts */}
+      <AttentionToasts onOpenCommandBar={handleOpenCommandBar} />
+
+      {/* Tour overlay */}
+      <TourOverlay />
+
+      {/* Fixed bottom-right toast — never overlaps header or content */}
+      <div className="fixed bottom-5 right-5 z-50 pointer-events-none">
+        <StatusToast message={statusMessage} />
+      </div>
     </main>
   );
 }

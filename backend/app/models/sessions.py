@@ -13,6 +13,7 @@ __all__ = [
     "NewsItem",
     "FileEdit",
     "BackgroundTask",
+    "KanbanTask",
     "WhiteboardData",
     "Session",
     "HistoryEntry",
@@ -74,6 +75,18 @@ class BackgroundTask(BaseModel):
     completed_at: str | None = None
 
 
+class KanbanTask(BaseModel):
+    """A task on the team kanban board."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    task_id: str
+    subject: str
+    status: str  # "pending" | "in_progress" | "completed"
+    assignee: str | None = None  # teammate_name if available
+    linear_id: str | None = None  # parsed from subject, e.g. "REC-42"
+
+
 class WhiteboardData(BaseModel):
     """Data for whiteboard display modes."""
 
@@ -98,6 +111,8 @@ class WhiteboardData(BaseModel):
     background_tasks: list[BackgroundTask] = Field(
         default_factory=lambda: cast(list[BackgroundTask], [])
     )
+    # Kanban board tasks (Phase 4) — aggregated across all team sessions
+    kanban_tasks: list[KanbanTask] = Field(default_factory=lambda: cast(list[KanbanTask], []))
 
 
 class Session(BaseModel):
@@ -128,6 +143,8 @@ class GameState(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     session_id: str
+    floor_id: str | None = None
+    room_id: str | None = None
     boss: Boss
     agents: list[Agent]
     office: OfficeState

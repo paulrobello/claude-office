@@ -90,6 +90,11 @@ export interface AgentAnimationState {
 
   // Animation state
   isTyping: boolean; // True when agent is actively using tools
+
+  // Character type overlays (from backend)
+  characterType?: string | null;
+  parentSessionId?: string | null;
+  parentId?: string | null;
 }
 
 /**
@@ -230,6 +235,24 @@ interface GameStore {
   setWhiteboardData: (data: WhiteboardData) => void;
   setWhiteboardMode: (mode: WhiteboardMode) => void;
   cycleWhiteboardMode: () => void;
+
+  // ========== Focus Popup State ==========
+  focusedCharacter: {
+    agentId: string | null;
+    isBoss: boolean;
+    name: string | null;
+    currentTask: string | null;
+    sessionId: string;
+  } | null;
+  setFocusedCharacter: (
+    c: {
+      agentId: string | null;
+      isBoss: boolean;
+      name: string | null;
+      currentTask: string | null;
+      sessionId: string;
+    } | null,
+  ) => void;
 
   // ========== UI State ==========
   isConnected: boolean;
@@ -372,6 +395,9 @@ const initialState = {
   whiteboardData: initialWhiteboardData,
   whiteboardMode: 0 as WhiteboardMode,
 
+  // Focus popup
+  focusedCharacter: null,
+
   // UI
   isConnected: false,
   isReplaying: false,
@@ -418,6 +444,9 @@ export const useGameStore = create<GameStore>()(
           queueType: null,
           queueIndex: -1,
           isTyping: false,
+          characterType: backendAgent.characterType ?? null,
+          parentSessionId: backendAgent.parentSessionId ?? null,
+          parentId: backendAgent.parentId ?? null,
         };
         newAgents.set(backendAgent.id, animState);
 
@@ -941,6 +970,12 @@ export const useGameStore = create<GameStore>()(
 
     setWhiteboardMode: (whiteboardMode) => set({ whiteboardMode }),
 
+    // ========================================================================
+    // FOCUS POPUP ACTIONS
+    // ========================================================================
+
+    setFocusedCharacter: (focusedCharacter) => set({ focusedCharacter }),
+
     cycleWhiteboardMode: () =>
       set((state) => ({
         whiteboardMode: ((state.whiteboardMode + 1) %
@@ -1091,6 +1126,9 @@ export const useGameStore = create<GameStore>()(
                 currentTask: backendAgent.currentTask ?? null,
                 desk: backendAgent.desk ?? null,
                 name: backendAgent.name ?? null,
+                characterType: backendAgent.characterType ?? null,
+                parentSessionId: backendAgent.parentSessionId ?? null,
+                parentId: backendAgent.parentId ?? null,
               });
             }
           }

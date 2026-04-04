@@ -19,7 +19,7 @@ import {
   Sprite,
   Application as PixiApplication,
 } from "pixi.js";
-import { useMemo, useEffect, useRef, type ReactNode } from "react";
+import { useMemo, useEffect, useRef, useCallback, useState, type ReactNode } from "react";
 import {
   TransformWrapper,
   TransformComponent,
@@ -42,15 +42,13 @@ import {
   selectContextUtilization,
   selectIsCompacting,
   selectPrintReport,
+  selectSessionId,
 } from "@/stores/gameStore";
+import { CharacterFocusPopup } from "./CharacterFocusPopup";
 import { useAnimationSystem } from "@/systems/animationSystem";
 import { useCompactionAnimation } from "@/systems/compactionAnimation";
 import { useOfficeTextures } from "@/hooks/useOfficeTextures";
-import {
-  CANVAS_WIDTH,
-  CANVAS_HEIGHT,
-  BACKGROUND_COLOR,
-} from "@/constants/canvas";
+import { CANVAS_WIDTH, CANVAS_HEIGHT, BACKGROUND_COLOR } from "@/constants/canvas";
 import {
   EMPLOYEE_OF_MONTH_POSITION,
   CITY_WINDOW_POSITION,
@@ -94,6 +92,35 @@ import { OfficeBackground } from "./OfficeBackground";
 
 // Register PixiJS components
 extend({ Container, Text, Graphics, Sprite });
+
+// ============================================================================
+// SUB-COMPONENTS
+// ============================================================================
+
+interface SubagentDotProps {
+  x: number;
+  y: number;
+  color: string;
+}
+
+function SubagentDot({ x, y, color }: SubagentDotProps): ReactNode {
+  const drawDot = useCallback(
+    (g: Graphics) => {
+      g.clear();
+      g.circle(0, 0, 4);
+      // Safe hex parsing with fallback
+      const hex = /^#[0-9a-fA-F]{6}$/.test(color)
+        ? parseInt(color.slice(1), 16)
+        : 0xf59e0b;
+      g.fill({ color: hex });
+      g.circle(0, 0, 4);
+      g.stroke({ color: 0xffffff, alpha: 0.4, width: 1 });
+    },
+    [color],
+  );
+
+  return <pixiGraphics draw={drawDot} x={x} y={y} />;
+}
 
 // ============================================================================
 // MAIN COMPONENT
@@ -146,6 +173,7 @@ export function OfficeGame(): ReactNode {
   const contextUtilization = useGameStore(selectContextUtilization);
   const isCompacting = useGameStore(selectIsCompacting);
   const printReport = useGameStore(selectPrintReport);
+  const sessionId = useGameStore(selectSessionId);
 
   // Compaction animation state
   const compactionAnimation = useCompactionAnimation();
@@ -184,6 +212,90 @@ export function OfficeGame(): ReactNode {
   // Desk positions for Y-sorted rendering
   const deskPositions = useDeskPositions(deskCount, occupiedDesks);
 
+  // Shared hit-test: given canvas-space coordinates, return which character is hit (if any)
+  const hitTestCharacter = useCallback(
+    (canvasX: number, canvasY: number): "boss" | string | null => {
+      const HIT_W = 32;
+      const HIT_H = 48;
+
+      const bossCX = boss.position.x;
+      const bossCY = boss.position.y - 40;
+      if (Math.abs(canvasX - bossCX) < HIT_W && Math.abs(canvasY - bossCY) < HIT_H) {
+        return "boss";
+      }
+
+      for (const agent of agents.values()) {
+        const ax = agent.currentPosition.x;
+        const ay = agent.currentPosition.y - 40;
+        if (Math.abs(canvasX - ax) < HIT_W && Math.abs(canvasY - ay) < HIT_H) {
+          return agent.id;
+        }
+      }
+      return null;
+    },
+    [boss, agents],
+  );
+
+  // Convert a mouse event to canvas coordinates
+  const toCanvasCoords = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>): { x: number; y: number } | null => {
+      const canvasEl = appRef.current?.canvas;
+      if (!canvasEl) return null;
+      const rect = canvasEl.getBoundingClientRect();
+      return {
+        x: ((e.clientX - rect.left) / rect.width) * CANVAS_WIDTH,
+        y: ((e.clientY - rect.top) / rect.height) * CANVAS_HEIGHT,
+      };
+    },
+    [],
+  );
+
+  // Cursor state: true when mouse is over a clickable character
+  const [isOverCharacter, setIsOverCharacter] = useState(false);
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const coords = toCanvasCoords(e);
+      if (!coords) return;
+      setIsOverCharacter(hitTestCharacter(coords.x, coords.y) !== null);
+    },
+    [toCanvasCoords, hitTestCharacter],
+  );
+
+  // Click-to-focus: convert DOM click → canvas coordinates → character hit test
+  const handleCanvasClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const coords = toCanvasCoords(e);
+      if (!coords) return;
+
+      const hit = hitTestCharacter(coords.x, coords.y);
+      if (!hit) return;
+
+      if (hit === "boss") {
+        useGameStore.getState().setFocusedCharacter({
+          agentId: null,
+          isBoss: true,
+          name: "Boss",
+          currentTask: boss.currentTask,
+          sessionId,
+        });
+        return;
+      }
+
+      const agent = agents.get(hit);
+      if (agent) {
+        useGameStore.getState().setFocusedCharacter({
+          agentId: agent.id,
+          isBoss: false,
+          name: agent.name,
+          currentTask: agent.currentTask,
+          sessionId,
+        });
+      }
+    },
+    [toCanvasCoords, hitTestCharacter, boss, agents, sessionId],
+  );
+
   // Keyboard shortcuts for debug
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -210,29 +322,31 @@ export function OfficeGame(): ReactNode {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [debugMode]);
 
-  // Reset the pan/zoom transform whenever the container is resized (e.g. sidebar
-  // open/close). Without this, react-zoom-pan-pinch keeps a stale translate that
-  // was calculated against the old container dimensions, which crops the scene.
+  // Reset pan/zoom only on actual window resize — NOT on container reflows.
+  // ResizeObserver was causing progressive canvas drift because the event log
+  // and sidebar content changes triggered micro-resizes on every update.
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const observer = new ResizeObserver(() => {
-      transformRef.current?.resetTransform(0);
-    });
-    observer.observe(container);
-    return () => observer.disconnect();
+    const handleResize = () => transformRef.current?.resetTransform(0);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   return (
     <div
       ref={containerRef}
-      className="w-full h-full flex items-center justify-center overflow-hidden relative"
+      data-tour-id="game-canvas"
+      className="w-full h-full overflow-hidden relative"
+      onClick={handleCanvasClick}
+      onMouseMove={handleMouseMove}
+      style={{ cursor: isOverCharacter ? "pointer" : "default" }}
     >
       <TransformWrapper
         ref={transformRef}
         initialScale={1}
         minScale={1}
         maxScale={3}
+        centerZoomedOut={false}
+        limitToBounds={false}
         wheel={{ step: 0.1 }}
         pinch={{ step: 5 }}
         doubleClick={{ mode: "reset" }}
@@ -240,9 +354,9 @@ export function OfficeGame(): ReactNode {
         <ZoomControls />
         <TransformComponent
           wrapperClass="w-full h-full"
-          contentClass="w-full h-full flex items-center justify-center"
+          contentClass="w-full h-full"
         >
-          <div className="pixi-canvas-container w-full h-full flex items-center justify-center">
+          <div className="pixi-canvas-container w-full h-full">
             <Application
               key={`pixi-app-${hmrVersion}`}
               width={CANVAS_WIDTH}
@@ -555,6 +669,74 @@ export function OfficeGame(): ReactNode {
                       />
                     ))}
 
+                  {/* Character Type Overlays - crown/badge/dot per agent type */}
+                  {Array.from(agents.values())
+                    .filter(
+                      (agent) =>
+                        agent.characterType &&
+                        !isInElevatorZone(agent.currentPosition),
+                    )
+                    .map((agent) => (
+                      <pixiContainer
+                        key={`chartype-${agent.id}`}
+                        zIndex={agent.currentPosition.y + 20}
+                      >
+                        {/* Lead crown overlay */}
+                        {agent.characterType === "lead" && (
+                          <pixiText
+                            text="👑"
+                            style={{ fontSize: 14 }}
+                            x={agent.currentPosition.x - 8}
+                            y={agent.currentPosition.y - 52}
+                          />
+                        )}
+
+                        {/* Teammate badge + nameplate overlay */}
+                        {agent.characterType === "teammate" && (
+                          <>
+                            <pixiText
+                              text="🎖️"
+                              style={{ fontSize: 10 }}
+                              x={agent.currentPosition.x - 6}
+                              y={agent.currentPosition.y - 46}
+                            />
+                            {agent.name && (
+                              <pixiText
+                                text={agent.name}
+                                style={{
+                                  fontSize: 7,
+                                  fill: agent.color ?? "#3b82f6",
+                                  fontFamily: "monospace",
+                                  fontWeight: "bold",
+                                }}
+                                x={agent.currentPosition.x - 18}
+                                y={agent.currentPosition.y - 34}
+                              />
+                            )}
+                          </>
+                        )}
+
+                        {/* Subagent shoulder dot */}
+                        {agent.characterType === "subagent" &&
+                          (() => {
+                            const parentAgent = agent.parentId
+                              ? Array.from(agents.values()).find(
+                                  (a) => a.id === agent.parentId,
+                                )
+                              : null;
+                            const dotColor = parentAgent?.color ?? "#f59e0b";
+                            return (
+                              <SubagentDot
+                                key={`dot-${agent.id}`}
+                                x={agent.currentPosition.x + 10}
+                                y={agent.currentPosition.y - 28}
+                                color={dotColor}
+                              />
+                            );
+                          })()}
+                      </pixiContainer>
+                    ))}
+
                   {/* Bubbles Layer - rendered on top of everything */}
                   {Array.from(agents.values())
                     .filter(
@@ -585,6 +767,9 @@ export function OfficeGame(): ReactNode {
           </div>
         </TransformComponent>
       </TransformWrapper>
+
+      {/* Character focus popup — DOM overlay, outside PixiJS canvas */}
+      <CharacterFocusPopup />
     </div>
   );
 }

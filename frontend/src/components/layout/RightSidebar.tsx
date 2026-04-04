@@ -61,10 +61,10 @@ export function RightSidebar(): React.ReactNode {
 
   return (
     <aside
-      className={`relative flex flex-col gap-2 flex-shrink-0 overflow-hidden ${
+      className={`relative flex flex-col gap-2 overflow-hidden ${
         isDragging ? "select-none" : ""
       }`}
-      style={{ width: sidebarWidth }}
+      style={{ width: sidebarWidth, maxHeight: "calc(100vh - 60px)" }}
     >
       {/* Horizontal Resize Handle (left edge) */}
       <div
@@ -117,7 +117,7 @@ export function RightSidebar(): React.ReactNode {
         </div>
 
         {/* Tab content */}
-        <div className="flex-grow min-h-0">
+        <div className="flex-grow min-h-0 overflow-hidden">
           {activeTab === "events" ? <EventLog /> : <ConversationHistory />}
         </div>
       </div>

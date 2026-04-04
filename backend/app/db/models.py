@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
@@ -16,6 +16,7 @@ class SessionRecord(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     project_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
     project_root: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
@@ -26,6 +27,12 @@ class SessionRecord(Base):
         onupdate=lambda: datetime.now(UTC),
     )
     status: Mapped[str] = mapped_column(String, default="active")
+    floor_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    room_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Agent Teams fields (Phase 4)
+    team_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    teammate_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    is_lead: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
     events: Mapped[list[EventRecord]] = relationship(
         "EventRecord", back_populates="session", cascade="all, delete-orphan"

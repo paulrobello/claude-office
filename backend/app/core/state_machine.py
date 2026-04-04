@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
@@ -28,11 +29,20 @@ from app.models.sessions import (
     ConversationEntry,
     GameState,
     HistoryEntry,
+    KanbanTask,
     NewsItem,
     WhiteboardData,
 )
 
 logger = logging.getLogger(__name__)
+
+_LINEAR_ID_RE = re.compile(r"\[([A-Z]+-\d+)\]")
+
+
+def _parse_linear_id(subject: str) -> str | None:
+    """Extract a Linear issue ID like 'REC-42' from '[REC-42]' in a task subject."""
+    match = _LINEAR_ID_RE.search(subject)
+    return match.group(1) if match else None
 
 
 @dataclass
@@ -129,6 +139,10 @@ def _empty_conversation() -> list[ConversationEntry]:
     return cast(list[ConversationEntry], [])
 
 
+def _empty_kanban_tasks() -> dict[str, KanbanTask]:
+    return cast(dict[str, KanbanTask], {})
+
+
 class OfficePhase(Enum):
     EMPTY = auto()  # No active session
     STARTING = auto()  # Session starting, boss arriving
@@ -164,6 +178,13 @@ class StateMachine:
     last_user_prompt: str | None = None
     background_tasks: list[BackgroundTask] = field(default_factory=_empty_background_tasks)
     conversation: list[ConversationEntry] = field(default_factory=_empty_conversation)
+    floor_id: str | None = None
+    room_id: str | None = None
+    # Agent Teams fields (Phase 4)
+    team_name: str | None = None
+    teammate_name: str | None = None
+    is_lead: bool = False
+    kanban_tasks: dict[str, KanbanTask] = field(default_factory=_empty_kanban_tasks)
 
     # Whiteboard tracking delegated to WhiteboardTracker
     whiteboard: WhiteboardTracker = field(default_factory=WhiteboardTracker)
@@ -315,10 +336,13 @@ class StateMachine:
             coffee_cups=self.whiteboard.coffee_cups,
             file_edits=self.whiteboard.get_file_edits_snapshot(),
             background_tasks=self.whiteboard.get_background_tasks_snapshot(),
+            kanban_tasks=list(self.kanban_tasks.values()),
         )
 
         return GameState(
             session_id=session_id,
+            floor_id=self.floor_id,
+            room_id=self.room_id,
             boss=boss,
             agents=agents_list,
             office=office,
@@ -645,6 +669,36 @@ class StateMachine:
         elif event.event_type == EventType.CLEANUP:
             if event.data and event.data.agent_id:
                 self.remove_agent(event.data.agent_id)
+
+        elif event.event_type == EventType.TASK_CREATED:
+            if event.data and event.data.task_id:
+                subject = event.data.task_subject or event.data.task_description or ""
+                self.kanban_tasks[event.data.task_id] = KanbanTask(
+                    task_id=event.data.task_id,
+                    subject=subject,
+                    status="pending",
+                    assignee=self.teammate_name,
+                    linear_id=_parse_linear_id(subject),
+                )
+
+        elif event.event_type == EventType.TASK_COMPLETED:
+            if event.data and event.data.task_id:
+                task_id = event.data.task_id
+                if task_id in self.kanban_tasks:
+                    self.kanban_tasks[task_id].status = "completed"
+                else:
+                    subject = event.data.task_subject or ""
+                    self.kanban_tasks[task_id] = KanbanTask(
+                        task_id=task_id,
+                        subject=subject,
+                        status="completed",
+                        assignee=self.teammate_name,
+                        linear_id=_parse_linear_id(subject),
+                    )
+
+        elif event.event_type == EventType.TEAMMATE_IDLE:
+            self.boss_state = BossState.IDLE
+            self.boss_bubble = None
 
         elif event.event_type == EventType.STOP:
             self.phase = OfficePhase.COMPLETING

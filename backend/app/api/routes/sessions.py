@@ -47,11 +47,14 @@ class SessionSummary(TypedDict):
 
     id: str
     projectName: str | None
+    displayName: str | None
     projectRoot: str | None
     createdAt: str
     updatedAt: str
     status: str
     eventCount: int
+    floorId: str | None
+    roomId: str | None
 
 
 class ReplayEvent(TypedDict):
@@ -72,11 +75,19 @@ class ReplayEntry(TypedDict):
 
 
 @router.get("")
-async def list_sessions(db: Annotated[AsyncSession, Depends(get_db)]) -> list[SessionSummary]:
-    """List all sessions with event counts."""
-    logger.debug("API: list_sessions called")
+async def list_sessions(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    room_id: str | None = None,
+    floor_id: str | None = None,
+) -> list[SessionSummary]:
+    """List all sessions with event counts, optionally filtered by room or floor."""
+    logger.debug("API: list_sessions called (room_id=%s, floor_id=%s)", room_id, floor_id)
     try:
         stmt = select(SessionRecord).order_by(SessionRecord.updated_at.desc())
+        if room_id:
+            stmt = stmt.where(SessionRecord.room_id == room_id)
+        if floor_id:
+            stmt = stmt.where(SessionRecord.floor_id == floor_id)
         result = await db.execute(stmt)
         records = result.scalars().all()
 
@@ -101,17 +112,40 @@ async def list_sessions(db: Annotated[AsyncSession, Depends(get_db)]) -> list[Se
                 {
                     "id": rec.id,
                     "projectName": rec.project_name,
+                    "displayName": rec.display_name,
                     "projectRoot": rec.project_root,
                     "createdAt": created_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     "updatedAt": updated_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     "status": rec.status,
                     "eventCount": count,
+                    "floorId": rec.floor_id,
+                    "roomId": rec.room_id,
                 }
             )
         return sessions
     except Exception as e:
         logger.exception("Error in list_sessions: %s", e)
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.patch("/{session_id}")
+async def rename_session(
+    session_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: dict[str, Any] | None = None,
+) -> dict[str, str]:
+    """Rename a session's display name."""
+    if not body or "displayName" not in body:
+        raise HTTPException(status_code=400, detail="displayName required")
+
+    result = await db.execute(select(SessionRecord).where(SessionRecord.id == session_id))
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session.display_name = body["displayName"]
+    await db.commit()
+    return {"status": "ok"}
 
 
 @router.get("/{session_id}/replay")
@@ -197,6 +231,85 @@ async def trigger_simulation() -> dict[str, str]:
 
         return {"status": "success", "message": "Simulation started in background"}
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+class FocusRequest(TypedDict, total=False):
+    """Optional request body for the focus endpoint."""
+
+    message: str
+
+
+@router.post("/{session_id}/focus")
+async def focus_session(
+    session_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Bring the user's existing terminal to the foreground (macOS only).
+
+    Optionally copies a message to the clipboard so the user can paste it.
+
+    Args:
+        session_id: The session to focus.
+        db: Database session dependency.
+        body: Optional JSON body with ``message`` field.
+
+    Returns:
+        A status payload with ``success`` and ``project_root`` keys.
+    """
+    result = await db.execute(select(SessionRecord).where(SessionRecord.id == session_id))
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    project_root = session.project_root
+    message: str | None = (body or {}).get("message")
+
+    try:
+        if message:
+            # Copy message to clipboard (macOS pbcopy, Linux xclip, no-op elsewhere)
+            try:
+                if os.name == "posix":
+                    if os.path.exists("/usr/bin/pbcopy"):
+                        proc = subprocess.Popen(
+                            ["pbcopy"], stdin=subprocess.PIPE, close_fds=True
+                        )
+                        proc.communicate(input=message.encode())
+                    elif os.path.exists("/usr/bin/xclip"):
+                        proc = subprocess.Popen(
+                            ["xclip", "-selection", "clipboard"],
+                            stdin=subprocess.PIPE,
+                            close_fds=True,
+                        )
+                        proc.communicate(input=message.encode())
+            except Exception:
+                pass  # Clipboard is best-effort
+
+        # Bring Terminal / iTerm2 to front using AppleScript (macOS only).
+        # We do NOT open a new window — we just activate whatever terminal the
+        # user already has open so they can paste the copied message.
+        if os.name == "posix" and os.path.exists("/usr/bin/osascript"):
+            # Prefer iTerm2 if running, fall back to Terminal.app
+            applescript = """
+tell application "System Events"
+    set iterm_running to (count of (processes whose name is "iTerm2")) > 0
+    set term_running  to (count of (processes whose name is "Terminal")) > 0
+end tell
+if iterm_running then
+    tell application "iTerm2" to activate
+else if term_running then
+    tell application "Terminal" to activate
+end if
+"""
+            subprocess.Popen(
+                ["osascript", "-e", applescript],
+                close_fds=True,
+            )
+
+        return {"success": True, "project_root": project_root}
+    except Exception as e:
+        logger.exception("Error in focus_session: %s", e)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

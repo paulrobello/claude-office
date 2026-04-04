@@ -66,6 +66,43 @@ class SummaryService:
         result = await self._call_with_retry(f"In 10 words or less, summarize this task:\n{desc}")
         return result or fallback
 
+    async def summarize_bubble_text(self, text: str, bubble_type: str = "thought") -> str:
+        """Summarize raw thinking/response text into a short human-readable bubble.
+
+        Args:
+            text: Raw transcript text (may be very technical/verbose).
+            bubble_type: "thought" for thinking blocks, "speech" for responses.
+
+        Returns:
+            A short (max ~60 chars) human-readable summary.
+        """
+        fallback = self._extract_first_sentence(text, max_len=60)
+
+        if not self.enabled or not self.client:
+            return fallback
+
+        truncated = text[:800] if len(text) > 800 else text
+
+        if bubble_type == "thought":
+            prompt = (
+                "You are summarizing what a coding AI agent is thinking. "
+                "In 8 words or less, describe what it's doing in simple terms. "
+                "Use present tense, no quotes. Examples: 'Reading the auth module', "
+                "'Planning database migration', 'Checking test results'.\n"
+                f"Thinking: {truncated}"
+            )
+        else:
+            prompt = (
+                "You are summarizing a coding AI agent's response. "
+                "In 8 words or less, describe what it said in simple terms. "
+                "Use past tense or present tense, no quotes. Examples: 'Fixed the login bug', "
+                "'Explaining the API design', 'Created 3 new test files'.\n"
+                f"Response: {truncated}"
+            )
+
+        result = await self._call_with_retry(prompt)
+        return result or fallback
+
     async def summarize_user_prompt(self, prompt: str) -> str:
         """Generate a summary of the user's prompt for marquee display."""
         if not prompt:
