@@ -1,0 +1,10 @@
+name: Linear Check
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+jobs:
+  linear-issue:
+    uses: Tesseron-Chile/shared-workflows/.github/workflows/linear-pr.yml@main
+    secrets: inherit
