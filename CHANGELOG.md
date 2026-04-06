@@ -2,6 +2,21 @@
 
 All notable changes to Claude Office Visualizer are documented here.
 
+## [0.14.0] - 2026-04-06
+
+### Added
+
+- **Pluralization Support (i18n)**: Translation system now supports singular/plural forms via `_one`/`_other` key suffixes. When `t()` is called with a `count` parameter, the correct plural form is automatically selected.
+- **Star History Chart**: README now includes a Star History chart showing repository growth over time.
+
+### Changed
+
+- **Consolidated event-type-styles**: Replaced two separate 11-case switch statements with a single `EVENT_TYPE_STYLES` map. Adding new event types now requires only one entry instead of updating two switches.
+
+### Fixed
+
+- **Grammar in count displays**: "1 events" now correctly shows as "1 event" across all locales (en, pt-BR, es).
+
 ## [0.13.0] - 2026-04-02
 
 ### Added

@@ -36,6 +36,11 @@ The application was built with [Next.js](https://nextjs.org/), [PixiJS](https://
 
 ## What's New
 
+### v0.14.0 (April 2026)
+
+- **Pluralization Support (i18n)**: Count-based translations now correctly display singular/plural forms (e.g., "1 event" vs "5 events") in all supported languages
+- **Star History Chart**: Repository growth visualization added to README
+
 ### v0.13.0 (April 2026)
 
 - **Multi-Language Support (i18n)**: Full internationalization with English, Portuguese (BR), and Spanish. Language selector in Settings — preference persists across sessions
