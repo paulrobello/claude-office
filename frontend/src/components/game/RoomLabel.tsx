@@ -23,21 +23,15 @@ export function RoomLabel({
 }: RoomLabelProps): ReactNode {
   const colorHex = parseInt(color.slice(1), 16);
 
-  // Match OfficeBackground wall width (+40px, offset -20)
-  const barWidth = CANVAS_WIDTH + 40;
-  const barX = -20;
-
   const drawBar = useCallback(
     (g: PixiGraphics) => {
       g.clear();
-      // Color bar background (matches wall width)
-      g.rect(barX, 0, barWidth, 40);
+      g.rect(0, 0, CANVAS_WIDTH, 40);
       g.fill({ color: colorHex, alpha: 0.25 });
-      // Color accent line at top
-      g.rect(barX, 0, barWidth, 5);
+      g.rect(0, 0, CANVAS_WIDTH, 5);
       g.fill(colorHex);
     },
-    [colorHex, barWidth, barX]
+    [colorHex]
   );
 
   const nameStyle = useMemo(
@@ -64,11 +58,11 @@ export function RoomLabel({
   return (
     <pixiContainer>
       <pixiGraphics draw={drawBar} />
-      <pixiText text={name} style={nameStyle} x={barX + 16} y={8} />
+      <pixiText text={name} style={nameStyle} x={16} y={8} />
       <pixiText
         text={`${agentCount}a · ${sessionCount}s`}
         style={countStyle}
-        x={barX + barWidth - 16}
+        x={CANVAS_WIDTH - 16}
         y={12}
         anchor={{ x: 1, y: 0 }}
       />

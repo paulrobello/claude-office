@@ -98,19 +98,17 @@ export function OfficeBackground({
   }, [effectiveHeight]);
 
   // Stable reference for wall drawing
-  // Draw slightly wider (+40px) to ensure wall covers all furniture at edges
-  const wallWidth = CANVAS_WIDTH + 40;
   const drawWallsCallback = useCallback(
     (g: Graphics) => {
       g.clear();
-      g.rect(-20, WALL_HEIGHT, wallWidth, effectiveHeight - WALL_HEIGHT);
+      g.rect(0, WALL_HEIGHT, CANVAS_WIDTH, effectiveHeight - WALL_HEIGHT);
       g.fill(FLOOR_COLOR);
-      g.rect(-20, 0, wallWidth, WALL_HEIGHT);
+      g.rect(0, 0, CANVAS_WIDTH, WALL_HEIGHT);
       g.fill(WALL_COLOR);
-      g.rect(-20, WALL_HEIGHT - WALL_TRIM_HEIGHT, wallWidth, WALL_TRIM_HEIGHT);
+      g.rect(0, WALL_HEIGHT - WALL_TRIM_HEIGHT, CANVAS_WIDTH, WALL_TRIM_HEIGHT);
       g.fill(WALL_TRIM_COLOR);
     },
-    [effectiveHeight, wallWidth],
+    [effectiveHeight],
   );
 
   return (
