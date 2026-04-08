@@ -82,7 +82,8 @@ export function OfficeRoom({ textures }: OfficeRoomProps): ReactNode {
   const isElevatorOpen = isRoom ? false : elevatorState === "open";
 
   const agentCount = isRoom ? roomCtx.project.agents.length : storeAgents.size;
-  const deskCount = Math.max(8, Math.ceil(agentCount / 4) * 4);
+  // In overview mode, use fixed 8 desks for consistent room sizing
+  const deskCount = isRoom ? 8 : Math.max(8, Math.ceil(agentCount / 4) * 4);
   const canvasHeight = getCanvasHeight(deskCount);
 
   const occupiedDesks = useMemo(() => {

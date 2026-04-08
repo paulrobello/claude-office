@@ -311,6 +311,20 @@ class EventProcessor:
         if not self.sessions:
             return None
 
+        # Lazy-register any sessions not yet in the registry
+        for session_id in self.sessions:
+            if not self.project_registry.get_project_for_session(session_id):
+                async with AsyncSessionLocal() as db:
+                    result = await db.execute(
+                        select(SessionRecord.project_name, SessionRecord.project_root)
+                        .where(SessionRecord.id == session_id)
+                    )
+                    row = result.one_or_none()
+                    if row and row.project_name:
+                        self.project_registry.register_session(
+                            session_id, row.project_name, row.project_root
+                        )
+
         # Group sessions by project
         project_sessions: dict[str, list[tuple[str, StateMachine]]] = {}
         for session_id, sm in self.sessions.items():
