@@ -19,7 +19,7 @@ import {
   Sprite,
   Application as PixiApplication,
 } from "pixi.js";
-import { useMemo, useEffect, useRef, useState, useCallback, type ReactNode } from "react";
+import { useMemo, useEffect, useRef, useCallback, type ReactNode } from "react";
 import {
   TransformWrapper,
   TransformComponent,
@@ -273,35 +273,61 @@ export function OfficeGame(): ReactNode {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [debugMode]);
 
-  // Track container size for fit-to-view scaling (must be before fitScale useEffect)
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  // ---- Fit-to-view scaling ----
+  // Automatically fit the canvas inside the container on mount, view switch,
+  // and resize — but stop auto-fitting once the user manually zooms.
+  const userHasZoomed = useRef(false);
+  const lastAppliedScale = useRef(0);
+
+  // Reset userHasZoomed when viewMode changes
+  useEffect(() => {
+    userHasZoomed.current = false;
+    lastAppliedScale.current = 0;
+  }, [viewMode]);
+
+  // Compute fitScale and apply via centerView
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const observer = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      setContainerSize({ width, height });
-    });
+
+    const applyFitScale = () => {
+      if (userHasZoomed.current) return;
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+      if (cw === 0 || ch === 0) return;
+
+      // Use actual canvas CSS size (autoDensity makes it larger than appWidth/appHeight)
+      const canvasEl = container.querySelector('canvas');
+      const canvasW = canvasEl?.clientWidth || appWidth;
+      const canvasH = canvasEl?.clientHeight || appHeight;
+      const scale = Math.min(cw / canvasW, ch / canvasH, 1);
+      if (Math.abs(scale - lastAppliedScale.current) < 0.01) return;
+      lastAppliedScale.current = scale;
+      transformRef.current?.centerView(scale, 0);
+      setTimeout(() => {
+        transformRef.current?.centerView(scale, 0);
+      }, 200);
+    };
+
+    // Wait for PixiJS canvas to be ready (check periodically)
+    let attempts = 0;
+    const waitForCanvas = setInterval(() => {
+      attempts++;
+      const canvas = container.querySelector('canvas');
+      if ((canvas && canvas.width > 150) || attempts > 20) {
+        clearInterval(waitForCanvas);
+        applyFitScale();
+      }
+    }, 100);
+
+    const observer = new ResizeObserver(() => applyFitScale());
     observer.observe(container);
-    return () => observer.disconnect();
-  }, []);
 
-  // Compute scale to fit canvas within container (use shorter dimension)
-  const fitScale = useMemo(() => {
-    if (containerSize.width === 0 || containerSize.height === 0) return 1;
-    return Math.min(containerSize.width / appWidth, containerSize.height / appHeight, 1);
-  }, [appWidth, appHeight, containerSize]);
-
-  // Apply fit scale whenever it changes
-  const fitScaleRef = useRef(fitScale);
-  useEffect(() => {
-    fitScaleRef.current = fitScale;
-    // Small delay to ensure TransformWrapper is ready after render
-    const timer = setTimeout(() => {
-      transformRef.current?.centerView(fitScale, 0);
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [fitScale]);
+    return () => {
+      clearInterval(waitForCanvas);
+      observer.disconnect();
+    };
+  }, [appWidth, appHeight, viewMode]);
 
   const handleSessionRoomClick = useCallback((sessionId: string) => {
     window.dispatchEvent(new CustomEvent("office:select-session", { detail: { sessionId } }));
@@ -322,10 +348,28 @@ export function OfficeGame(): ReactNode {
     useProjectStore.getState().setViewMode("office");
   }, [projects]);
 
+  // Double-click resets to fit scale
+  const handleDoubleClick = useCallback(() => {
+    userHasZoomed.current = false;
+    lastAppliedScale.current = 0;
+    const container = containerRef.current;
+    if (!container) return;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    if (cw === 0 || ch === 0) return;
+    const canvasEl = container.querySelector('canvas');
+    const canvasW = canvasEl?.clientWidth || appWidth;
+    const canvasH = canvasEl?.clientHeight || appHeight;
+    const scale = Math.min(cw / canvasW, ch / canvasH, 1);
+    lastAppliedScale.current = scale;
+    transformRef.current?.centerView(scale, 200);
+  }, [appWidth, appHeight]);
+
   return (
     <div
       ref={containerRef}
       className="w-full h-full flex items-center justify-center overflow-hidden relative"
+      onDoubleClick={handleDoubleClick}
     >
       <TransformWrapper
         ref={transformRef}
@@ -334,14 +378,18 @@ export function OfficeGame(): ReactNode {
         maxScale={3}
         wheel={{ step: 0.1 }}
         pinch={{ step: 5 }}
-        doubleClick={{ mode: "reset" }}
+        doubleClick={{ disabled: true }}
+        centerZoomedOut={false}
+        limitToBounds={false}
+        onWheel={() => { userHasZoomed.current = true; }}
+        onPinching={() => { userHasZoomed.current = true; }}
       >
         <ZoomControls />
         <TransformComponent
           wrapperClass="w-full h-full"
-          contentClass="w-full h-full flex items-center justify-center"
+          contentClass=""
         >
-          <div className="pixi-canvas-container w-full h-full flex items-center justify-center">
+          <div className="pixi-canvas-container">
             <Application
               key={`pixi-app-${hmrVersion}-${viewMode}`}
               width={appWidth}
