@@ -57,7 +57,7 @@ const LABEL_H_FULL = 42;
 
 export function getMultiRoomCanvasSize(
   projectCount: number,
-  fullRoomHeight: number = 1066, // getCanvasHeight(8)
+  fullRoomHeight: number = 1166, // getCanvasHeight(8) + 100 for boss overflow
   fullRoomWidth: number = 1280,
 ) {
   const cols = Math.min(projectCount, ROOM_GRID_COLS);

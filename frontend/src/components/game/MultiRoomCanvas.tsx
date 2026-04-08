@@ -22,8 +22,8 @@ import {
 import { CANVAS_WIDTH, getCanvasHeight } from "@/constants/canvas";
 import type { OfficeTextures } from "@/hooks/useOfficeTextures";
 
-/** Room height at full scale (8 desks minimum). */
-const FULL_ROOM_H = getCanvasHeight(8);
+/** Room height at full scale. Add extra 100px for boss area bottom overflow. */
+const FULL_ROOM_H = getCanvasHeight(8) + 100;
 
 /** Label height at full scale (inside the scaled container). Tight to room. */
 const LABEL_H = 42;
