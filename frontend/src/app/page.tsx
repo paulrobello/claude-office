@@ -33,6 +33,8 @@ import {
 import Modal from "@/components/overlay/Modal";
 import SettingsModal from "@/components/overlay/SettingsModal";
 import { usePreferencesStore } from "@/stores/preferencesStore";
+import { useProjectStore, selectViewMode } from "@/stores/projectStore";
+import { useProjectWebSocket } from "@/hooks/useProjectWebSocket";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { Session } from "@/hooks/useSessions";
 
@@ -53,6 +55,17 @@ const OfficeGame = dynamic(
   () =>
     import("@/components/game/OfficeGame").then((m) => ({
       default: m.OfficeGame,
+    })),
+  {
+    ssr: false,
+    loading: () => <LoadingFallback />,
+  },
+);
+
+const ProjectRoomGrid = dynamic(
+  () =>
+    import("@/components/game/ProjectRoomGrid").then((m) => ({
+      default: m.ProjectRoomGrid,
     })),
   {
     ssr: false,
@@ -114,6 +127,13 @@ export default function V2TestPage(): React.ReactNode {
     handleSimulate,
     handleReset,
   } = useSessionSwitch({ sessionId, setSessionId, fetchSessions, showStatus });
+
+  // ------------------------------------------------------------------
+  // Multi-project state
+  // ------------------------------------------------------------------
+  useProjectWebSocket();
+  const viewMode = useProjectStore(selectViewMode);
+  const setViewMode = useProjectStore((s) => s.setViewMode);
 
   // ------------------------------------------------------------------
   // Store subscriptions
@@ -404,7 +424,28 @@ export default function V2TestPage(): React.ReactNode {
           />
 
           <div className="flex-grow border border-slate-800 rounded-lg shadow-2xl bg-slate-900 overflow-hidden relative">
-            <OfficeGame />
+            {/* View Mode Toggle */}
+            <div className="absolute top-2 left-2 z-10 flex gap-1 bg-slate-800/80 rounded-md p-0.5 backdrop-blur-sm">
+              {(["all-merged", "overview"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`px-2 py-1 text-xs rounded transition-colors ${
+                    viewMode === mode
+                      ? "bg-purple-600 text-white"
+                      : "text-slate-400 hover:text-white hover:bg-slate-700"
+                  }`}
+                >
+                  {mode === "all-merged" ? "Office" : "Projects"}
+                </button>
+              ))}
+            </div>
+
+            {viewMode === "overview" || viewMode === "room-detail" ? (
+              <ProjectRoomGrid />
+            ) : (
+              <OfficeGame />
+            )}
           </div>
 
           <RightSidebar />

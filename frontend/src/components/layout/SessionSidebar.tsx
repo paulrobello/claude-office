@@ -12,6 +12,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { ptBR as dateFnsPtBR, es as dateFnsEs } from "date-fns/locale";
 import { GitStatusPanel } from "@/components/game/GitStatusPanel";
+import { ProjectSidebar } from "@/components/layout/ProjectSidebar";
 import type { Session } from "@/hooks/useSessions";
 import { useDragResize } from "@/hooks/useDragResize";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -121,6 +122,11 @@ export function SessionSidebar({
 
       {!isCollapsed && (
         <>
+          {/* Project Groups */}
+          <div className="bg-slate-950 border border-slate-800 rounded-lg overflow-hidden flex-shrink-0">
+            <ProjectSidebar />
+          </div>
+
           {/* Session Browser */}
           <div
             className="bg-slate-950 border border-slate-800 rounded-lg overflow-hidden flex-shrink-0 flex flex-col"
