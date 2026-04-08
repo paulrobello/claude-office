@@ -78,6 +78,24 @@ class TaskRecord(Base):
     )
 
 
+class AgentSeatPreference(Base):
+    """Persists agent desk/color assignments across reconnects."""
+
+    __tablename__ = "agent_seat_preferences"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String, index=True)
+    agent_id: Mapped[str] = mapped_column(String, index=True)
+    desk: Mapped[int] = mapped_column()
+    color: Mapped[str] = mapped_column(String)
+    room_key: Mapped[str] = mapped_column(String)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+
+
 class UserPreference(Base):
     """Database model for user preferences.
 
