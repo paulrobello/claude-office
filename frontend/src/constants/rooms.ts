@@ -53,7 +53,7 @@ export const ROOM_LABEL_HEIGHT = 24;
  * scaled by ROOM_SCALE, plus gaps and label space.
  */
 /** Label height inside the scaled container (full-scale pixels). */
-const LABEL_H_FULL = 50;
+const LABEL_H_FULL = 42;
 
 export function getMultiRoomCanvasSize(
   projectCount: number,

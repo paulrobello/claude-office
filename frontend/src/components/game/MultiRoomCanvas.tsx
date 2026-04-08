@@ -25,8 +25,8 @@ import type { OfficeTextures } from "@/hooks/useOfficeTextures";
 /** Room height at full scale (8 desks minimum). */
 const FULL_ROOM_H = getCanvasHeight(8);
 
-/** Label height at full scale (inside the scaled container). */
-const LABEL_H = 50;
+/** Label height at full scale (inside the scaled container). Tight to room. */
+const LABEL_H = 42;
 
 /** Calculate the x,y position for a room cell (including label) at the given index. */
 export function getRoomPosition(index: number) {
