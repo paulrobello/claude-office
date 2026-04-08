@@ -231,7 +231,7 @@ export function OfficeGame(): ReactNode {
       <TransformWrapper
         ref={transformRef}
         initialScale={1}
-        minScale={1}
+        minScale={0.3}
         maxScale={3}
         wheel={{ step: 0.1 }}
         pinch={{ step: 5 }}

@@ -208,8 +208,8 @@ class EventProcessor:
         all_agents: list[Agent] = []
         all_arrival_queue: list[str] = []
         all_departure_queue: list[str] = []
-        total_desk_count = 0
-        latest_updated = datetime.min.replace(tzinfo=UTC)
+        next_desk = 1  # Global compact desk counter
+        latest_updated: datetime | None = None
         all_todos: list[TodoItem] = []
         all_conversation: list[ConversationEntry] = []
         active_session_ids: list[str] = []
@@ -236,32 +236,36 @@ class EventProcessor:
                 id=f"{short_id}:boss",
                 name=state.boss.current_task or short_id,
                 color=colors[idx % len(colors)],
-                number=total_desk_count + 1,
+                number=next_desk,
                 state=boss_agent_state,
-                desk=total_desk_count + 1,
+                desk=next_desk,
                 current_task=state.boss.current_task,
                 bubble=state.boss.bubble,
             )
             all_agents.append(boss_as_agent)
+            next_desk += 1
 
-            # Namespace all agents from this session
+            # Namespace all agents from this session with compact desk numbers
             for agent in state.agents:
                 namespaced = agent.model_copy(update={
                     "id": f"{short_id}:{agent.id}",
-                    "desk": (agent.desk or 0) + total_desk_count + 1,
-                    "number": (agent.number or 0) + total_desk_count + 1,
+                    "desk": next_desk,
+                    "number": next_desk,
                 })
                 all_agents.append(namespaced)
+                next_desk += 1
 
-            # Namespace queues
+            # Only carry over agents that are actually arriving/departing
+            arriving_agents = {a.id for a in state.agents if a.state == AgentState.ARRIVING}
+            departing_agents = {a.id for a in state.agents if a.state == AgentState.COMPLETED}
             for aid in state.arrival_queue:
-                all_arrival_queue.append(f"{short_id}:{aid}")
+                if aid in arriving_agents:
+                    all_arrival_queue.append(f"{short_id}:{aid}")
             for aid in state.departure_queue:
-                all_departure_queue.append(f"{short_id}:{aid}")
+                if aid in departing_agents:
+                    all_departure_queue.append(f"{short_id}:{aid}")
 
-            total_desk_count += state.office.desk_count or 8
-
-            if state.last_updated > latest_updated:
+            if latest_updated is None or state.last_updated > latest_updated:
                 latest_updated = state.last_updated
 
             all_todos.extend(state.todos)
@@ -275,7 +279,7 @@ class EventProcessor:
         )
 
         merged_office = OfficeState(
-            desk_count=max(8, total_desk_count),
+            desk_count=max(8, ((next_desk - 1 + 3) // 4) * 4),
             elevator_state=ElevatorState.CLOSED,
             phone_state=PhoneState.IDLE,
             context_utilization=0.0,
@@ -288,7 +292,7 @@ class EventProcessor:
             boss=merged_boss,
             agents=all_agents,
             office=merged_office,
-            last_updated=latest_updated if latest_updated.tzinfo else datetime.now(UTC),
+            last_updated=latest_updated or datetime.now(UTC),
             todos=all_todos,
             arrival_queue=all_arrival_queue,
             departure_queue=all_departure_queue,
