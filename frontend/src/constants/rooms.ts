@@ -54,7 +54,7 @@ export const ROOM_LABEL_HEIGHT = 24;
  */
 export function getMultiRoomCanvasSize(
   projectCount: number,
-  fullRoomHeight: number = 1024,
+  fullRoomHeight: number = 1066, // getCanvasHeight(8) = 432 + 2*192 + 250
   fullRoomWidth: number = 1280,
 ) {
   const cols = Math.min(projectCount, ROOM_GRID_COLS);

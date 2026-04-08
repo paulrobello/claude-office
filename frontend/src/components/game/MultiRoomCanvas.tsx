@@ -19,15 +19,18 @@ import {
   ROOM_GRID_COLS,
   ROOM_LABEL_HEIGHT,
 } from "@/constants/rooms";
-import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/constants/canvas";
+import { CANVAS_WIDTH, getCanvasHeight } from "@/constants/canvas";
 import type { OfficeTextures } from "@/hooks/useOfficeTextures";
 
+/** Default room height — 8 desks (the minimum desk count). */
+const DEFAULT_ROOM_HEIGHT = getCanvasHeight(8);
+
 /** Calculate the x,y position for a room at the given index. */
-export function getRoomPosition(index: number) {
+export function getRoomPosition(index: number, roomHeight: number = DEFAULT_ROOM_HEIGHT) {
   const col = index % ROOM_GRID_COLS;
   const row = Math.floor(index / ROOM_GRID_COLS);
   const scaledW = CANVAS_WIDTH * ROOM_SCALE;
-  const scaledH = CANVAS_HEIGHT * ROOM_SCALE;
+  const scaledH = roomHeight * ROOM_SCALE;
   return {
     x: ROOM_GAP + col * (scaledW + ROOM_GAP),
     y: ROOM_GAP + ROOM_LABEL_HEIGHT + row * (scaledH + ROOM_LABEL_HEIGHT + ROOM_GAP),
