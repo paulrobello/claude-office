@@ -62,17 +62,6 @@ const OfficeGame = dynamic(
   },
 );
 
-const ProjectRoomGrid = dynamic(
-  () =>
-    import("@/components/game/ProjectRoomGrid").then((m) => ({
-      default: m.ProjectRoomGrid,
-    })),
-  {
-    ssr: false,
-    loading: () => <LoadingFallback />,
-  },
-);
-
 // ============================================================================
 // PAGE COMPONENT
 // ============================================================================
@@ -441,11 +430,7 @@ export default function V2TestPage(): React.ReactNode {
               ))}
             </div>
 
-            {viewMode === "overview" || viewMode === "room-detail" ? (
-              <ProjectRoomGrid />
-            ) : (
-              <OfficeGame />
-            )}
+            <OfficeGame />
           </div>
 
           <RightSidebar />

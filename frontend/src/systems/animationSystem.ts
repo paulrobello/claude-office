@@ -435,9 +435,11 @@ import { useEffect } from "react";
  * React hook to start/stop the animation system.
  * Should be called from the main game component.
  */
-export function useAnimationSystem(): void {
+export function useAnimationSystem(options?: { enabled?: boolean }): void {
+  const enabled = options?.enabled ?? true;
   useEffect(() => {
+    if (!enabled) return;
     animationSystem.start();
     return () => animationSystem.stop();
-  }, []);
+  }, [enabled]);
 }

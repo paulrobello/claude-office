@@ -46,6 +46,10 @@ import {
 import { useAnimationSystem } from "@/systems/animationSystem";
 import { useCompactionAnimation } from "@/systems/compactionAnimation";
 import { useOfficeTextures } from "@/hooks/useOfficeTextures";
+import { useProjectStore, selectViewMode, selectProjects } from "@/stores/projectStore";
+import { getMultiRoomCanvasSize } from "@/constants/rooms";
+import { MultiRoomCanvas } from "./MultiRoomCanvas";
+import { OfficeRoom } from "./OfficeRoom";
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
@@ -109,11 +113,15 @@ export function OfficeGame(): ReactNode {
   // HMR version for forcing remount
   const hmrVersion = getHmrVersion();
 
+  // Multi-project view state
+  const viewMode = useProjectStore(selectViewMode);
+  const projects = useProjectStore(selectProjects);
+
   // Load all office textures
   const { textures, loaded: spritesLoaded } = useOfficeTextures();
 
-  // Start animation system
-  useAnimationSystem();
+  // Start animation system (disabled in overview mode — agents use static poses)
+  useAnimationSystem({ enabled: viewMode === "all-merged" });
 
   // Cleanup on unmount (HMR or navigation)
   useEffect(() => {
@@ -185,6 +193,14 @@ export function OfficeGame(): ReactNode {
   // Dynamic canvas height based on desk count
   const canvasHeight = useMemo(() => getCanvasHeight(deskCount), [deskCount]);
 
+  // Canvas dimensions for multi-room view
+  const multiRoomSize = useMemo(
+    () => getMultiRoomCanvasSize(Math.max(1, projects.length)),
+    [projects.length]
+  );
+  const appWidth = viewMode === "overview" ? multiRoomSize.width : CANVAS_WIDTH;
+  const appHeight = viewMode === "overview" ? multiRoomSize.height : canvasHeight;
+
   // Desk positions for Y-sorted rendering
   const deskPositions = useDeskPositions(deskCount, occupiedDesks);
 
@@ -248,9 +264,9 @@ export function OfficeGame(): ReactNode {
         >
           <div className="pixi-canvas-container w-full h-full flex items-center justify-center">
             <Application
-              key={`pixi-app-${hmrVersion}`}
-              width={CANVAS_WIDTH}
-              height={canvasHeight}
+              key={`pixi-app-${hmrVersion}-${viewMode}`}
+              width={appWidth}
+              height={appHeight}
               backgroundColor={BACKGROUND_COLOR}
               autoDensity={true}
               resolution={
@@ -264,7 +280,11 @@ export function OfficeGame(): ReactNode {
               {!spritesLoaded && <LoadingScreen />}
 
               {/* Office content - hidden while loading */}
-              {spritesLoaded && (
+              {spritesLoaded && viewMode === "overview" && (
+                <MultiRoomCanvas textures={textures} />
+              )}
+
+              {spritesLoaded && viewMode !== "overview" && (
                 <>
                   {/* Floor and walls */}
                   <OfficeBackground floorTileTexture={textures.floorTile} canvasHeight={canvasHeight} />
