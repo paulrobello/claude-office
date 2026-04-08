@@ -54,6 +54,10 @@ const ptBR: Record<TranslationKey, string> = {
   "settings.clockTip":
     "Dica: Clique no relógio do escritório para alternar rapidamente entre os modos.",
   "settings.language": "Idioma",
+  "settings.theme": "Tema",
+  "settings.light": "Claro",
+  "settings.dark": "Escuro",
+  "settings.system": "Sistema",
 
   // Sessions
   "sessions.title": "Sessões",
