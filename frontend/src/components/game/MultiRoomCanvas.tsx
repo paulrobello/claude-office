@@ -2,12 +2,13 @@
  * MultiRoomCanvas - Renders multiple OfficeRoom instances in a 2-column grid.
  *
  * Each room is wrapped in a RoomProvider and rendered at ROOM_SCALE
- * with a RoomLabel above it.
+ * with a RoomLabel above it. Rooms are separated by visible corridors.
  */
 
 "use client";
 
-import { type ReactNode } from "react";
+import { useCallback, type ReactNode } from "react";
+import { Graphics as PixiGraphics } from "pixi.js";
 import { useShallow } from "zustand/react/shallow";
 import { useProjectStore, selectProjects } from "@/stores/projectStore";
 import { RoomProvider } from "@/contexts/RoomContext";
@@ -31,7 +32,6 @@ const LABEL_H = 50;
 export function getRoomPosition(index: number) {
   const col = index % ROOM_GRID_COLS;
   const row = Math.floor(index / ROOM_GRID_COLS);
-  // Each cell = label + room, all at ROOM_SCALE
   const cellW = CANVAS_WIDTH * ROOM_SCALE;
   const cellH = (FULL_ROOM_H + LABEL_H) * ROOM_SCALE;
   return {
@@ -59,14 +59,14 @@ export function MultiRoomCanvas({
         const pos = getRoomPosition(index);
         return (
           <pixiContainer key={project.key} x={pos.x} y={pos.y} scale={ROOM_SCALE}>
-            {/* Label at top (full-scale coordinates inside the scaled container) */}
+            {/* Label at top */}
             <RoomLabel
               name={project.name}
               color={project.color}
               agentCount={project.agents.length}
               sessionCount={project.sessionCount}
             />
-            {/* Room content pushed down by label height */}
+            {/* Room content below label */}
             <pixiContainer y={LABEL_H}>
               <RoomProvider project={project}>
                 <OfficeRoom textures={textures} />

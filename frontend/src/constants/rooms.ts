@@ -2,8 +2,8 @@
 export const ROOM_WIDTH = 640;
 export const ROOM_HEIGHT = 512;
 
-/** Gap between rooms in grid */
-export const ROOM_GAP = 16;
+/** Gap between rooms in grid (corridor width) */
+export const ROOM_GAP = 40;
 
 /** Max columns in overview grid */
 export const ROOM_GRID_COLS = 2;
