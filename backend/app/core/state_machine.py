@@ -153,6 +153,7 @@ class StateMachine:
     boss_current_task: str | None = None  # Summarized user prompt
     elevator_state: ElevatorState = ElevatorState.CLOSED
     agents: dict[str, Agent] = field(default_factory=_empty_agents)
+    departed_agents: dict[str, tuple[Agent, float]] = field(default_factory=dict)
     arrival_queue: list[str] = field(default_factory=_empty_str_list)
     handin_queue: list[str] = field(default_factory=_empty_str_list)
     history: list[HistoryEntry] = field(default_factory=_empty_history_list)
@@ -283,7 +284,10 @@ class StateMachine:
 
         desk_count = min(self.MAX_AGENTS, max(8, ((len(self.agents) + 3) // 4) * 4))
 
-        agents_list: list[Agent] = list(self.agents.values())
+        self._cleanup_departed()
+        agents_list: list[Agent] = list(self.agents.values()) + [
+            a for a, _ in self.departed_agents.values()
+        ]
 
         total_tokens = self.total_input_tokens + self.total_output_tokens
         context_utilization = min(1.0, total_tokens / self.MAX_CONTEXT_TOKENS)
@@ -331,14 +335,33 @@ class StateMachine:
             conversation=self.conversation.copy(),
         )
 
+    DEPARTED_TTL = 60.0  # seconds to keep departed agents visible
+
     def remove_agent(self, agent_id: str) -> None:
-        """Remove an agent from the office and all queues."""
+        """Move agent to departed_agents (kept for 60s) and remove from queues."""
+        import time
+
         if agent_id in self.agents:
-            del self.agents[agent_id]
+            agent = self.agents.pop(agent_id)
+            agent.state = AgentState.LEAVING
+            self.departed_agents[agent_id] = (agent, time.monotonic())
         if agent_id in self.arrival_queue:
             self.arrival_queue.remove(agent_id)
         if agent_id in self.handin_queue:
             self.handin_queue.remove(agent_id)
+        self._cleanup_departed()
+
+    def _cleanup_departed(self) -> None:
+        """Remove agents that departed more than DEPARTED_TTL seconds ago."""
+        import time
+
+        now = time.monotonic()
+        expired = [
+            aid for aid, (_, ts) in self.departed_agents.items()
+            if now - ts > self.DEPARTED_TTL
+        ]
+        for aid in expired:
+            del self.departed_agents[aid]
 
     def _extract_token_usage_from_jsonl(self, transcript_path: str) -> dict[str, int] | None:
         """Extract the latest token usage from a Claude JSONL transcript file."""
