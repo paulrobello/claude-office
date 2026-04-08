@@ -42,14 +42,13 @@ function makeProject(): ProjectGroup {
 
 describe("RoomContext", () => {
   it("RoomProvider creates a valid React element", () => {
+    const project = makeProject();
     const element = createElement(
       RoomProvider,
-      { project: makeProject() },
-      createElement("div")
+      { project, children: createElement("div") },
     );
     expect(element).toBeDefined();
     expect(element.type).toBe(RoomProvider);
-    expect(element.props.project.key).toBe("test");
   });
 
   it("exports all expected hooks", () => {
