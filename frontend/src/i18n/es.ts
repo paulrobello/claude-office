@@ -76,6 +76,9 @@ const es: Record<TranslationKey, string> = {
   "sidebar.wholeOffice": "Toda la Oficina",
   "sidebar.allProjects": "Todos los Proyectos",
   "sidebar.allSessions": "Todas las Sesiones",
+  "sidebar.tab.office": "Oficina",
+  "sidebar.tab.projects": "Proyectos",
+  "sidebar.tab.sessions": "Sesiones",
 
   // Right Sidebar
   "sidebar.events": "Eventos",

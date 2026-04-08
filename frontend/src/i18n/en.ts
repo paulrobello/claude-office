@@ -74,6 +74,9 @@ const en = {
   "sidebar.wholeOffice": "Whole Office",
   "sidebar.allProjects": "All Projects",
   "sidebar.allSessions": "All Sessions",
+  "sidebar.tab.office": "Office",
+  "sidebar.tab.projects": "Projects",
+  "sidebar.tab.sessions": "Sessions",
 
   // Right Sidebar
   "sidebar.events": "Events",

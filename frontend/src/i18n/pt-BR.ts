@@ -76,6 +76,9 @@ const ptBR: Record<TranslationKey, string> = {
   "sidebar.wholeOffice": "Escritório Completo",
   "sidebar.allProjects": "Todos os Projetos",
   "sidebar.allSessions": "Todas as Sessões",
+  "sidebar.tab.office": "Escritório",
+  "sidebar.tab.projects": "Projetos",
+  "sidebar.tab.sessions": "Sessões",
 
   // Right Sidebar
   "sidebar.events": "Eventos",
