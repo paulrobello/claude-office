@@ -30,7 +30,7 @@ export function getRoomPosition(index: number) {
   const scaledH = CANVAS_HEIGHT * ROOM_SCALE;
   return {
     x: ROOM_GAP + col * (scaledW + ROOM_GAP),
-    y: ROOM_GAP + row * (scaledH + ROOM_LABEL_HEIGHT + ROOM_GAP),
+    y: ROOM_GAP + ROOM_LABEL_HEIGHT + row * (scaledH + ROOM_LABEL_HEIGHT + ROOM_GAP),
   };
 }
 

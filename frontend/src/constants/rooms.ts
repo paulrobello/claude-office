@@ -65,6 +65,6 @@ export function getMultiRoomCanvasSize(
     cols,
     rows,
     width: ROOM_GAP + cols * (scaledW + ROOM_GAP),
-    height: ROOM_GAP + rows * (scaledH + ROOM_LABEL_HEIGHT + ROOM_GAP),
+    height: ROOM_GAP + ROOM_LABEL_HEIGHT + rows * (scaledH + ROOM_LABEL_HEIGHT + ROOM_GAP),
   };
 }

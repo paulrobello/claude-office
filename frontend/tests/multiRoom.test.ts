@@ -10,15 +10,15 @@ function getRoomPosition(index: number) {
   const scaledH = CANVAS_HEIGHT * ROOM_SCALE;
   return {
     x: ROOM_GAP + col * (scaledW + ROOM_GAP),
-    y: ROOM_GAP + row * (scaledH + ROOM_LABEL_HEIGHT + ROOM_GAP),
+    y: ROOM_GAP + ROOM_LABEL_HEIGHT + row * (scaledH + ROOM_LABEL_HEIGHT + ROOM_GAP),
   };
 }
 
 describe("getRoomPosition", () => {
-  it("first room is at top-left with padding", () => {
+  it("first room is at top-left with padding + label space", () => {
     const pos = getRoomPosition(0);
     expect(pos.x).toBe(ROOM_GAP);
-    expect(pos.y).toBe(ROOM_GAP);
+    expect(pos.y).toBe(ROOM_GAP + ROOM_LABEL_HEIGHT);
   });
 
   it("second room is to the right of first", () => {
@@ -33,7 +33,7 @@ describe("getRoomPosition", () => {
     const pos2 = getRoomPosition(2);
     expect(pos2.x).toBe(ROOM_GAP); // back to first column
     const scaledH = CANVAS_HEIGHT * ROOM_SCALE;
-    expect(pos2.y).toBe(ROOM_GAP + scaledH + ROOM_LABEL_HEIGHT + ROOM_GAP);
+    expect(pos2.y).toBe(ROOM_GAP + ROOM_LABEL_HEIGHT + scaledH + ROOM_LABEL_HEIGHT + ROOM_GAP);
   });
 
   it("fourth room is second col second row", () => {
