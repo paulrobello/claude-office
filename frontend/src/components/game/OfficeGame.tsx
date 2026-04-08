@@ -19,7 +19,7 @@ import {
   Sprite,
   Application as PixiApplication,
 } from "pixi.js";
-import { useMemo, useEffect, useRef, type ReactNode } from "react";
+import { useMemo, useEffect, useRef, useCallback, type ReactNode } from "react";
 import {
   TransformWrapper,
   TransformComponent,
@@ -281,7 +281,7 @@ export function OfficeGame(): ReactNode {
 
               {/* Office content - hidden while loading */}
               {spritesLoaded && viewMode === "overview" && (
-                <MultiRoomCanvas textures={textures} />
+                <MultiRoomCanvas textures={textures} rooms={projects} />
               )}
 
               {spritesLoaded && viewMode !== "overview" && (
