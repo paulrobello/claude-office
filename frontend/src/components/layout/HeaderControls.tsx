@@ -8,8 +8,13 @@ import {
   Trash2,
   HelpCircle,
   Settings,
+  UserX,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useTheme } from "next-themes";
 
 // ============================================================================
 // TYPES
@@ -22,6 +27,7 @@ interface HeaderControlsProps {
   onSimulate: () => Promise<void>;
   onReset: () => void;
   onClearDB: () => void;
+  onCleanupAgents: () => void;
   onToggleDebug: () => void;
   onOpenSettings: () => void;
   onOpenHelp: () => void;
@@ -44,11 +50,23 @@ export function HeaderControls({
   onSimulate,
   onReset,
   onClearDB,
+  onCleanupAgents,
   onToggleDebug,
   onOpenSettings,
   onOpenHelp,
 }: HeaderControlsProps): React.ReactNode {
   const { t } = useTranslation();
+  const { theme, setTheme } = useTheme();
+
+  const cycleTheme = () => {
+    if (theme === "light") setTheme("dark");
+    else if (theme === "dark") setTheme("system");
+    else setTheme("light");
+  };
+
+  const ThemeIcon = theme === "dark" ? Moon : theme === "light" ? Sun : Monitor;
+  const themeLabel = theme === "dark" ? "Dark" : theme === "light" ? "Light" : "System";
+
   return (
     <div className="flex gap-4 items-center">
       <button
@@ -76,6 +94,14 @@ export function HeaderControls({
       </button>
 
       <button
+        onClick={onCleanupAgents}
+        className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 border border-orange-500/30 rounded text-xs font-bold transition-colors"
+      >
+        <UserX size={14} />
+        {t("header.cleanupAgents")}
+      </button>
+
+      <button
         onClick={onToggleDebug}
         className={`flex items-center gap-2 px-3 py-1.5 border rounded text-xs font-bold transition-colors ${
           debugMode
@@ -85,6 +111,14 @@ export function HeaderControls({
       >
         <Bug size={14} />
         {debugMode ? t("header.debugOn") : t("header.debugOff")}
+      </button>
+
+      <button
+        onClick={cycleTheme}
+        className="flex items-center gap-2 px-3 py-1.5 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 border border-slate-500/30 rounded text-xs font-bold transition-colors"
+        title={`Theme: ${themeLabel}`}
+      >
+        <ThemeIcon size={14} />
       </button>
 
       <button
