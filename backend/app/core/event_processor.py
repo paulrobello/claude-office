@@ -301,6 +301,75 @@ class EventProcessor:
             conversation=all_conversation,
         )
 
+    async def get_project_grouped_state(self) -> "MultiProjectGameState | None":
+        """Build a MultiProjectGameState grouped by project."""
+        from app.models.projects import MultiProjectGameState, ProjectGroup
+
+        if not self.sessions:
+            return None
+
+        # Group sessions by project
+        project_sessions: dict[str, list[tuple[str, StateMachine]]] = {}
+        for session_id, sm in self.sessions.items():
+            project = self.project_registry.get_project_for_session(session_id)
+            key = project.key if project else "unknown"
+            if key not in project_sessions:
+                project_sessions[key] = []
+            project_sessions[key].append((session_id, sm))
+
+        groups: list[ProjectGroup] = []
+        latest_updated: datetime | None = None
+
+        for key, sessions in project_sessions.items():
+            project = self.project_registry.get_project(key)
+            color = project.color if project else "#888888"
+            name = project.name if project else "Unknown"
+            root = project.root if project else None
+
+            all_agents: list[Agent] = []
+            desk_num = 1
+            group_boss = Boss(state=BossState.IDLE)
+            all_todos: list[TodoItem] = []
+
+            for sid, sm in sessions:
+                state = sm.to_game_state(sid)
+
+                # First non-idle boss becomes the room boss
+                if group_boss.state == BossState.IDLE and state.boss.state != BossState.IDLE:
+                    group_boss = state.boss
+
+                for agent in state.agents:
+                    updated = agent.model_copy(update={
+                        "project_key": key,
+                        "session_id": sid,
+                        "desk": desk_num,
+                        "number": desk_num,
+                    })
+                    all_agents.append(updated)
+                    desk_num += 1
+
+                all_todos.extend(state.todos)
+
+                if latest_updated is None or state.last_updated > latest_updated:
+                    latest_updated = state.last_updated
+
+            groups.append(ProjectGroup(
+                key=key,
+                name=name,
+                color=color,
+                root=root,
+                agents=all_agents,
+                boss=group_boss,
+                session_count=len(sessions),
+                todos=all_todos,
+            ))
+
+        return MultiProjectGameState(
+            projects=groups,
+            office=OfficeState(),
+            last_updated=latest_updated or datetime.now(UTC),
+        )
+
     async def get_project_root(self, session_id: str) -> str | None:
         """Get the cached project_root for a session from the database.
 
