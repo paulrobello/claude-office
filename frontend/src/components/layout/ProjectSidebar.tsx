@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Layers } from "lucide-react";
 import {
   useProjectStore,
@@ -18,6 +18,18 @@ export function ProjectSidebar() {
   const activeRoomKey = useProjectStore(selectActiveRoomKey);
   const zoomToProjects = useProjectStore((s) => s.zoomToProjects);
   const zoomToProject = useProjectStore((s) => s.zoomToProject);
+
+  /** Click a project → switch to its session and zoom in */
+  const handleProjectClick = useCallback((project: ProjectGroup) => {
+    // Find the first agent's sessionId to switch session data
+    if (project.agents.length > 0) {
+      const sid = (project.agents[0] as Record<string, unknown>).sessionId as string | undefined;
+      if (sid) {
+        window.dispatchEvent(new CustomEvent("office:select-session", { detail: { sessionId: sid } }));
+      }
+    }
+    zoomToProject(project.key);
+  }, [zoomToProject]);
 
   if (projects.length === 0) return null;
 
@@ -52,7 +64,7 @@ export function ProjectSidebar() {
           key={project.key}
           project={project}
           isActive={viewMode === "project" && activeRoomKey === project.key}
-          onClickProject={() => zoomToProject(project.key)}
+          onClickProject={() => handleProjectClick(project)}
         />
       ))}
     </div>

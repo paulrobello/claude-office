@@ -152,11 +152,15 @@ export function OfficeGame(): ReactNode {
     });
   }, [projects, storeSessions]);
 
+  // Multi-room vs single-office rendering
+  // Singular modes ("project"/"session") render as single office using gameStore data
+  const isMultiRoom = viewMode === "projects" || viewMode === "sessions";
+
   // Load all office textures
   const { textures, loaded: spritesLoaded } = useOfficeTextures();
 
-  // Start animation system (disabled in overview mode — agents use static poses)
-  useAnimationSystem({ enabled: viewMode === "office" });
+  // Start animation system (disabled in multi-room mode — agents use static poses)
+  useAnimationSystem({ enabled: !isMultiRoom });
 
   // Cleanup on unmount (HMR or navigation)
   useEffect(() => {
@@ -229,13 +233,10 @@ export function OfficeGame(): ReactNode {
   const canvasHeight = useMemo(() => getCanvasHeight(deskCount), [deskCount]);
 
   // Canvas dimensions for multi-room view
-  const isMultiRoom = viewMode !== "office";
   const multiRoomRooms = useMemo(() => {
     if (viewMode === "sessions") return sessionRooms;
-    if (viewMode === "session") return sessionRooms.filter((r) => r.key === activeRoomKey);
-    if (viewMode === "project") return projects.filter((p) => p.key === activeRoomKey);
     return projects; // "projects" mode
-  }, [viewMode, sessionRooms, projects, activeRoomKey]);
+  }, [viewMode, sessionRooms, projects]);
   const multiRoomSize = useMemo(
     () => getMultiRoomCanvasSize(Math.max(1, multiRoomRooms.length)),
     [multiRoomRooms.length]

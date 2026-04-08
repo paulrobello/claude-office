@@ -49,11 +49,21 @@ export const useProjectStore = create<ProjectStoreState>((set) => ({
 
   setActiveRoom: (key) => set({ activeRoomKey: key }),
 
-  zoomToProject: (key) => set({ viewMode: "project", activeRoomKey: key }),
+  zoomToProject: (key) =>
+    set((state) => ({
+      previousViewMode: state.viewMode,
+      viewMode: "project",
+      activeRoomKey: key,
+    })),
 
   zoomToProjects: () => set({ viewMode: "projects", activeRoomKey: null }),
 
-  zoomToSession: (key) => set({ viewMode: "session", activeRoomKey: key }),
+  zoomToSession: (key) =>
+    set((state) => ({
+      previousViewMode: state.viewMode,
+      viewMode: "session",
+      activeRoomKey: key,
+    })),
 
   goBackToMultiRoom: () =>
     set((state) => ({
