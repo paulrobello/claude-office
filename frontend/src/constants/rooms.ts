@@ -3,7 +3,7 @@ export const ROOM_WIDTH = 640;
 export const ROOM_HEIGHT = 512;
 
 /** Gap between rooms in grid (corridor width) */
-export const ROOM_GAP = 40;
+export const ROOM_GAP = 24;
 
 /** Max columns in overview grid */
 export const ROOM_GRID_COLS = 2;
@@ -65,10 +65,11 @@ export function getMultiRoomCanvasSize(
   // Each cell = (room + label) * scale
   const cellW = fullRoomWidth * ROOM_SCALE;
   const cellH = (fullRoomHeight + LABEL_H_FULL) * ROOM_SCALE;
+  const edgePad = 8;
   return {
     cols,
     rows,
-    width: ROOM_GAP + cols * (cellW + ROOM_GAP),
-    height: ROOM_GAP + rows * (cellH + ROOM_GAP),
+    width: edgePad * 2 + cols * cellW + (cols - 1) * ROOM_GAP,
+    height: edgePad * 2 + rows * cellH + (rows - 1) * ROOM_GAP,
   };
 }
