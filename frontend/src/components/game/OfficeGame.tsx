@@ -322,7 +322,8 @@ export function OfficeGame(): ReactNode {
               key={`pixi-app-${hmrVersion}-${viewMode}`}
               width={appWidth}
               height={appHeight}
-              backgroundColor={BACKGROUND_COLOR}
+              backgroundColor={isMultiRoom ? 0x0e1726 : BACKGROUND_COLOR}
+              backgroundAlpha={isMultiRoom ? 0 : 1}
               autoDensity={true}
               resolution={
                 typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1
