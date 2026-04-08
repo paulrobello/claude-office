@@ -60,7 +60,7 @@ export default function SettingsModal({
       footer={
         <button
           onClick={onClose}
-          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold rounded-lg transition-colors"
+          className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-900 dark:text-white text-sm font-bold rounded-lg transition-colors"
         >
           {t("modal.close")}
         </button>
@@ -69,7 +69,7 @@ export default function SettingsModal({
       <div className="space-y-6">
         {/* Theme */}
         <div>
-          <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
+          <label className="block text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
             {t("settings.theme")}
           </label>
           <div
@@ -104,10 +104,10 @@ export default function SettingsModal({
                     buttons[nextIdx].focus();
                   }
                 }}
-                className={`flex-1 px-4 py-3 rounded-lg border text-sm font-bold transition-colors focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 outline-none ${
+                className={`flex-1 px-4 py-3 rounded-lg border text-sm font-bold transition-colors focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 outline-none ${
                   theme === value
                     ? "bg-purple-500/20 border-purple-500 text-purple-300"
-                    : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600"
+                    : "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-600"
                 }`}
               >
                 {t(`settings.${value}` as const)}
@@ -118,7 +118,7 @@ export default function SettingsModal({
 
         {/* Language */}
         <div>
-          <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
+          <label className="block text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
             {t("settings.language")}
           </label>
           <div
@@ -153,10 +153,10 @@ export default function SettingsModal({
                         (parent.children[next] as HTMLElement)?.focus();
                     }
                   }}
-                  className={`flex-1 px-4 py-3 rounded-lg border text-sm font-bold transition-colors focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 outline-none ${
+                  className={`flex-1 px-4 py-3 rounded-lg border text-sm font-bold transition-colors focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 outline-none ${
                     language === locale
                       ? "bg-purple-500/20 border-purple-500 text-purple-300"
-                      : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600"
+                      : "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-600"
                   }`}
                 >
                   {label}
@@ -168,7 +168,7 @@ export default function SettingsModal({
 
         {/* Clock Type */}
         <div>
-          <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
+          <label className="block text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
             {t("settings.clockType")}
           </label>
           <div
@@ -203,10 +203,10 @@ export default function SettingsModal({
                     buttons[nextIdx].focus();
                   }
                 }}
-                className={`flex-1 px-4 py-3 rounded-lg border text-sm font-bold transition-colors focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 outline-none ${
+                className={`flex-1 px-4 py-3 rounded-lg border text-sm font-bold transition-colors focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 outline-none ${
                   clockType === type
                     ? "bg-purple-500/20 border-purple-500 text-purple-300"
-                    : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600"
+                    : "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-600"
                 }`}
               >
                 {type === "analog"
@@ -220,7 +220,7 @@ export default function SettingsModal({
         {/* Time Format - only visible when digital */}
         {clockType === "digital" && (
           <div>
-            <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
+            <label className="block text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
               {t("settings.timeFormat")}
             </label>
             <div
@@ -257,10 +257,10 @@ export default function SettingsModal({
                       buttons[nextIdx].focus();
                     }
                   }}
-                  className={`flex-1 px-4 py-3 rounded-lg border text-sm font-bold transition-colors focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 outline-none ${
+                  className={`flex-1 px-4 py-3 rounded-lg border text-sm font-bold transition-colors focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 outline-none ${
                     clockFormat === fmt
                       ? "bg-purple-500/20 border-purple-500 text-purple-300"
-                      : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600"
+                      : "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-600"
                   }`}
                 >
                   {fmt === "12h" ? t("settings.12hour") : t("settings.24hour")}
@@ -271,8 +271,8 @@ export default function SettingsModal({
         )}
 
         {/* Session Settings */}
-        <div className="pt-4 border-t border-slate-800">
-          <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
+        <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
+          <label className="block text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
             {t("settings.sessionBehavior")}
           </label>
           <div
@@ -287,13 +287,13 @@ export default function SettingsModal({
                 handleAutoFollowToggle();
               }
             }}
-            className="flex items-center justify-between p-3 rounded-lg bg-slate-800 border border-slate-700 cursor-pointer hover:border-slate-600 transition-colors"
+            className="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 cursor-pointer hover:border-slate-400 dark:hover:border-slate-600 transition-colors"
           >
             <div>
-              <p className="text-slate-300 text-sm font-medium">
+              <p className="text-slate-700 dark:text-slate-300 text-sm font-medium">
                 {t("settings.autoFollow")}
               </p>
-              <p className="text-slate-500 text-xs mt-0.5">
+              <p className="text-slate-400 dark:text-slate-500 text-xs mt-0.5">
                 {t("settings.autoFollowDesc")}
               </p>
             </div>
@@ -312,8 +312,8 @@ export default function SettingsModal({
         </div>
 
         {/* Tip */}
-        <div className="pt-4 border-t border-slate-800">
-          <p className="text-slate-500 text-xs">{t("settings.clockTip")}</p>
+        <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
+          <p className="text-slate-400 dark:text-slate-500 text-xs">{t("settings.clockTip")}</p>
         </div>
       </div>
     </Modal>
