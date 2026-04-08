@@ -35,6 +35,7 @@ import SettingsModal from "@/components/overlay/SettingsModal";
 import { usePreferencesStore } from "@/stores/preferencesStore";
 import { useProjectStore, selectViewMode, selectPreviousViewMode } from "@/stores/projectStore";
 import { useProjectWebSocket } from "@/hooks/useProjectWebSocket";
+import { TaskDrawer } from "@/components/tasks/TaskDrawer";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { Session } from "@/hooks/useSessions";
 
@@ -45,7 +46,7 @@ import type { Session } from "@/hooks/useSessions";
 function LoadingFallback() {
   const { t } = useTranslation();
   return (
-    <div className="w-full h-full bg-slate-900 animate-pulse flex items-center justify-center text-white font-mono text-center">
+    <div className="w-full h-full bg-slate-100 dark:bg-slate-900 animate-pulse flex items-center justify-center text-slate-900 dark:text-white font-mono text-center">
       {t("app.initializingSystems")}
     </div>
   );
@@ -237,7 +238,7 @@ export default function V2TestPage(): React.ReactNode {
   // Render
   // ------------------------------------------------------------------
   return (
-    <main className="flex h-screen flex-col bg-neutral-950 p-2 overflow-hidden relative">
+    <main className="flex h-screen flex-col bg-slate-100 dark:bg-neutral-950 p-2 overflow-hidden relative">
       {/* ----------------------------------------------------------------
           Modals
       ---------------------------------------------------------------- */}
@@ -249,7 +250,7 @@ export default function V2TestPage(): React.ReactNode {
           <>
             <button
               onClick={() => setIsClearModalOpen(false)}
-              className="px-4 py-2 text-slate-400 hover:text-white text-sm font-bold transition-colors"
+              className="px-4 py-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm font-bold transition-colors"
             >
               {t("modal.cancel")}
             </button>
@@ -272,36 +273,36 @@ export default function V2TestPage(): React.ReactNode {
         footer={
           <button
             onClick={() => setIsHelpModalOpen(false)}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold rounded-lg transition-colors"
+            className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-900 dark:text-white text-sm font-bold rounded-lg transition-colors"
           >
             {t("modal.close")}
           </button>
         }
       >
         <div className="space-y-3 font-mono text-sm">
-          <div className="flex justify-between items-center py-2 border-b border-slate-700">
-            <kbd className="px-2 py-1 bg-slate-800 rounded text-white font-bold">
+          <div className="flex justify-between items-center py-2 border-b border-slate-300 dark:border-slate-700">
+            <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-slate-900 dark:text-white font-bold">
               D
             </kbd>
-            <span className="text-slate-300">{t("modal.toggleDebug")}</span>
+            <span className="text-slate-700 dark:text-slate-300">{t("modal.toggleDebug")}</span>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-slate-700">
-            <kbd className="px-2 py-1 bg-slate-800 rounded text-white font-bold">
+          <div className="flex justify-between items-center py-2 border-b border-slate-300 dark:border-slate-700">
+            <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-slate-900 dark:text-white font-bold">
               P
             </kbd>
-            <span className="text-slate-300">{t("modal.showAgentPaths")}</span>
+            <span className="text-slate-700 dark:text-slate-300">{t("modal.showAgentPaths")}</span>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-slate-700">
-            <kbd className="px-2 py-1 bg-slate-800 rounded text-white font-bold">
+          <div className="flex justify-between items-center py-2 border-b border-slate-300 dark:border-slate-700">
+            <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-slate-900 dark:text-white font-bold">
               Q
             </kbd>
-            <span className="text-slate-300">{t("modal.showQueueSlots")}</span>
+            <span className="text-slate-700 dark:text-slate-300">{t("modal.showQueueSlots")}</span>
           </div>
           <div className="flex justify-between items-center py-2">
-            <kbd className="px-2 py-1 bg-slate-800 rounded text-white font-bold">
+            <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-slate-900 dark:text-white font-bold">
               L
             </kbd>
-            <span className="text-slate-300">{t("modal.showPhaseLabels")}</span>
+            <span className="text-slate-700 dark:text-slate-300">{t("modal.showPhaseLabels")}</span>
           </div>
         </div>
       </Modal>
@@ -319,7 +320,7 @@ export default function V2TestPage(): React.ReactNode {
           <>
             <button
               onClick={() => setSessionPendingDelete(null)}
-              className="px-4 py-2 text-slate-400 hover:text-white text-sm font-bold transition-colors"
+              className="px-4 py-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm font-bold transition-colors"
             >
               {t("modal.cancel")}
             </button>
@@ -340,7 +341,7 @@ export default function V2TestPage(): React.ReactNode {
           </span>
           ?
         </p>
-        <p className="text-slate-400 text-sm mt-2">
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">
           {t("modal.deleteSessionWarning")}{" "}
           {sessionPendingDelete?.eventCount ?? 0} {t("modal.events")}.{" "}
           {t("modal.cannotBeUndone")}
@@ -357,20 +358,20 @@ export default function V2TestPage(): React.ReactNode {
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? t("modal.close") : t("mobile.menu")}
               aria-expanded={mobileMenuOpen}
-              className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-white transition-colors"
+              className="p-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg text-slate-900 dark:text-white transition-colors"
             >
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           )}
           <h1
-            className={`font-bold text-white tracking-tight flex items-center gap-2 ${
+            className={`font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2 ${
               isMobile ? "text-lg" : "text-2xl"
             }`}
           >
             <span className="text-orange-500">Claude</span>{" "}
             {!isMobile && t("app.title")}
             {!isMobile && (
-              <span className="text-xs font-mono font-normal px-2 py-0.5 bg-slate-800 rounded text-slate-400 border border-slate-700">
+              <span className="text-xs font-mono font-normal px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                 v0.13.0
               </span>
             )}
@@ -404,7 +405,7 @@ export default function V2TestPage(): React.ReactNode {
                 isConnected ? "bg-emerald-400 animate-pulse" : "bg-rose-500"
               }`}
             />
-            <span className="text-xs text-slate-400 font-mono">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
               {agents.size} {t("header.agents")}
             </span>
           </div>
@@ -434,7 +435,7 @@ export default function V2TestPage(): React.ReactNode {
       ---------------------------------------------------------------- */}
       {isMobile ? (
         <div className="flex-grow flex flex-col gap-1.5 overflow-hidden min-h-0">
-          <div className="flex-[3] border border-slate-800 rounded-lg shadow-2xl bg-slate-900 overflow-hidden relative min-h-0">
+          <div className="flex-[3] border border-slate-200 dark:border-slate-800 rounded-lg shadow-2xl bg-slate-50 dark:bg-slate-900 overflow-hidden relative min-h-0">
             <OfficeGame />
           </div>
           <MobileAgentActivity agents={agents} boss={boss} />
@@ -453,9 +454,9 @@ export default function V2TestPage(): React.ReactNode {
             onDeleteSession={setSessionPendingDelete}
           />
 
-          <div className="flex-grow border border-slate-800 rounded-lg shadow-2xl bg-slate-900 overflow-hidden relative">
+          <div className="flex-grow border border-slate-200 dark:border-slate-800 rounded-lg shadow-2xl bg-slate-50 dark:bg-slate-900 overflow-hidden relative">
             {/* View Mode Toggle */}
-            <div className="absolute top-2 left-2 z-10 flex items-center gap-1 bg-slate-800/80 rounded-md p-0.5 backdrop-blur-sm">
+            <div className="absolute top-2 left-2 z-10 flex items-center gap-1 bg-slate-200/80 dark:bg-slate-800/80 rounded-md p-0.5 backdrop-blur-sm">
               {(["office", "projects", "sessions"] as const).map((mode) => (
                 <button
                   key={mode}
@@ -465,7 +466,7 @@ export default function V2TestPage(): React.ReactNode {
                       || (mode === "projects" && viewMode === "project")
                       || (mode === "sessions" && viewMode === "session")
                       ? "bg-purple-600 text-white"
-                      : "text-slate-400 hover:text-white hover:bg-slate-700"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-700"
                   }`}
                 >
                   {mode === "office"
@@ -478,7 +479,7 @@ export default function V2TestPage(): React.ReactNode {
               {(viewMode === "project" || viewMode === "session") && (
                 <button
                   onClick={goBackToMultiRoom}
-                  className="ml-1 px-2 py-1 text-xs rounded text-slate-400 hover:text-white hover:bg-slate-700 transition-colors border-l border-slate-600"
+                  className="ml-1 px-2 py-1 text-xs rounded text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors border-l border-slate-300 dark:border-slate-600"
                 >
                   {viewMode === "session" ? "\u2190 Sessions" : "\u2190 Projects"}
                 </button>
@@ -486,6 +487,7 @@ export default function V2TestPage(): React.ReactNode {
             </div>
 
             <OfficeGame />
+            <TaskDrawer />
           </div>
 
           <RightSidebar />
