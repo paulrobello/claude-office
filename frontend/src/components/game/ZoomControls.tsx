@@ -17,21 +17,21 @@ export function ZoomControls(): ReactNode {
     <div className="absolute bottom-3 right-3 flex flex-row gap-1 z-10">
       <button
         onClick={() => zoomIn()}
-        className="w-10 h-10 bg-slate-800/90 hover:bg-slate-700 text-white rounded-lg flex items-center justify-center text-xl font-bold border border-slate-600 shadow-lg active:scale-95 transition-transform"
+        className="w-10 h-10 bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-lg flex items-center justify-center text-xl font-bold border border-slate-300 dark:border-slate-600 shadow-lg active:scale-95 transition-transform"
         aria-label={t("zoom.in")}
       >
         +
       </button>
       <button
         onClick={() => zoomOut()}
-        className="w-10 h-10 bg-slate-800/90 hover:bg-slate-700 text-white rounded-lg flex items-center justify-center text-xl font-bold border border-slate-600 shadow-lg active:scale-95 transition-transform"
+        className="w-10 h-10 bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-lg flex items-center justify-center text-xl font-bold border border-slate-300 dark:border-slate-600 shadow-lg active:scale-95 transition-transform"
         aria-label={t("zoom.out")}
       >
         −
       </button>
       <button
         onClick={() => resetTransform()}
-        className="w-10 h-10 bg-slate-800/90 hover:bg-slate-700 text-white rounded-lg flex items-center justify-center text-xs font-bold border border-slate-600 shadow-lg active:scale-95 transition-transform"
+        className="w-10 h-10 bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-lg flex items-center justify-center text-xs font-bold border border-slate-300 dark:border-slate-600 shadow-lg active:scale-95 transition-transform"
         aria-label={t("zoom.reset")}
       >
         1:1

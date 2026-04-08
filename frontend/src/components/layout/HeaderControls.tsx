@@ -138,8 +138,8 @@ export function HeaderControls({
       </button>
 
       {/* Connection and AI status */}
-      <div className="flex flex-col items-end border-l border-slate-800 pl-4">
-        <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest leading-none mb-1">
+      <div className="flex flex-col items-end border-l border-slate-200 dark:border-slate-800 pl-4">
+        <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-widest leading-none mb-1">
           {t("header.status")}
         </span>
         <div className="flex items-center gap-3">
