@@ -103,6 +103,28 @@ async def websocket_all_endpoint(websocket: WebSocket) -> None:
         await manager.disconnect_all(websocket)
 
 
+@app.websocket("/ws/projects")
+async def websocket_projects(websocket: WebSocket) -> None:
+    """WebSocket that sends project-grouped state from all active sessions."""
+    await manager.connect_projects(websocket)
+
+    project_state = await event_processor.get_project_grouped_state()
+    if project_state:
+        await manager.send_personal_message(
+            {
+                "type": "project_state",
+                "data": project_state.model_dump(by_alias=True, mode="json"),
+            },
+            websocket,
+        )
+
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        await manager.disconnect_projects(websocket)
+
+
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
     await manager.connect(websocket, session_id)

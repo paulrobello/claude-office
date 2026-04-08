@@ -51,6 +51,20 @@ async def broadcast_state(session_id: str, sm: StateMachine) -> None:
             )
 
 
+    # Also notify project subscribers with project-grouped state
+    if manager.project_connections:
+        from app.core.event_processor import event_processor
+
+        project_state = await event_processor.get_project_grouped_state()
+        if project_state:
+            await manager.broadcast_to_project_subscribers(
+                {
+                    "type": "project_state",
+                    "data": project_state.model_dump(mode="json", by_alias=True),
+                },
+            )
+
+
 async def broadcast_event(
     session_id: str,
     event_dict: HistoryEntry,
