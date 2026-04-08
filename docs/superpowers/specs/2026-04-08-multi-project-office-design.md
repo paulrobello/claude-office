@@ -342,21 +342,23 @@ Claude Office reads this config to:
 
 ## Implementation Order
 
-### Phase 1 (可视化 + 项目归属) — 10 tasks
+### Phase 1 (可视化 + 项目归属) — 12 tasks
 
 1. Backend: ProjectRegistry + project color assignment
-2. Backend: Project-grouped merged state (new endpoint /ws/projects)
-3. Backend: /api/v1/projects endpoints
-4. Frontend: Extract reusable `MiniOffice` component from current `OfficeGame`
+2. Backend: TranscriptWatcher — scan ~/.claude/projects/ as fallback discovery (from Pixel Agents)
+3. Backend: Smart project name extraction from paths (enhanced from Pixel Agents)
+4. Backend: Project-grouped merged state (new endpoint /ws/projects)
+5. Backend: /api/v1/projects endpoints
+6. Backend: Agent seat persistence in SQLite (from Pixel Agents)
+7. Frontend: Extract reusable `MiniOffice` component from current `OfficeGame`
    - MiniOffice takes: agents[], boss, deskCount, projectName, color, size
    - Contains: walls, floor, desks, clock, whiteboard, safety sign, water cooler, city window, elevator, employee of month
    - Scalable: renders at any size (full or thumbnail)
-5. Frontend: `ProjectRoomGrid` component — renders multiple MiniOffice instances in a grid
-6. Frontend: View mode switcher (Overview / Room Detail / All Merged)
-7. Frontend: Overview zoom navigation (programmatic zoom to room)
-8. Frontend: Sidebar project tree (collapsible groups, click → zoom)
-9. Frontend: Agent project badge + room border coloring
-10. Integration test + commit
+8. Frontend: `ProjectRoomGrid` component — renders multiple MiniOffice instances in a grid
+9. Frontend: View mode switcher (Overview / Room Detail / All Merged)
+10. Frontend: Overview zoom navigation (programmatic zoom to room)
+11. Frontend: Sidebar project tree (collapsible groups, click → zoom)
+12. Frontend: Agent project badge + room border coloring + seat restore
 
 ### Phase 2 (任务调度) — 6 tasks
 
@@ -369,6 +371,78 @@ Claude Office reads this config to:
 
 ---
 
+## Borrowed from Pixel Agents Standalone
+
+以下特性从 pixel-agents-standalone 借鉴，整合到 Claude Office 中：
+
+### B1. Transcript 直读作为备用发现机制
+
+**问题**：Claude Office 完全依赖 hooks POST 事件。如果 hook 没装好、丢事件或者是 Cursor 等第三方工具的 Claude session，后端看不到。
+
+**Pixel Agents 做法**：`server/watcher.ts` 直接监听 `~/.claude/projects/` 下所有 `.jsonl` 文件，不依赖任何 hook 配置。
+
+**借鉴方案**：新增 `TranscriptWatcher` 作为**补充发现机制**：
+- Hooks 仍然是主要的事件源（实时、低延迟）
+- TranscriptWatcher 每 5 秒扫描 `~/.claude/projects/`，发现 hooks 没上报的 session
+- 对于这些"孤儿 session"，从 JSONL 解析基本状态（工具调用、idle、权限等待）
+- 好处：Cursor 的 Claude session、没装 hook 的 Claude Code 都能被检测到
+
+```python
+# backend/app/core/transcript_watcher.py (NEW)
+class TranscriptWatcher:
+    """Watches ~/.claude/projects/ for session JSONL files.
+    Supplements hooks by discovering sessions that don't send hook events."""
+    
+    scan_interval: float = 5.0  # seconds
+    active_threshold: float = 600.0  # 10 minutes
+    
+    async def scan(self) -> list[DiscoveredSession]:
+        # Walk ~/.claude/projects/*/**.jsonl
+        # Filter by mtime within active_threshold
+        # Extract project_name from directory path
+        # Return sessions not already tracked by EventProcessor
+    
+    async def parse_basic_state(self, jsonl_path: str) -> BasicAgentState:
+        # Read last N lines of JSONL
+        # Detect: tool_use (typing), idle, permission_request
+        # Return simplified state for visualization
+```
+
+### B2. 项目名从路径提取（增强）
+
+**Pixel Agents 做法**：`basename(dirname(filePath)).split("-").filter(Boolean)` 取最后一段。
+
+**增强方案**：更智能的项目名提取：
+```python
+def extract_project_name(transcript_path: str) -> str:
+    # ~/.claude/projects/-Users-apple-Projects-others-startups-startups-mono-abc123/session.jsonl
+    # → dir name: "-Users-apple-Projects-others-startups-startups-mono-abc123"
+    # → strip hash suffix (last segment if looks like hex)
+    # → take last 2 meaningful segments: "startups-mono"
+    # → or match against known git roots from ProjectRegistry
+```
+
+### B3. Agent 座位持久化
+
+**Pixel Agents 做法**：`~/.pixel-agents/agent-seats.json` 保存每个 agent 的 palette、hueShift、seatId。
+
+**借鉴方案**：在 SQLite 中新增 `agent_seat_preferences` 表：
+```python
+class AgentSeatPreference(Base):
+    session_id: str       # Which session
+    agent_id: str         # Agent identifier
+    desk: int             # Preferred desk number
+    color: str            # Assigned color
+    room_key: str         # Which project room
+```
+Agent 重连后保持同一个座位和颜色，不会每次随机分配。
+
+### B4. 布局编辑器（Phase 3，未来）
+
+**Pixel Agents 做法**：用户可在浏览器中拖拽家具、改地板颜色、自定义办公室布局。
+
+**未来方案**：允许用户自定义每个房间的布局（家具位置、地板样式）。非 Phase 1/2 优先级。
+
 ## Tech Decisions
 
 | Decision | Choice | Reason |
@@ -376,9 +450,10 @@ Claude Office reads this config to:
 | Room layout | CSS Grid on PixiJS canvas | Flexible, scales with project count |
 | Zoom | react-zoom-pan-pinch (existing) | Already integrated, add programmatic targets |
 | AO communication | HTTP REST + SSE | AO's native interface, no custom bridge needed |
-| Project discovery | Hooks + AO config | Hooks for real-time, AO config for pre-seeding |
+| Project discovery | Hooks (primary) + TranscriptWatcher (fallback) | Hooks for real-time; watcher catches Cursor/unhook'd sessions |
 | Room sizing | Dynamic based on agent count | Avoids wasted space for small projects |
 | State structure | Grouped by project | Frontend can render rooms independently |
+| Seat persistence | SQLite table | Agents keep same desk/color across reconnects |
 
 ## Non-Goals (for now)
 
