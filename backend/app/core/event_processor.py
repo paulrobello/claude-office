@@ -426,6 +426,10 @@ class EventProcessor:
         if event.session_id not in self.sessions:
             self.sessions[event.session_id] = StateMachine()
 
+        # Ensure session is registered with project registry
+        if not self.project_registry.get_project_for_session(event.session_id):
+            await self._auto_register_project(event)
+
         sm = self.sessions[event.session_id]
 
         sm.transition(event)
@@ -706,6 +710,29 @@ class EventProcessor:
             logger.debug(f"Restored {len(sm.todos)} tasks for session {session_id}")
 
             self.sessions[session_id] = sm
+
+    async def _auto_register_project(self, event: Event) -> None:
+        """Try to register this session with the project registry.
+
+        Uses event data first, then falls back to the DB session record.
+        """
+        session_id = event.session_id
+        project_name = event.data.project_name if event.data else None
+
+        if not project_name:
+            # Try DB
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(
+                    select(SessionRecord.project_name, SessionRecord.project_root)
+                    .where(SessionRecord.id == session_id)
+                )
+                row = result.one_or_none()
+                if row:
+                    project_name = row.project_name
+
+        if project_name:
+            project_root = await self.get_project_root(session_id)
+            self.project_registry.register_session(session_id, project_name, project_root)
 
     async def _persist_event(self, event: Event) -> None:
         """Save event to database and manage session records.
