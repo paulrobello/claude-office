@@ -51,22 +51,25 @@ export function MultiRoomCanvas({
     <>
       {projects.map((project, index) => {
         const pos = getRoomPosition(index);
+        const scaledW = CANVAS_WIDTH * ROOM_SCALE;
         return (
-          <pixiContainer
-            key={project.key}
-            x={pos.x}
-            y={pos.y}
-            scale={ROOM_SCALE}
-          >
-            <RoomLabel
-              name={project.name}
-              color={project.color}
-              agentCount={project.agents.length}
-              sessionCount={project.sessionCount}
-            />
-            <RoomProvider project={project}>
-              <OfficeRoom textures={textures} />
-            </RoomProvider>
+          <pixiContainer key={project.key}>
+            {/* Room label at full scale, above the scaled room */}
+            <pixiContainer x={pos.x} y={pos.y - ROOM_LABEL_HEIGHT}>
+              <RoomLabel
+                name={project.name}
+                color={project.color}
+                agentCount={project.agents.length}
+                sessionCount={project.sessionCount}
+                width={scaledW}
+              />
+            </pixiContainer>
+            {/* Room content at ROOM_SCALE */}
+            <pixiContainer x={pos.x} y={pos.y} scale={ROOM_SCALE}>
+              <RoomProvider project={project}>
+                <OfficeRoom textures={textures} />
+              </RoomProvider>
+            </pixiContainer>
           </pixiContainer>
         );
       })}
