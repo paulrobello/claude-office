@@ -2,8 +2,8 @@
  * Canvas and rendering constants for the office game.
  */
 
-/** Width of the game canvas in pixels */
-export const CANVAS_WIDTH = 1280;
+/** Width of the game canvas in pixels (slightly wider than 1280 to cover all furniture) */
+export const CANVAS_WIDTH = 1300;
 
 /** Default height of the game canvas in pixels */
 export const CANVAS_HEIGHT = 1024;
