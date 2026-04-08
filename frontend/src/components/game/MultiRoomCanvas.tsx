@@ -7,10 +7,8 @@
 
 "use client";
 
-import { useCallback, type ReactNode } from "react";
-import { Graphics as PixiGraphics } from "pixi.js";
-import { useShallow } from "zustand/react/shallow";
-import { useProjectStore, selectProjects } from "@/stores/projectStore";
+import { type ReactNode } from "react";
+import type { ProjectGroup } from "@/types/projects";
 import { RoomProvider } from "@/contexts/RoomContext";
 import { OfficeRoom } from "./OfficeRoom";
 import { RoomLabel } from "./RoomLabel";
@@ -45,35 +43,45 @@ export function getRoomPosition(index: number) {
 
 interface MultiRoomCanvasProps {
   textures: OfficeTextures;
+  rooms: ProjectGroup[];
+  onRoomClick?: (roomKey: string) => void;
 }
 
 export function MultiRoomCanvas({
   textures,
+  rooms,
+  onRoomClick,
 }: MultiRoomCanvasProps): ReactNode {
-  const projects = useProjectStore(useShallow(selectProjects));
-
-  if (projects.length === 0) {
+  if (rooms.length === 0) {
     return null;
   }
 
   return (
     <>
-      {projects.map((project, index) => {
+      {rooms.map((room, index) => {
         const pos = getRoomPosition(index);
         return (
-          <pixiContainer key={project.key} x={pos.x} y={pos.y} scale={ROOM_SCALE}>
+          <pixiContainer
+            key={room.key}
+            x={pos.x}
+            y={pos.y}
+            scale={ROOM_SCALE}
+            eventMode={onRoomClick ? "static" : "auto"}
+            cursor={onRoomClick ? "pointer" : "default"}
+            onPointerTap={() => onRoomClick?.(room.key)}
+          >
             {/* Label at top (nudged down 4px full-scale = 2px rendered) */}
             <pixiContainer y={4}>
-            <RoomLabel
-              name={project.name}
-              color={project.color}
-              agentCount={project.agents.length}
-              sessionCount={project.sessionCount}
-            />
+              <RoomLabel
+                name={room.name}
+                color={room.color}
+                agentCount={room.agents.length}
+                sessionCount={room.sessionCount}
+              />
             </pixiContainer>
             {/* Room content below label */}
             <pixiContainer y={LABEL_H}>
-              <RoomProvider project={project}>
+              <RoomProvider project={room}>
                 <OfficeRoom textures={textures} />
               </RoomProvider>
             </pixiContainer>
