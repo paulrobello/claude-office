@@ -35,7 +35,7 @@ body {
     object-fit: contain;
   }
 
-  /* Custom Scrollbar Theme */
+  /* Custom Scrollbar Theme - Light */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -46,7 +46,7 @@ body {
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #1e293b; /* slate-800 */
+    background: #cbd5e1; /* slate-300 */
     border-radius: 10px;
     border: 2px solid transparent;
     background-clip: padding-box;
@@ -58,9 +58,23 @@ body {
     background-clip: padding-box;
   }
 
-  /* Firefox */
+  /* Custom Scrollbar Theme - Dark */
+  .dark ::-webkit-scrollbar-thumb {
+    background: #1e293b; /* slate-800 */
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #f97316; /* orange-500 */
+  }
+
+  /* Firefox - Light */
   * {
     scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+
+  /* Firefox - Dark */
+  .dark * {
     scrollbar-color: #1e293b transparent;
   }
 }
