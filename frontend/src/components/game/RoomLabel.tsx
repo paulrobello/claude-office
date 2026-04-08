@@ -9,38 +9,38 @@ interface RoomLabelProps {
   color: string;
   agentCount: number;
   sessionCount: number;
-  /** Width of the label bar. Defaults to CANVAS_WIDTH (for scaled container use). */
-  width?: number;
 }
 
+/**
+ * RoomLabel renders inside the scaled pixiContainer (at full-scale coordinates).
+ * At ROOM_SCALE=0.5, a 40px bar becomes 20px on screen.
+ */
 export function RoomLabel({
   name,
   color,
   agentCount,
   sessionCount,
-  width,
 }: RoomLabelProps): ReactNode {
-  const barWidth = width ?? CANVAS_WIDTH;
   const colorHex = parseInt(color.slice(1), 16);
 
   const drawBar = useCallback(
     (g: PixiGraphics) => {
       g.clear();
-      // Color bar background
-      g.roundRect(0, 0, barWidth, 22, 4);
-      g.fill({ color: colorHex, alpha: 0.3 });
+      // Color bar background (full width of room)
+      g.roundRect(0, 0, CANVAS_WIDTH, 40, 6);
+      g.fill({ color: colorHex, alpha: 0.25 });
       // Color accent line at top
-      g.rect(0, 0, barWidth, 3);
+      g.rect(0, 0, CANVAS_WIDTH, 5);
       g.fill(colorHex);
     },
-    [colorHex, barWidth]
+    [colorHex]
   );
 
   const nameStyle = useMemo(
     () =>
       new TextStyle({
         fontFamily: '"Courier New", monospace',
-        fontSize: 14,
+        fontSize: 24,
         fontWeight: "bold",
         fill: color,
       }),
@@ -51,7 +51,7 @@ export function RoomLabel({
     () =>
       new TextStyle({
         fontFamily: '"Courier New", monospace',
-        fontSize: 11,
+        fontSize: 18,
         fill: "#94a3b8",
       }),
     []
@@ -60,12 +60,12 @@ export function RoomLabel({
   return (
     <pixiContainer>
       <pixiGraphics draw={drawBar} />
-      <pixiText text={name} style={nameStyle} x={8} y={3} />
+      <pixiText text={name} style={nameStyle} x={16} y={8} />
       <pixiText
         text={`${agentCount}a · ${sessionCount}s`}
         style={countStyle}
-        x={barWidth - 8}
-        y={5}
+        x={CANVAS_WIDTH - 16}
+        y={12}
         anchor={{ x: 1, y: 0 }}
       />
     </pixiContainer>

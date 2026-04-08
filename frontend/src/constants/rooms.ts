@@ -52,19 +52,23 @@ export const ROOM_LABEL_HEIGHT = 24;
  * Uses the full office dimensions (CANVAS_WIDTH=1280, CANVAS_HEIGHT=1024)
  * scaled by ROOM_SCALE, plus gaps and label space.
  */
+/** Label height inside the scaled container (full-scale pixels). */
+const LABEL_H_FULL = 50;
+
 export function getMultiRoomCanvasSize(
   projectCount: number,
-  fullRoomHeight: number = 1066, // getCanvasHeight(8) = 432 + 2*192 + 250
+  fullRoomHeight: number = 1066, // getCanvasHeight(8)
   fullRoomWidth: number = 1280,
 ) {
   const cols = Math.min(projectCount, ROOM_GRID_COLS);
   const rows = Math.ceil(projectCount / ROOM_GRID_COLS);
-  const scaledW = fullRoomWidth * ROOM_SCALE;
-  const scaledH = fullRoomHeight * ROOM_SCALE;
+  // Each cell = (room + label) * scale
+  const cellW = fullRoomWidth * ROOM_SCALE;
+  const cellH = (fullRoomHeight + LABEL_H_FULL) * ROOM_SCALE;
   return {
     cols,
     rows,
-    width: ROOM_GAP + cols * (scaledW + ROOM_GAP),
-    height: ROOM_GAP + ROOM_LABEL_HEIGHT + rows * (scaledH + ROOM_LABEL_HEIGHT + ROOM_GAP),
+    width: ROOM_GAP + cols * (cellW + ROOM_GAP),
+    height: ROOM_GAP + rows * (cellH + ROOM_GAP),
   };
 }
