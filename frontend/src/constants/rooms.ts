@@ -25,6 +25,13 @@ export const ROOM_POSITIONS = {
   elevator: { x: 560, y: 200 },
 } as const;
 
+/** Scale factor for rooms in overview mode */
+export const ROOM_SCALE = 0.5;
+
+/** Scaled room dimensions */
+export const SCALED_ROOM_W = ROOM_WIDTH * ROOM_SCALE; // 320
+export const SCALED_ROOM_H = ROOM_HEIGHT * ROOM_SCALE; // 256
+
 /** Calculate grid dimensions for N rooms */
 export function getRoomGridSize(roomCount: number) {
   const cols = Math.min(roomCount, ROOM_GRID_COLS);
@@ -34,5 +41,30 @@ export function getRoomGridSize(roomCount: number) {
     rows,
     width: cols * ROOM_WIDTH + (cols - 1) * ROOM_GAP,
     height: rows * ROOM_HEIGHT + (rows - 1) * ROOM_GAP,
+  };
+}
+
+/** Room label height (rendered above each room) */
+export const ROOM_LABEL_HEIGHT = 24;
+
+/**
+ * Calculate total canvas size needed for N rooms in PixiJS overview mode.
+ * Uses the full office dimensions (CANVAS_WIDTH=1280, CANVAS_HEIGHT=1024)
+ * scaled by ROOM_SCALE, plus gaps and label space.
+ */
+export function getMultiRoomCanvasSize(
+  projectCount: number,
+  fullRoomHeight: number = 1024,
+  fullRoomWidth: number = 1280,
+) {
+  const cols = Math.min(projectCount, ROOM_GRID_COLS);
+  const rows = Math.ceil(projectCount / ROOM_GRID_COLS);
+  const scaledW = fullRoomWidth * ROOM_SCALE;
+  const scaledH = fullRoomHeight * ROOM_SCALE;
+  return {
+    cols,
+    rows,
+    width: ROOM_GAP + cols * (scaledW + ROOM_GAP),
+    height: ROOM_GAP + rows * (scaledH + ROOM_LABEL_HEIGHT + ROOM_GAP),
   };
 }
