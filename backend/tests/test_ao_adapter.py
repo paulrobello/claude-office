@@ -56,29 +56,32 @@ class TestAOAdapterConnect:
 class TestAOAdapterPoll:
     @pytest.mark.asyncio
     async def test_poll_returns_external_sessions(self, adapter: AOAdapter):
-        ao_response = [
-            {
-                "id": "sess-1",
-                "project": "my-project",
-                "worktreePath": "/tmp/worktree/1",
-                "issue": "#42",
-                "status": "working",
-                "pr": {
-                    "url": "https://github.com/org/repo/pull/10",
-                    "number": 10,
-                    "ciStatus": "passing",
-                    "reviewStatus": "pending",
+        ao_response = {
+            "sessions": [
+                {
+                    "id": "sess-1",
+                    "projectId": "my-project",
+                    "metadata": {"worktree": "/tmp/worktree/1"},
+                    "issueId": "#42",
+                    "status": "working",
+                    "pr": {
+                        "url": "https://github.com/org/repo/pull/10",
+                        "number": 10,
+                        "ciStatus": "passing",
+                        "reviewStatus": "pending",
+                    },
                 },
-            },
-            {
-                "id": "sess-2",
-                "project": "other-project",
-                "worktreePath": None,
-                "issue": None,
-                "status": "spawning",
-                "pr": None,
-            },
-        ]
+                {
+                    "id": "sess-2",
+                    "projectId": "other-project",
+                    "metadata": {},
+                    "issueId": None,
+                    "status": "spawning",
+                    "pr": None,
+                },
+            ],
+            "stats": {},
+        }
         with patch("app.services.adapters.ao.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -99,7 +102,7 @@ class TestAOAdapterPoll:
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.get = AsyncMock(return_value=Response(200, json=[], request=_DUMMY_REQ))
+            mock_client.get = AsyncMock(return_value=Response(200, json={"sessions": []}, request=_DUMMY_REQ))
             mock_client_cls.return_value = mock_client
 
             sessions = await adapter.poll()
@@ -110,12 +113,14 @@ class TestAOAdapterSpawn:
     @pytest.mark.asyncio
     async def test_spawn_returns_external_session(self, adapter: AOAdapter):
         spawn_response = {
-            "id": "new-sess-1",
-            "project": "my-project",
-            "worktreePath": "/tmp/worktree/new",
-            "issue": "#99",
-            "status": "spawning",
-            "pr": None,
+            "session": {
+                "id": "new-sess-1",
+                "projectId": "my-project",
+                "metadata": {"worktree": "/tmp/worktree/new"},
+                "issueId": "#99",
+                "status": "spawning",
+                "pr": None,
+            },
         }
         with patch("app.services.adapters.ao.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()

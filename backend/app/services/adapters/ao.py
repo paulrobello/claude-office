@@ -10,6 +10,25 @@ from app.services.adapters import ExternalSession
 
 logger = logging.getLogger(__name__)
 
+# Map AO statuses to our TaskStatus values
+_AO_STATUS_MAP: dict[str, str] = {
+    "spawning": "spawning",
+    "working": "working",
+    "ready": "working",
+    "active": "working",
+    "idle": "working",
+    "pr_open": "pr_open",
+    "pr-open": "pr_open",
+    "review": "review_pending",
+    "approved": "approved",
+    "merged": "merged",
+    "done": "done",
+    "killed": "done",
+    "exited": "done",
+    "error": "error",
+    "failed": "error",
+}
+
 
 class AOAdapter:
     """Adapter for Agent Orchestrator HTTP API."""
@@ -39,36 +58,44 @@ class AOAdapter:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 f"{self.ao_url}/api/spawn",
-                json={"project": project_id, "issue": issue},
+                json={"projectId": project_id, "issue": issue},
             )
             resp.raise_for_status()
             data = resp.json()
-            return self._to_external_session(data)
+            # AO returns {"session": {...}}
+            session_data = data.get("session", data) if isinstance(data, dict) else data
+            return self._to_external_session(session_data)
 
     async def poll(self) -> list[ExternalSession]:
         """GET /api/sessions and convert to ExternalSession list."""
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(f"{self.ao_url}/api/sessions")
             resp.raise_for_status()
-            return [self._to_external_session(s) for s in resp.json()]
+            data = resp.json()
+            # AO returns {"sessions": [...], ...} not a bare array
+            sessions = data.get("sessions", []) if isinstance(data, dict) else data
+            return [self._to_external_session(s) for s in sessions]
 
     async def get_projects(self) -> list[dict]:
         """GET /api/projects from AO."""
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(f"{self.ao_url}/api/projects")
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+            return data.get("projects", []) if isinstance(data, dict) else data
 
     @staticmethod
     def _to_external_session(data: dict) -> ExternalSession:
         """Convert AO session JSON to ExternalSession."""
         pr = data.get("pr") or {}
+        metadata = data.get("metadata") or {}
+        # AO uses projectId, issueId, metadata.worktree
         return ExternalSession(
             session_id=data["id"],
-            project_id=data.get("project", ""),
-            worktree_path=data.get("worktreePath"),
-            issue=data.get("issue"),
-            status=data.get("status", "spawning"),
+            project_id=data.get("projectId") or data.get("project", ""),
+            worktree_path=metadata.get("worktree") or data.get("worktreePath"),
+            issue=data.get("issueId") or data.get("issue"),
+            status=_AO_STATUS_MAP.get(data.get("status", ""), "working"),
             pr_url=pr.get("url"),
             pr_number=pr.get("number"),
             ci_status=pr.get("ciStatus"),
