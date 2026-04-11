@@ -2,7 +2,7 @@
 
 All notable changes to Claude Office Visualizer are documented here.
 
-## [0.14.0] - 2026-04-06
+## [0.14.0] - 2026-04-11
 
 ### Added
 
@@ -12,6 +12,27 @@ All notable changes to Claude Office Visualizer are documented here.
 ### Changed
 
 - **Consolidated event-type-styles**: Replaced two separate 11-case switch statements with a single `EVENT_TYPE_STYLES` map. Adding new event types now requires only one entry instead of updating two switches.
+- **Frontend**: Upgrade Next.js 16.2.1 → 16.2.3
+- **Frontend**: Upgrade React / React DOM 19.2.4 → 19.2.5
+- **Frontend**: Upgrade react-zoom-pan-pinch 3.7.0 → 4.0.3
+- **Frontend**: Upgrade TypeScript 5.9.3 → 6.0.2
+- **Frontend**: Upgrade lucide-react 1.7.0 → 1.8.0
+- **Frontend**: Upgrade @types/node 25.5.0 → 25.6.0
+- **Frontend**: Upgrade vitest 4.1.2 → 4.1.4
+- **Frontend**: Upgrade prettier 3.8.1 → 3.8.2
+- **Frontend**: Upgrade bun-types 1.3.11 → 1.3.12
+- **Frontend**: Pin ESLint to ^9 (v10 incompatible with eslint-plugin-react)
+- **Backend**: Upgrade anthropic 0.87.0 → 0.94.0
+- **Backend**: Upgrade fastapi 0.135.2 → 0.135.3
+- **Backend**: Upgrade uvicorn 0.42.0 → 0.44.0
+- **Backend**: Upgrade SQLAlchemy 2.0.48 → 2.0.49
+- **Backend**: Upgrade ruff 0.15.8 → 0.15.10
+- **Backend**: Upgrade pytest 9.0.2 → 9.0.3
+- **Backend**: Upgrade rich 14.3.3 → 14.3.4
+- **Backend**: Upgrade click 8.3.1 → 8.3.2
+- **Backend**: Upgrade greenlet 3.3.2 → 3.4.0
+- **Backend**: Upgrade jiter 0.13.0 → 0.14.0
+- **Backend**: Upgrade python-multipart 0.0.22 → 0.0.26
 
 ### Fixed
 
