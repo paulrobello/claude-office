@@ -392,11 +392,17 @@ async def clear_database(db: Annotated[AsyncSession, Depends(get_db)]) -> dict[s
     try:
         simulation_killed = kill_simulation()
 
-        await db.execute(delete(UserPreference))
+        # Preserve building/floor configuration while clearing everything else.
+        await db.execute(delete(UserPreference).where(UserPreference.key != "building_config"))
         await db.execute(delete(TaskRecord))
         await db.execute(delete(EventRecord))
         await db.execute(delete(SessionRecord))
         await db.commit()
+
+        # Re-invalidate cached building config in case other preferences changed.
+        from app.core.floor_config import invalidate_building_config
+
+        invalidate_building_config()
 
         await event_processor.clear_all_sessions()
         git_service.clear()
