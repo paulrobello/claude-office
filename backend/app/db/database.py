@@ -1,6 +1,8 @@
+import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -12,14 +14,32 @@ from sqlalchemy.pool import StaticPool
 
 from app.config import get_settings
 
+logger = logging.getLogger(__name__)
+
 settings = get_settings()
 
 _engine: AsyncEngine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
-    connect_args={"check_same_thread": False},
+    connect_args={"check_same_thread": False, "timeout": 15},
     poolclass=StaticPool,
 )
+
+
+@event.listens_for(_engine.sync_engine, "connect")
+def _set_sqlite_pragma(dbapi_connection: Any, _connection_record: Any) -> None:  # pyright: ignore[reportUnusedFunction]
+    """Enable WAL mode and busy timeout on every SQLite connection.
+
+    WAL mode allows concurrent readers alongside a single writer, which
+    prevents the "database is locked" errors that occur when multiple
+    async tasks (hook events, pollers, git service) write concurrently.
+    """
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.close()
+
+
 _session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
     bind=_engine,
     class_=AsyncSession,
