@@ -36,6 +36,9 @@ class EventType(StrEnum):
     LEAVING = "leaving"
     ERROR = "error"
     BACKGROUND_TASK_NOTIFICATION = "background_task_notification"
+    TASK_CREATED = "task_created"
+    TASK_COMPLETED = "task_completed"
+    TEAMMATE_IDLE = "teammate_idle"
 
 
 class EventData(BaseModel):
@@ -76,6 +79,15 @@ class EventData(BaseModel):
     background_task_summary: str | None = None
     # Task list override (from CLAUDE_CODE_TASK_LIST_ID env var)
     task_list_id: str | None = None
+    # Room assignment (populated by ProductMapper)
+    floor_id: str | None = None
+    room_id: str | None = None
+    # Agent Teams fields (Phase 4)
+    team_name: str | None = None
+    teammate_name: str | None = None
+    # Task-specific fields
+    task_id: str | None = None
+    task_subject: str | None = None
 
 
 class Event(BaseModel):

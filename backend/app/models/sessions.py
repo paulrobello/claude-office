@@ -13,6 +13,7 @@ __all__ = [
     "NewsItem",
     "FileEdit",
     "BackgroundTask",
+    "KanbanTask",
     "WhiteboardData",
     "Session",
     "HistoryEntry",
@@ -74,12 +75,25 @@ class BackgroundTask(BaseModel):
     completed_at: str | None = None
 
 
+class KanbanTask(BaseModel):
+    """A single kanban board task."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    task_id: str
+    subject: str
+    status: str  # "pending" | "in_progress" | "completed"
+    assignee: str | None = None
+    linear_id: str | None = None  # parsed from subject, e.g. "REC-42"
+
+
 class WhiteboardData(BaseModel):
     """Data for whiteboard display modes."""
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     tool_usage: dict[str, int] = Field(default_factory=dict)
+    kanban_tasks: list[KanbanTask] = Field(default_factory=lambda: cast(list[KanbanTask], []))
     task_completed_count: int = 0
     bug_fixed_count: int = 0
     coffee_break_count: int = 0

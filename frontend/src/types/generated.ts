@@ -27,7 +27,8 @@ export type AgentState =
   | "waiting"
   | "reporting_done"
   | "leaving"
-  | "in_elevator";
+  | "in_elevator"
+  | "idle";
 export type Desk = number | null;
 /**
  * Type of speech/thought bubble content.
@@ -40,6 +41,9 @@ export type Text = string;
 export type Icon = string | null;
 export type Persistent = boolean;
 export type Currenttask = string | null;
+export type Charactertype = string | null;
+export type Parentsessionid = string | null;
+export type Parentid = string | null;
 export type Agentid = string;
 export type Agentname = string;
 export type Color1 = string;
@@ -129,7 +133,10 @@ export type EventType =
   | "waiting"
   | "leaving"
   | "error"
-  | "background_task_notification";
+  | "background_task_notification"
+  | "task_created"
+  | "task_completed"
+  | "teammate_idle";
 export type SessionId = string;
 export type Timestamp2 = string;
 export type ProjectName = string | null;
@@ -168,6 +175,12 @@ export type BackgroundTaskOutputFile = string | null;
 export type BackgroundTaskStatus = string | null;
 export type BackgroundTaskSummary = string | null;
 export type TaskListId = string | null;
+export type FloorId = string | null;
+export type RoomId = string | null;
+export type TeamName = string | null;
+export type TeammateName = string | null;
+export type TaskId = string | null;
+export type TaskSubject = string | null;
 export type Filepath = string;
 export type Editcount = number;
 export type Sessionid = string;
@@ -191,7 +204,7 @@ export type Agentid2 = string;
 export type Summary2 = string;
 export type Timestamp3 = string;
 export type History = HistoryEntry[];
-export type TaskId = string;
+export type TaskId1 = string;
 export type Content = string;
 /**
  * Status of a todo list item.
@@ -211,6 +224,12 @@ export type Metadata = {
 export type Todos = TodoItem[];
 export type Arrivalqueue = string[];
 export type Departurequeue = string[];
+export type Taskid1 = string;
+export type Subject = string;
+export type Status1 = string;
+export type Assignee = string | null;
+export type Linearid = string | null;
+export type Kanbantasks = KanbanTask[];
 export type Taskcompletedcount = number;
 export type Bugfixedcount = number;
 export type Coffeebreakcount = number;
@@ -262,7 +281,7 @@ export type PhoneState1 = "idle" | "ringing" | "in_use";
 export type Id3 = string;
 export type CreatedAt = string;
 export type UpdatedAt = string;
-export type Status1 = string;
+export type Status2 = string;
 export type EventCount = number;
 export type AgentCount = number;
 
@@ -286,6 +305,9 @@ export interface Agent {
   bubble?: BubbleContent | null;
   currentTask?: Currenttask;
   position?: Position;
+  characterType?: Charactertype;
+  parentSessionId?: Parentsessionid;
+  parentId?: Parentid;
   [k: string]: unknown;
 }
 /**
@@ -442,6 +464,12 @@ export interface EventData {
   background_task_status?: BackgroundTaskStatus;
   background_task_summary?: BackgroundTaskSummary;
   task_list_id?: TaskListId;
+  floor_id?: FloorId;
+  room_id?: RoomId;
+  team_name?: TeamName;
+  teammate_name?: TeammateName;
+  task_id?: TaskId;
+  task_subject?: TaskSubject;
   [k: string]: unknown;
 }
 /**
@@ -529,7 +557,7 @@ export interface Detail {
  * via the `definition` "TodoItem".
  */
 export interface TodoItem {
-  task_id?: TaskId;
+  task_id?: TaskId1;
   content: Content;
   status: TodoStatus;
   active_form?: ActiveForm;
@@ -548,6 +576,7 @@ export interface TodoItem {
  */
 export interface WhiteboardData {
   toolUsage?: Toolusage;
+  kanbanTasks?: Kanbantasks;
   taskCompletedCount?: Taskcompletedcount;
   bugFixedCount?: Bugfixedcount;
   coffeeBreakCount?: Coffeebreakcount;
@@ -566,6 +595,20 @@ export interface WhiteboardData {
 }
 export interface Toolusage {
   [k: string]: number;
+}
+/**
+ * A single kanban board task.
+ *
+ * This interface was referenced by `ClaudeOfficeBackendTypes`'s JSON-Schema
+ * via the `definition` "KanbanTask".
+ */
+export interface KanbanTask {
+  taskId: Taskid1;
+  subject: Subject;
+  status: Status1;
+  assignee?: Assignee;
+  linearId?: Linearid;
+  [k: string]: unknown;
 }
 /**
  * News ticker item for the whiteboard.
@@ -608,7 +651,7 @@ export interface Session {
   id: Id3;
   created_at: CreatedAt;
   updated_at: UpdatedAt;
-  status: Status1;
+  status: Status2;
   event_count: EventCount;
   agent_count: AgentCount;
   [k: string]: unknown;
