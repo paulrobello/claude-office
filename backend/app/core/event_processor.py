@@ -570,7 +570,8 @@ class EventProcessor:
 
         Uses ``session.merge()`` for dialect-agnostic upsert that avoids
         UNIQUE constraint race conditions when multiple events arrive
-        concurrently for the same session.
+        concurrently for the same session, or when the session record
+        has been deleted by a concurrent clear-DB operation.
         """
         async with AsyncSessionLocal() as db:
             project_name = event.data.project_name if event.data else None
@@ -580,27 +581,21 @@ class EventProcessor:
             source_dir = project_dir or working_dir
             project_root = derive_git_root(source_dir) if source_dir else None
 
-            # Check for existing session first.
-            result = await db.execute(
-                select(SessionRecord).where(SessionRecord.id == event.session_id)
+            # Build a session record and merge (upsert) into the DB.
+            # merge() handles both new inserts and updates to existing rows,
+            # and won't raise StaleDataError if the row was deleted concurrently.
+            now = datetime.now(UTC)
+            session_rec = SessionRecord(
+                id=event.session_id,
+                project_name=project_name,
+                project_root=project_root,
+                status="active",
+                created_at=now,
+                updated_at=now,
             )
-            session_rec = result.scalar_one_or_none()
+            session_rec = await db.merge(session_rec)
 
-            if session_rec is None:
-                # First event for this session — create record with merge
-                # to handle any concurrent insert race gracefully.
-                now = datetime.now(UTC)
-                session_rec = SessionRecord(
-                    id=event.session_id,
-                    project_name=project_name,
-                    project_root=project_root,
-                    status="active",
-                    created_at=now,
-                    updated_at=now,
-                )
-                session_rec = await db.merge(session_rec)
-
-            # Update project info if not yet set.
+            # Update project info if not yet set on the existing record.
             if project_name and not session_rec.project_name:
                 session_rec.project_name = project_name
             if project_root and not session_rec.project_root:
