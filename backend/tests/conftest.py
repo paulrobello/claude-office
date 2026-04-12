@@ -1,5 +1,11 @@
 """Pytest fixtures for backend tests."""
 
+import os
+
+# Disable AI summary service in tests to avoid network timeouts
+# when CLAUDE_CODE_OAUTH_TOKEN is present in .env but expired.
+os.environ["SUMMARY_ENABLED"] = "False"
+
 import asyncio
 import tempfile
 from collections.abc import AsyncIterator, Iterator
@@ -9,7 +15,12 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
+from app.config import get_settings
 from app.db.database import Base, get_db, override_engine
+
+# Ensure settings are cached with SUMMARY_ENABLED=False
+get_settings.cache_clear()
+_ = get_settings()
 
 
 @pytest.fixture(scope="session", autouse=True)
