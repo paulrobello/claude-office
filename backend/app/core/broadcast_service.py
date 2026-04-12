@@ -6,6 +6,8 @@ that handler modules can import just what they need without pulling in the
 full EventProcessor class.
 """
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any
 
 from app.api.websocket import manager

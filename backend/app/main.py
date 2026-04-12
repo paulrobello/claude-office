@@ -156,7 +156,7 @@ async def websocket_room(websocket: WebSocket, room_id: str) -> None:
     await manager.connect_room(websocket, room_id)
     try:
         # Send current room state on connect
-        orch: RoomOrchestrator | None = event_processor.orchestrators.get(room_id)  # type: ignore[union-attr]
+        orch: RoomOrchestrator | None = event_processor.orchestrators.get(room_id)
         if orch:
             state = orch.merge()
             if state:
