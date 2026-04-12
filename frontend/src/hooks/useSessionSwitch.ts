@@ -22,6 +22,7 @@ interface UseSessionSwitchResult {
   handleClearDB: () => Promise<void>;
   handleSimulate: () => Promise<void>;
   handleReset: () => void;
+  handleRenameSession: (sessionId: string, newName: string) => Promise<void>;
 }
 
 // ============================================================================
@@ -131,11 +132,40 @@ export function useSessionSwitch({
     showStatus(t("status.storeReset"), "info");
   };
 
+  const handleRenameSession = async (
+    sessionId: string,
+    newName: string,
+  ): Promise<void> => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+
+    try {
+      const res = await fetch(
+        `http://localhost:8000/api/v1/sessions/${sessionId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ display_name: trimmed }),
+        },
+      );
+      if (res.ok) {
+        await fetchSessions();
+        showStatus(t("status.sessionRenamed"), "success");
+      } else {
+        showStatus(t("status.failedRenameSession"), "error");
+      }
+    } catch (e) {
+      console.error(e);
+      showStatus(t("status.errorConnecting"), "error");
+    }
+  };
+
   return {
     handleSessionSelect,
     handleDeleteSession,
     handleClearDB,
     handleSimulate,
     handleReset,
+    handleRenameSession,
   };
 }

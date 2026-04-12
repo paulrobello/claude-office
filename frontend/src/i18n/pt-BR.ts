@@ -179,6 +179,8 @@ const ptBR: Record<TranslationKey, string> = {
   "status.sessionDeleted": "Sessão excluída.",
   "status.failedDeleteSession": "Falha ao excluir sessão.",
   "status.errorConnecting": "Erro ao conectar ao backend.",
+  "status.sessionRenamed": "Sessão renomeada.",
+  "status.failedRenameSession": "Falha ao renomear sessão.",
   "status.clearingDatabase": "Limpando banco de dados...",
   "status.databaseCleared": "Banco de dados limpo.",
   "status.failedClearDatabase": "Falha ao limpar banco de dados.",

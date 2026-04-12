@@ -176,6 +176,8 @@ const en = {
   "status.sessionDeleted": "Session deleted.",
   "status.failedDeleteSession": "Failed to delete session.",
   "status.errorConnecting": "Error connecting to backend.",
+  "status.sessionRenamed": "Session renamed.",
+  "status.failedRenameSession": "Failed to rename session.",
   "status.clearingDatabase": "Clearing database...",
   "status.databaseCleared": "Database cleared.",
   "status.failedClearDatabase": "Failed to clear database.",

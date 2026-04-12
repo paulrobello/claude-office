@@ -179,6 +179,8 @@ const es: Record<TranslationKey, string> = {
   "status.sessionDeleted": "Sesión eliminada.",
   "status.failedDeleteSession": "Error al eliminar sesión.",
   "status.errorConnecting": "Error al conectar con el backend.",
+  "status.sessionRenamed": "Sesión renombrada.",
+  "status.failedRenameSession": "Error al renombrar la sesión.",
   "status.clearingDatabase": "Limpiando base de datos...",
   "status.databaseCleared": "Base de datos limpia.",
   "status.failedClearDatabase": "Error al limpiar base de datos.",
