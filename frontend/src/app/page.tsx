@@ -129,6 +129,7 @@ export default function V2TestPage(): React.ReactNode {
     handleClearDB,
     handleSimulate,
     handleReset,
+    handleRenameSession,
   } = useSessionSwitch({ sessionId, setSessionId, fetchSessions, showStatus });
 
   // ------------------------------------------------------------------
@@ -449,6 +450,7 @@ export default function V2TestPage(): React.ReactNode {
             }
             onSessionSelect={handleSessionSelect}
             onDeleteSession={setSessionPendingDelete}
+            onRenameSession={handleRenameSession}
           />
 
           <div
@@ -478,6 +480,7 @@ export default function V2TestPage(): React.ReactNode {
               }
               onSessionSelect={handleSessionSelect}
               onDeleteSession={setSessionPendingDelete}
+              onRenameSession={handleRenameSession}
             />
           }
         />

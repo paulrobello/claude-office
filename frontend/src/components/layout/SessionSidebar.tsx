@@ -84,11 +84,72 @@ interface SessionSidebarProps {
   onToggleCollapsed: () => void;
   onSessionSelect: (id: string) => Promise<void>;
   onDeleteSession: (session: Session) => void;
+  onRenameSession: (sessionId: string, newName: string) => Promise<void>;
 }
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
+
+/** Editable session name — double-click to rename, Enter/blur to save, Escape to cancel. */
+function EditableName({
+  session,
+  isEditing,
+  onStartEdit,
+  onCommit,
+  onCancel,
+  className,
+}: {
+  session: Session;
+  isEditing: boolean;
+  onStartEdit: () => void;
+  onCommit: (name: string) => void;
+  onCancel: () => void;
+  className?: string;
+}): React.ReactNode {
+  const [draft, setDraft] = useState(
+    () => session.displayName ?? getProjectKey(session),
+  );
+
+  if (isEditing) {
+    return (
+      <input
+        type="text"
+        value={draft}
+        autoFocus
+        className="text-xs font-bold flex-1 bg-slate-700 text-white px-1 py-0 rounded outline-none border border-purple-500"
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onCommit(draft);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            onCancel();
+          }
+        }}
+        onBlur={() => onCommit(draft)}
+        onClick={(e) => e.stopPropagation()}
+      />
+    );
+  }
+
+  const displayName = session.displayName ?? getProjectKey(session);
+
+  return (
+    <span
+      className={className}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        setDraft(session.displayName ?? getProjectKey(session));
+        onStartEdit();
+      }}
+      title={session.displayName ? "Double-click to rename" : undefined}
+    >
+      {displayName}
+    </span>
+  );
+}
 
 /**
  * Desktop left sidebar containing the collapsible session browser and git
@@ -103,6 +164,7 @@ export function SessionSidebar({
   onToggleCollapsed,
   onSessionSelect,
   onDeleteSession,
+  onRenameSession,
 }: SessionSidebarProps): React.ReactNode {
   const { t, language } = useTranslation();
   const dateFnsLocale =
@@ -113,6 +175,7 @@ export function SessionSidebar({
         : undefined;
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
 
   const toggleGroup = useCallback((key: string) => {
     setExpandedGroups((prev) => {
@@ -246,15 +309,23 @@ export function SessionSidebar({
                                 className="text-slate-500 flex-shrink-0"
                               />
                             )}
-                            <span
+                            <EditableName
+                              session={primary}
+                              isEditing={editingSessionId === primary.id}
+                              onStartEdit={() =>
+                                setEditingSessionId(primary.id)
+                              }
+                              onCommit={(name) => {
+                                setEditingSessionId(null);
+                                onRenameSession(primary.id, name);
+                              }}
+                              onCancel={() => setEditingSessionId(null)}
                               className={`text-xs font-bold truncate flex-1 ${
                                 primary.id === sessionId
                                   ? "text-purple-300"
                                   : "text-slate-300"
                               }`}
-                            >
-                              {projectKey}
-                            </span>
+                            />
                             <button
                               type="button"
                               onClick={(e) => {
@@ -330,7 +401,8 @@ export function SessionSidebar({
                                       className="text-slate-600 flex-shrink-0"
                                     />
                                     <span className="text-[10px] text-slate-500 font-mono truncate flex-1">
-                                      {session.id.slice(0, 12)}
+                                      {session.displayName ??
+                                        session.id.slice(0, 12)}
                                     </span>
                                     <span className="text-[10px] text-slate-600">
                                       {formatDistanceToNow(
