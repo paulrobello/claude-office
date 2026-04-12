@@ -48,12 +48,15 @@ class SessionSummary(TypedDict):
 
     id: str
     label: str | None
+    displayName: str | None
     projectName: str | None
     projectRoot: str | None
     createdAt: str
     updatedAt: str
     status: str
     eventCount: int
+    floorId: str | None
+    roomId: str | None
 
 
 class ReplayEvent(TypedDict):
@@ -74,15 +77,27 @@ class ReplayEntry(TypedDict):
 
 
 @router.get("")
-async def list_sessions(db: Annotated[AsyncSession, Depends(get_db)]) -> list[SessionSummary]:
+async def list_sessions(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    room_id: str | None = None,
+    floor_id: str | None = None,
+) -> list[SessionSummary]:
     """List all sessions with event counts.
 
     Only returns sessions that have received a ``session_start`` event.  Child
     sessions spawned by OpenCode @agent mentions never receive a ``session_start``
     — they start directly with ``user_prompt_submit`` / ``pre_tool_use`` events —
     so filtering on this event type keeps them out of the sidebar.
+
+    Args:
+        db: Database session dependency.
+        room_id: Optional filter to only return sessions in a specific room.
+        floor_id: Optional filter to only return sessions on a specific floor.
+
+    Returns:
+        List of session summaries matching the given filters.
     """
-    logger.debug("API: list_sessions called")
+    logger.debug("API: list_sessions called (room_id=%s, floor_id=%s)", room_id, floor_id)
     try:
         # Find all session IDs that have at least one session_start event.
         # Child @agent sessions never get session_start, so they're excluded.
@@ -95,6 +110,13 @@ async def list_sessions(db: Annotated[AsyncSession, Depends(get_db)]) -> list[Se
         sessions_with_start: set[str] = {row[0] for row in start_result.all()}
 
         stmt = select(SessionRecord).order_by(SessionRecord.updated_at.desc())
+
+        # Apply optional room/floor filters
+        if room_id is not None:
+            stmt = stmt.where(SessionRecord.room_id == room_id)
+        if floor_id is not None:
+            stmt = stmt.where(SessionRecord.floor_id == floor_id)
+
         result = await db.execute(stmt)
         records = result.scalars().all()
 
@@ -124,12 +146,15 @@ async def list_sessions(db: Annotated[AsyncSession, Depends(get_db)]) -> list[Se
                 {
                     "id": rec.id,
                     "label": rec.label,
+                    "displayName": rec.display_name,
                     "projectName": rec.project_name,
                     "projectRoot": rec.project_root,
                     "createdAt": created_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     "updatedAt": updated_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     "status": rec.status,
                     "eventCount": count,
+                    "floorId": rec.floor_id,
+                    "roomId": rec.room_id,
                 }
             )
         return sessions
@@ -175,6 +200,103 @@ async def update_session_label(
         raise
     except Exception as e:
         await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+class DisplayNameUpdate(BaseModel):
+    """Request body for updating a session display name."""
+
+    display_name: str | None = None
+
+
+@router.patch("/{session_id}")
+async def update_session(
+    session_id: str, body: DisplayNameUpdate, db: Annotated[AsyncSession, Depends(get_db)]
+) -> dict[str, str]:
+    """Update the display name of a session.
+
+    Args:
+        session_id: Identifier for the session to update.
+        body: Request body containing the new display_name value.
+        db: Database session dependency.
+
+    Returns:
+        A status payload confirming the update.
+
+    Raises:
+        HTTPException: If the session is not found or update fails.
+    """
+    try:
+        result = await db.execute(select(SessionRecord).where(SessionRecord.id == session_id))
+        session = result.scalar_one_or_none()
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        session.display_name = body.display_name
+        await db.commit()
+        return {"status": "success", "message": f"Session {session_id} updated"}
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+class FocusRequest(BaseModel):
+    """Request body for focusing a session terminal."""
+
+    message: str | None = None
+
+
+@router.post("/{session_id}/focus")
+async def focus_session(
+    session_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: FocusRequest | None = None,
+) -> dict[str, str]:
+    """Bring a session's terminal to the foreground and optionally copy a message to clipboard.
+
+    Uses macOS AppleScript to activate the Terminal window. If a message is
+    provided, it is copied to the system clipboard.
+
+    Args:
+        session_id: Identifier for the session to focus.
+        body: Optional request body with a message to copy to clipboard.
+        db: Database session dependency.
+
+    Returns:
+        A status payload confirming the focus action.
+
+    Raises:
+        HTTPException: If the session is not found or the focus action fails.
+    """
+    try:
+        result = await db.execute(select(SessionRecord).where(SessionRecord.id == session_id))
+        session = result.scalar_one_or_none()
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Bring Terminal to foreground via AppleScript
+        subprocess.run(
+            ["osascript", "-e", 'tell application "Terminal" to activate'],
+            capture_output=True,
+            timeout=5,
+        )
+
+        # Optionally copy message to clipboard
+        if body and body.message:
+            subprocess.run(
+                ["pbcopy"],
+                input=body.message.encode("utf-8"),
+                capture_output=True,
+                timeout=5,
+            )
+
+        return {"status": "success", "message": f"Session {session_id} focused"}
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

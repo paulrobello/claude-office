@@ -19,7 +19,12 @@ from sqlalchemy import delete, select
 
 from app.config import get_settings
 from app.core.beads_poller import get_beads_poller, has_beads, init_beads_poller
-from app.core.broadcast_service import broadcast_error, broadcast_event, broadcast_state
+from app.core.broadcast_service import (
+    broadcast_error,
+    broadcast_event,
+    broadcast_room_state,
+    broadcast_state,
+)
 from app.core.floor_config import get_cached_building_config
 from app.core.handlers import (
     enrich_agent_from_transcript,
@@ -36,6 +41,7 @@ from app.core.handlers import (
 )
 from app.core.jsonl_parser import get_last_assistant_response
 from app.core.product_mapper import get_product_mapper
+from app.core.room_orchestrator import RoomOrchestrator
 from app.core.state_machine import StateMachine
 from app.core.task_file_poller import init_task_file_poller
 from app.core.task_persistence import load_tasks, save_tasks
@@ -97,6 +103,7 @@ class EventProcessor:
 
     def __init__(self) -> None:
         self.sessions: dict[str, StateMachine] = {}
+        self.orchestrators: dict[str, RoomOrchestrator] = {}
         self._sessions_lock = asyncio.Lock()
         self._transcript_poller_initialized = False
         self._task_poller_initialized = False
@@ -172,6 +179,13 @@ class EventProcessor:
             session_id: Identifier for the session to purge.
         """
         async with self._sessions_lock:
+            sm = self.sessions.get(session_id)
+            if sm and sm.room_id:
+                orchestrator = self.orchestrators.get(sm.room_id)
+                if orchestrator:
+                    orchestrator.remove_session(session_id)
+                    if orchestrator.is_empty:
+                        del self.orchestrators[sm.room_id]
             self.sessions.pop(session_id, None)
 
     async def clear_all_sessions(self) -> None:
@@ -262,6 +276,14 @@ class EventProcessor:
                 sm.floor_id = assignment.floor_id
                 sm.room_id = assignment.room_id
 
+        # Sync team fields from event data.
+        if event.data:
+            if event.data.team_name is not None:
+                sm.team_name = event.data.team_name
+            if event.data.teammate_name is not None:
+                sm.teammate_name = event.data.teammate_name
+                sm.is_lead = False
+
         agent_id = event.data.agent_id if event.data and event.data.agent_id else "main"
 
         # Build detail dict from event data fields for frontend inspection.
@@ -336,6 +358,17 @@ class EventProcessor:
         # ------------------------------------------------------------------
         await broadcast_state(event.session_id, sm)
         await broadcast_event(event.session_id, event_dict)
+
+        # ------------------------------------------------------------------
+        # Room orchestrator broadcast (team sessions)
+        # ------------------------------------------------------------------
+        if sm.room_id:
+            orchestrator = self.orchestrators.get(sm.room_id)
+            if orchestrator is None:
+                orchestrator = RoomOrchestrator(sm.room_id)
+                self.orchestrators[sm.room_id] = orchestrator
+            orchestrator.update_session(event.session_id, sm)
+            await broadcast_room_state(sm.room_id, orchestrator)
 
         # ------------------------------------------------------------------
         # SUBAGENT_START

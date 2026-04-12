@@ -148,6 +148,34 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
         await manager.disconnect(websocket, session_id)
 
 
+@app.websocket("/ws/room/{room_id}")
+async def websocket_room(websocket: WebSocket, room_id: str) -> None:
+    """Room-level WebSocket: sends merged state for all sessions in a room."""
+    from app.core.room_orchestrator import RoomOrchestrator
+
+    await manager.connect_room(websocket, room_id)
+    try:
+        # Send current room state on connect
+        orch: RoomOrchestrator | None = event_processor.orchestrators.get(room_id)  # type: ignore[union-attr]
+        if orch:
+            state = orch.merge()
+            if state:
+                await websocket.send_json(
+                    {
+                        "type": "state_update",
+                        "timestamp": state.last_updated.isoformat(),
+                        "state": state.model_dump(mode="json", by_alias=True),
+                    }
+                )
+        # Keep alive -- discard incoming messages
+        while True:
+            await websocket.receive_text()
+    except Exception:
+        pass
+    finally:
+        await manager.disconnect_room(websocket, room_id)
+
+
 if STATIC_DIR.exists():
     app.mount("/_next", StaticFiles(directory=STATIC_DIR / "_next"), name="next_static")
 

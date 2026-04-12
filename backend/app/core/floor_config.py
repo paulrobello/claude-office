@@ -2,11 +2,13 @@
 
 Provides Pydantic models for defining building layouts with floors (teams)
 and rooms (repos). Configuration is stored as JSON in the user_preferences
-table under the key ``building_config``.
+table under the key ``building_config``, and can also be loaded from
+``floors.toml`` for development/testing.
 """
 
 import json
 import logging
+from pathlib import Path
 from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,6 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import UserPreference
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_TOML_PATH = Path(__file__).parent.parent.parent / "floors.toml"
 
 BUILDING_CONFIG_KEY = "building_config"
 
@@ -146,3 +150,56 @@ async def load_building_config(db: AsyncSession) -> BuildingConfig:
         logger.exception("Error loading building_config: %s", exc)
 
     return BuildingConfig()
+
+
+def load_building_config_from_toml(
+    *,
+    toml_path: Path | None = None,
+    toml_string: str | None = None,
+) -> BuildingConfig:
+    """Load building config from a TOML file or string (sync, for testing/dev).
+
+    Args:
+        toml_path: Path to a ``floors.toml`` file.
+        toml_string: Raw TOML content (takes priority over *toml_path*).
+
+    Returns:
+        A :class:`BuildingConfig`. Returns an empty config on errors.
+    """
+    import tomli
+
+    raw: dict[str, Any] = {}
+
+    if toml_string is not None:
+        raw = tomli.loads(toml_string)
+    elif toml_path is not None:
+        if not toml_path.exists():
+            logger.warning("floors.toml not found at %s — using empty config", toml_path)
+            return BuildingConfig()
+        raw = tomli.loads(toml_path.read_text(encoding="utf-8"))
+    else:
+        return BuildingConfig()
+
+    floors: list[FloorConfig] = []
+    for entry in raw.get("floors", []):
+        entry_dict: dict[str, Any] = entry
+        floor_id: str = entry_dict["name"].lower().replace(" ", "")
+        rooms: list[RoomConfig] = [
+            RoomConfig(id=str(r), repo_name=str(r)) for r in entry_dict.get("repos", [])
+        ]
+        floors.append(
+            FloorConfig(
+                id=floor_id,
+                name=str(entry_dict["name"]),
+                floor_number=int(entry_dict["floor_number"]),
+                accent=str(entry_dict.get("accent", "#6366f1")),
+                icon=str(entry_dict.get("icon", "🏢")),
+                rooms=rooms,
+            )
+        )
+
+    floors.sort(key=lambda f: f.floor_number, reverse=True)
+    return BuildingConfig(
+        building_name=str(raw.get("building_name", "Office")),
+        floors=floors,
+    )
