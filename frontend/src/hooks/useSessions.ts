@@ -16,12 +16,15 @@ import {
 export interface Session {
   id: string;
   label: string | null;
+  displayName: string | null;
   projectName: string | null;
   projectRoot: string | null;
   createdAt: string;
   updatedAt: string;
   status: string;
   eventCount: number;
+  floorId: string | null;
+  roomId: string | null;
 }
 
 // ============================================================================
