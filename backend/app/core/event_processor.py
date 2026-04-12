@@ -20,6 +20,7 @@ from sqlalchemy import delete, select
 from app.config import get_settings
 from app.core.beads_poller import get_beads_poller, has_beads, init_beads_poller
 from app.core.broadcast_service import broadcast_error, broadcast_event, broadcast_state
+from app.core.floor_config import get_cached_building_config
 from app.core.handlers import (
     enrich_agent_from_transcript,
     ensure_task_poller_running,
@@ -34,6 +35,7 @@ from app.core.handlers import (
     handle_user_prompt_submit,
 )
 from app.core.jsonl_parser import get_last_assistant_response
+from app.core.product_mapper import get_product_mapper
 from app.core.state_machine import StateMachine
 from app.core.task_file_poller import init_task_file_poller
 from app.core.task_persistence import load_tasks, save_tasks
@@ -243,6 +245,22 @@ class EventProcessor:
         sm = self.sessions[event.session_id]
 
         sm.transition(event)
+
+        # Resolve floor/room assignment when building has configured floors.
+        building_config = get_cached_building_config()
+        if building_config.floors:
+            mapper = get_product_mapper(building_config)
+            project_name = event.data.project_name if event.data else None
+            project_dir = event.data.project_dir if event.data else None
+            working_dir = event.data.working_dir if event.data else None
+            assignment = mapper.resolve(
+                project_name=project_name,
+                project_dir=project_dir,
+                working_dir=working_dir,
+            )
+            if assignment:
+                sm.floor_id = assignment.floor_id
+                sm.room_id = assignment.room_id
 
         agent_id = event.data.agent_id if event.data and event.data.agent_id else "main"
 

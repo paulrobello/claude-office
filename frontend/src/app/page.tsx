@@ -3,6 +3,11 @@
  *
  * Uses the unified Zustand store, XState machines, and OfficeGame component.
  * Layout and logic are delegated to extracted components and custom hooks.
+ *
+ * Navigation modes:
+ * - "single" (default): the original flat layout with sidebar + canvas + sidebar
+ * - "building": cross-section building view (when user configures floors)
+ * - "floor": floor-level view wrapping the office canvas
  */
 
 "use client";
@@ -12,6 +17,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useWebSocketEvents } from "@/hooks/useWebSocketEvents";
 import { useSessions } from "@/hooks/useSessions";
 import { useSessionSwitch } from "@/hooks/useSessionSwitch";
+import { useFloorConfig } from "@/hooks/useFloorConfig";
 import {
   useGameStore,
   selectIsConnected,
@@ -19,6 +25,8 @@ import {
   selectAgents,
   selectBoss,
 } from "@/stores/gameStore";
+import { useNavigationStore } from "@/stores/navigationStore";
+import { useTourStore } from "@/stores/tourStore";
 import { useShallow } from "zustand/react/shallow";
 import { Menu, X } from "lucide-react";
 import { SessionSidebar } from "@/components/layout/SessionSidebar";
@@ -32,6 +40,11 @@ import {
 } from "@/components/layout/StatusToast";
 import Modal from "@/components/overlay/Modal";
 import SettingsModal from "@/components/overlay/SettingsModal";
+import { Breadcrumb } from "@/components/navigation/Breadcrumb";
+import { ViewTransition } from "@/components/navigation/ViewTransition";
+import { BuildingView } from "@/components/views/BuildingView";
+import { FloorView } from "@/components/views/FloorView";
+import { TourOverlay } from "@/components/tour/TourOverlay";
 import { usePreferencesStore } from "@/stores/preferencesStore";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { Session } from "@/hooks/useSessions";
@@ -76,6 +89,9 @@ export default function V2TestPage(): React.ReactNode {
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<
+    "general" | "building"
+  >("general");
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
     null,
   );
@@ -126,6 +142,31 @@ export default function V2TestPage(): React.ReactNode {
     (state) => state.loadPersistedDebugSettings,
   );
   const loadPreferences = usePreferencesStore((s) => s.loadPreferences);
+
+  // Navigation store
+  const view = useNavigationStore((s) => s.view);
+
+  // ------------------------------------------------------------------
+  // Floor config + tour initialization
+  // ------------------------------------------------------------------
+  useFloorConfig();
+
+  // Watch for edit-building requests from BuildingView
+  const consumeEditBuilding = useNavigationStore((s) => s.consumeEditBuilding);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (consumeEditBuilding()) {
+        setSettingsInitialTab("building");
+        setIsSettingsModalOpen(true);
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [consumeEditBuilding]);
+
+  const loadTourSeen = useTourStore((s) => s.loadTourSeen);
+  useEffect(() => {
+    loadTourSeen();
+  }, [loadTourSeen]);
 
   // ------------------------------------------------------------------
   // WebSocket connection — reconnects when sessionId changes
@@ -260,6 +301,7 @@ export default function V2TestPage(): React.ReactNode {
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
+        initialTab={settingsInitialTab}
       />
 
       <Modal
@@ -326,6 +368,9 @@ export default function V2TestPage(): React.ReactNode {
               </span>
             )}
           </h1>
+
+          {/* Breadcrumb — only when in building/floor view */}
+          {!isMobile && <Breadcrumb />}
         </div>
 
         {/* Centered status toast */}
@@ -389,7 +434,10 @@ export default function V2TestPage(): React.ReactNode {
           </div>
           <MobileAgentActivity agents={agents} boss={boss} />
         </div>
-      ) : (
+      ) : view === "single" ? (
+        /* ----------------------------------------------------------------
+            Single View (default, original layout)
+        ---------------------------------------------------------------- */
         <div className="flex-grow flex gap-2 overflow-hidden min-h-0">
           <SessionSidebar
             sessions={sessions}
@@ -403,13 +451,42 @@ export default function V2TestPage(): React.ReactNode {
             onDeleteSession={setSessionPendingDelete}
           />
 
-          <div className="flex-grow border border-slate-800 rounded-lg shadow-2xl bg-slate-900 overflow-hidden relative">
+          <div
+            data-tour-id="game-canvas"
+            className="flex-grow border border-slate-800 rounded-lg shadow-2xl bg-slate-900 overflow-hidden relative"
+          >
             <OfficeGame />
           </div>
 
           <RightSidebar />
         </div>
+      ) : (
+        /* ----------------------------------------------------------------
+            Building / Floor View (animated transitions)
+        ---------------------------------------------------------------- */
+        <ViewTransition
+          view={view}
+          buildingView={<BuildingView sessions={sessions} />}
+          floorView={
+            <FloorView
+              sessions={sessions}
+              sessionsLoading={sessionsLoading}
+              sessionId={sessionId}
+              isCollapsed={leftSidebarCollapsed}
+              onToggleCollapsed={() =>
+                setLeftSidebarCollapsed(!leftSidebarCollapsed)
+              }
+              onSessionSelect={handleSessionSelect}
+              onDeleteSession={setSessionPendingDelete}
+            />
+          }
+        />
       )}
+
+      {/* ----------------------------------------------------------------
+          Tour Overlay
+      ---------------------------------------------------------------- */}
+      <TourOverlay />
     </main>
   );
 }

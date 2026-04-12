@@ -1,5 +1,6 @@
 """API routes for user preferences."""
 
+import json
 import logging
 from typing import Annotated
 
@@ -8,6 +9,8 @@ from pydantic import BaseModel
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.floor_config import invalidate_building_config
+from app.core.product_mapper import invalidate_product_mapper
 from app.db.database import get_db
 from app.db.models import UserPreference
 
@@ -58,6 +61,10 @@ async def set_preference(
 ) -> dict[str, str]:
     """Set a preference value. Creates or updates the preference."""
     try:
+        # Validate building_config values against the schema before persisting.
+        if key == "building_config":
+            _validate_building_config(body.value)
+
         result = await db.execute(select(UserPreference).where(UserPreference.key == key))
         pref = result.scalar_one_or_none()
 
@@ -68,6 +75,12 @@ async def set_preference(
             db.add(pref)
 
         await db.commit()
+
+        # Invalidate cached floor/mapper data so the next request picks up changes.
+        if key == "building_config":
+            invalidate_building_config()
+            invalidate_product_mapper()
+
         return {"key": key, "value": body.value}
     except Exception as e:
         await db.rollback()
@@ -89,6 +102,11 @@ async def delete_preference(
         await db.execute(delete(UserPreference).where(UserPreference.key == key))
         await db.commit()
 
+        # Invalidate cached floor/mapper data when building_config is removed.
+        if key == "building_config":
+            invalidate_building_config()
+            invalidate_product_mapper()
+
         return {"status": "success", "message": f"Preference '{key}' deleted"}
     except HTTPException:
         raise
@@ -96,3 +114,23 @@ async def delete_preference(
         await db.rollback()
         logger.exception("Error deleting preference %s: %s", key, e)
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+def _validate_building_config(value: str) -> None:
+    """Validate that a JSON string conforms to the BuildingConfig schema.
+
+    Args:
+        value: JSON string to validate.
+
+    Raises:
+        HTTPException: If the value is not valid JSON or doesn't match the schema.
+    """
+    from app.core.floor_config import BuildingConfig
+
+    try:
+        BuildingConfig.from_json(value)
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid building_config: {exc}",
+        ) from exc

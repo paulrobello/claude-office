@@ -228,6 +228,8 @@ export type Newsitems = NewsItem[];
 export type Coffeecups = number;
 export type Backgroundtasks = BackgroundTask[];
 export type Conversation = ConversationEntry[];
+export type Floorid = string | null;
+export type Roomid = string | null;
 /**
  * Current branch name
  */
@@ -483,6 +485,8 @@ export interface GameState {
   departureQueue?: Departurequeue;
   whiteboardData?: WhiteboardData;
   conversation?: Conversation;
+  floorId?: Floorid;
+  roomId?: Roomid;
   [k: string]: unknown;
 }
 /**

@@ -19,6 +19,7 @@ const ptBR: Record<TranslationKey, string> = {
   "header.aiOn": "LIGADO",
   "header.aiOff": "DESLIGADO",
   "header.agents": "agentes",
+  "header.tour": "TUR",
 
   // Modals
   "modal.confirmDbWipe": "Confirmar Limpeza do Banco",
@@ -54,6 +55,25 @@ const ptBR: Record<TranslationKey, string> = {
   "settings.clockTip":
     "Dica: Clique no relógio do escritório para alternar rapidamente entre os modos.",
   "settings.language": "Idioma",
+  "settings.tabs.general": "Geral",
+  "settings.tabs.building": "Edifício",
+  "settings.building.name": "Nome do Edifício",
+  "settings.building.namePlaceholder": "Minha Empresa",
+  "settings.building.floors": "Andares",
+  "settings.building.addFloor": "Adicionar Andar",
+  "settings.building.floorName": "Nome do Andar",
+  "settings.building.floorNumber": "Andar",
+  "settings.building.accentColor": "Cor",
+  "settings.building.icon": "Ícone",
+  "settings.building.repos": "Pastas de projetos",
+  "settings.building.reposPlaceholder": "claude-office, minha-api, web-ui",
+  "settings.building.save": "Salvar",
+  "settings.building.saving": "Salvando...",
+  "settings.building.saved": "Salvo!",
+  "settings.building.deleteFloor": "Remover",
+  "settings.building.noFloors": "Nenhum andar configurado",
+  "settings.building.enableHint":
+    "Adicione andares e mapeie nomes de pastas de projetos para ativar a visualização de edifício",
 
   // Sessions
   "sessions.title": "Sessões",
@@ -171,6 +191,36 @@ const ptBR: Record<TranslationKey, string> = {
     "Sessão excluída. Nenhuma outra sessão disponível.",
   "status.connectedTo": "Conectado a {sessionName}",
   "status.autoFollowed": "Seguindo nova sessão: {sessionName}",
+
+  // Navigation
+  "navigation.building": "Edifício",
+
+  // Tour
+  "tour.steps.welcome.title": "Bem-vindo",
+  "tour.steps.welcome.description":
+    "Este é seu centro de comando. Clique em um andar para explorar.",
+  "tour.steps.singleWelcome.title": "Bem-vindo ao Claude Office",
+  "tour.steps.singleWelcome.description":
+    "Este escritório em pixel art mostra suas sessões do Claude Code em tempo real. Vamos dar uma olhada rápida.",
+  "tour.steps.simulate.title": "Iniciar Simulação",
+  "tour.steps.simulate.description":
+    "Clique em Simular para dar vida ao escritório.",
+  "tour.steps.agentsArrive.title": "Agentes Chegam",
+  "tour.steps.agentsArrive.description":
+    "Agentes chegam pelo elevador, caminham até suas mesas e começam a trabalhar.",
+  "tour.steps.inspectAgent.title": "Inspecione um Agente",
+  "tour.steps.inspectAgent.description":
+    "Clique em qualquer personagem para inspecioná-lo.",
+  "tour.steps.focusPopup.title": "Popup de Foco",
+  "tour.steps.focusPopup.description":
+    "Daqui você pode copiar uma mensagem para a área de transferência e ir para o terminal. O escritório atualiza em tempo real enquanto o Claude trabalha.",
+  "tour.steps.zoomOut.title": "Afastar",
+  "tour.steps.zoomOut.description": "Tente afastar para ver a visão geral.",
+  "tour.steps.settings.title": "Configurar Andares",
+  "tour.steps.settings.description":
+    "Abra Configurações para adicionar andares e mapear pastas de projetos para uma visão de edifício multi-andar.",
+  "tour.skip": "Pular tour",
+  "tour.next": "Próximo",
 };
 
 export default ptBR;

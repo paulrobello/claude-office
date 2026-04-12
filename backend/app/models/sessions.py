@@ -140,3 +140,5 @@ class GameState(BaseModel):
     conversation: list[ConversationEntry] = Field(
         default_factory=lambda: cast(list[ConversationEntry], [])
     )
+    floor_id: str | None = None
+    room_id: str | None = None

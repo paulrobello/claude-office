@@ -17,6 +17,7 @@ const en = {
   "header.aiOn": "ON",
   "header.aiOff": "OFF",
   "header.agents": "agents",
+  "header.tour": "TOUR",
 
   // Modals
   "modal.confirmDbWipe": "Confirm Database Wipe",
@@ -52,6 +53,25 @@ const en = {
   "settings.clockTip":
     "Tip: Click the clock in the office to quickly cycle between modes.",
   "settings.language": "Language",
+  "settings.tabs.general": "General",
+  "settings.tabs.building": "Building",
+  "settings.building.name": "Building Name",
+  "settings.building.namePlaceholder": "My Company",
+  "settings.building.floors": "Floors",
+  "settings.building.addFloor": "Add Floor",
+  "settings.building.floorName": "Floor Name",
+  "settings.building.floorNumber": "Floor",
+  "settings.building.accentColor": "Accent",
+  "settings.building.icon": "Icon",
+  "settings.building.repos": "Project folders",
+  "settings.building.reposPlaceholder": "claude-office, my-api, web-ui",
+  "settings.building.save": "Save",
+  "settings.building.saving": "Saving...",
+  "settings.building.saved": "Saved!",
+  "settings.building.deleteFloor": "Remove",
+  "settings.building.noFloors": "No floors configured",
+  "settings.building.enableHint":
+    "Add floors and map project folder names to enable building navigation view",
 
   // Sessions
   "sessions.title": "Sessions",
@@ -168,6 +188,37 @@ const en = {
     "Session deleted. No other sessions available.",
   "status.connectedTo": "Connected to {sessionName}",
   "status.autoFollowed": "Auto-followed new session: {sessionName}",
+
+  // Navigation
+  "navigation.building": "Building",
+
+  // Tour
+  "tour.steps.welcome.title": "Welcome",
+  "tour.steps.welcome.description":
+    "This is your command center. Click a floor to explore.",
+  "tour.steps.singleWelcome.title": "Welcome to Claude Office",
+  "tour.steps.singleWelcome.description":
+    "This pixel art office shows your Claude Code sessions in real time. Let's take a quick look around.",
+  "tour.steps.simulate.title": "Start Simulation",
+  "tour.steps.simulate.description":
+    "Click Simulate to bring the office to life.",
+  "tour.steps.agentsArrive.title": "Agents Arrive",
+  "tour.steps.agentsArrive.description":
+    "Agents arrive through the elevator, walk to their desks, and start working.",
+  "tour.steps.inspectAgent.title": "Inspect an Agent",
+  "tour.steps.inspectAgent.description":
+    "Click on any character to inspect them.",
+  "tour.steps.focusPopup.title": "Focus Popup",
+  "tour.steps.focusPopup.description":
+    "From here you can copy a message to clipboard and jump to your terminal. The office updates in real time as Claude works.",
+  "tour.steps.zoomOut.title": "Zoom Out",
+  "tour.steps.zoomOut.description":
+    "Try zooming back out to see the big picture.",
+  "tour.steps.settings.title": "Configure Floors",
+  "tour.steps.settings.description":
+    "Open Settings to add floors and map project folders for a multi-floor building view.",
+  "tour.skip": "Skip tour",
+  "tour.next": "Next",
 } as const;
 
 export type TranslationKey = keyof typeof en;

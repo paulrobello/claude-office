@@ -62,3 +62,39 @@ body {
     scrollbar-color: #1e293b transparent;
   }
 }
+
+/* Tour pulse animation */
+@keyframes tourPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 12px rgba(249, 115, 22, 0.4);
+    border-color: rgba(249, 115, 22, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(249, 115, 22, 0.6);
+    border-color: rgba(249, 115, 22, 1);
+  }
+}
+
+/* View transition animations */
+@keyframes zoomInView {
+  from {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes zoomOutView {
+  from {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

@@ -8,8 +8,11 @@ import {
   Trash2,
   HelpCircle,
   Settings,
+  Map,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useNavigationStore } from "@/stores/navigationStore";
+import { useTourStore } from "@/stores/tourStore";
 
 // ============================================================================
 // TYPES
@@ -49,10 +52,18 @@ export function HeaderControls({
   onOpenHelp,
 }: HeaderControlsProps): React.ReactNode {
   const { t } = useTranslation();
+  const view = useNavigationStore((s) => s.view);
+  const buildingConfig = useNavigationStore((s) => s.buildingConfig);
+  const hasSeenTour = useTourStore((s) => s.hasSeenTour);
+  const startTour = useTourStore((s) => s.startTour); // (mode: "single" | "building") => void
+  const hasBuildingConfig =
+    buildingConfig !== null && (buildingConfig?.floors.length ?? 0) > 0;
+
   return (
     <div className="flex gap-4 items-center">
       <button
         onClick={onSimulate}
+        data-tour-id="simulate-btn"
         className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 rounded text-xs font-bold transition-colors"
       >
         <Play size={14} fill="currentColor" />
@@ -87,8 +98,24 @@ export function HeaderControls({
         {debugMode ? t("header.debugOn") : t("header.debugOff")}
       </button>
 
+      {/* Tour button */}
+      {!hasSeenTour && (
+        <button
+          onClick={() => {
+            const mode =
+              view !== "single" && hasBuildingConfig ? "building" : "single";
+            startTour(mode);
+          }}
+          className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 border border-orange-500/30 rounded text-xs font-bold transition-colors"
+        >
+          <Map size={14} />
+          {t("header.tour")}
+        </button>
+      )}
+
       <button
         onClick={onOpenSettings}
+        data-tour-id="settings-btn"
         className="flex items-center gap-2 px-3 py-1.5 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 border border-slate-500/30 rounded text-xs font-bold transition-colors"
       >
         <Settings size={14} />

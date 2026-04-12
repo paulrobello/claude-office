@@ -165,6 +165,10 @@ class StateMachine:
     background_tasks: list[BackgroundTask] = field(default_factory=_empty_background_tasks)
     conversation: list[ConversationEntry] = field(default_factory=_empty_conversation)
 
+    # Floor/room assignment for multi-floor building navigation
+    floor_id: str | None = None
+    room_id: str | None = None
+
     # Whiteboard tracking delegated to WhiteboardTracker
     whiteboard: WhiteboardTracker = field(default_factory=WhiteboardTracker)
 
@@ -329,6 +333,8 @@ class StateMachine:
             departure_queue=self.handin_queue.copy(),
             whiteboard_data=whiteboard_data,
             conversation=self.conversation.copy(),
+            floor_id=self.floor_id,
+            room_id=self.room_id,
         )
 
     def remove_agent(self, agent_id: str) -> None:

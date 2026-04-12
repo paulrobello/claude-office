@@ -9,8 +9,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from rich.logging import RichHandler
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncConnection
 
-from app.api.routes import events, preferences, sessions
+from app.api.routes import events, floors, preferences, sessions
 from app.api.websocket import manager
 from app.config import get_settings
 from app.core.event_processor import event_processor
@@ -28,6 +30,28 @@ logging.basicConfig(
 settings = get_settings()
 
 
+async def _migrate_schema(conn: AsyncConnection) -> None:
+    """Add columns to existing tables that were added after initial schema.
+
+    Only runs for SQLite. Uses ALTER TABLE ADD COLUMN which is a no-op if
+    the column already exists (checked via PRAGMA first).
+    """
+    dialect = conn.dialect.name
+    if dialect != "sqlite":
+        return
+
+    new_columns: dict[str, str] = {
+        "label": "TEXT DEFAULT NULL",
+    }
+
+    result = await conn.execute(text("PRAGMA table_info(sessions)"))
+    existing = {row[1] for row in result.fetchall()}
+
+    for col_name, col_def in new_columns.items():
+        if col_name not in existing:
+            await conn.execute(text(f"ALTER TABLE sessions ADD COLUMN {col_name} {col_def}"))
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Manage application startup and shutdown lifecycle."""
@@ -35,6 +59,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _migrate_schema(conn)
 
     git_service.start()
 
@@ -60,6 +85,7 @@ app.add_middleware(
 )
 
 app.include_router(events.router, prefix=f"{settings.API_V1_STR}")
+app.include_router(floors.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(preferences.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(sessions.router, prefix=f"{settings.API_V1_STR}")
 
