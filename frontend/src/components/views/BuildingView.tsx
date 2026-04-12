@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { useNavigationStore } from "@/stores/navigationStore";
 import type { FloorConfig } from "@/types/navigation";
 import type { Session } from "@/hooks/useSessions";
@@ -101,15 +102,25 @@ export function BuildingView({ sessions }: BuildingViewProps): React.ReactNode {
   const goToFloor = useNavigationStore((s) => s.goToFloor);
   const requestEditBuilding = useNavigationStore((s) => s.requestEditBuilding);
 
+  // Active sessions that don't match any floor
+  const unmatchedSessions = useMemo(
+    () =>
+      buildingConfig
+        ? sessions.filter(
+            (s) =>
+              s.status === "active" &&
+              !sessionMatchesAnyFloor(s, buildingConfig.floors),
+          )
+        : [],
+    [sessions, buildingConfig],
+  );
+
+  const [lobbySearch, setLobbySearch] = useState("");
+
   if (!buildingConfig) return null;
 
   const sortedFloors = [...buildingConfig.floors].sort(
     (a, b) => b.floorNumber - a.floorNumber,
-  );
-
-  // Sessions that don't match any floor
-  const unmatchedSessions = sessions.filter(
-    (s) => !sessionMatchesAnyFloor(s, buildingConfig.floors),
   );
 
   return (
@@ -159,37 +170,52 @@ export function BuildingView({ sessions }: BuildingViewProps): React.ReactNode {
           );
         })}
 
-        {/* Lobby / Ground — unmatched sessions */}
+        {/* Lobby / Ground — active unmatched sessions */}
         <div className="border border-dashed border-slate-800 rounded-lg overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-2.5 bg-slate-900/30">
             <span className="text-slate-600">{"\u{1F6AA}"}</span>
             <span className="text-sm text-slate-500 font-bold">Lobby</span>
             {unmatchedSessions.length > 0 && (
               <span className="text-xs text-slate-600 font-mono">
-                &middot; {unmatchedSessions.length} unassigned
+                &middot; {unmatchedSessions.length} active unassigned
               </span>
             )}
           </div>
           {unmatchedSessions.length > 0 ? (
-            <div className="px-5 py-2 space-y-1">
-              {unmatchedSessions.map((session) => (
-                <div
-                  key={session.id}
-                  className="flex items-center gap-2 text-xs text-slate-400 font-mono"
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      session.status === "active"
-                        ? "bg-emerald-400"
-                        : "bg-slate-600"
-                    }`}
-                  />
-                  <span className="truncate">
-                    {session.projectName || session.id.slice(0, 8)}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <>
+              <div className="px-3 py-1.5 border-t border-slate-800/50">
+                <input
+                  type="text"
+                  value={lobbySearch}
+                  onChange={(e) => setLobbySearch(e.target.value)}
+                  placeholder="Search sessions..."
+                  className="w-full px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs text-slate-300 font-mono placeholder:text-slate-700 focus:border-slate-600 focus:outline-none transition-colors"
+                />
+              </div>
+              <div className="overflow-y-auto max-h-32 px-5 py-1.5 space-y-1">
+                {unmatchedSessions
+                  .filter((s) => {
+                    if (!lobbySearch) return true;
+                    const q = lobbySearch.toLowerCase();
+                    return (
+                      (s.projectName?.toLowerCase().includes(q) ?? false) ||
+                      s.id.toLowerCase().includes(q) ||
+                      (s.projectRoot?.toLowerCase().includes(q) ?? false)
+                    );
+                  })
+                  .map((session) => (
+                    <div
+                      key={session.id}
+                      className="flex items-center gap-2 text-xs text-slate-400 font-mono"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-emerald-400" />
+                      <span className="truncate">
+                        {session.projectName || session.id.slice(0, 8)}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </>
           ) : (
             <div className="px-5 py-2">
               <span className="text-xs text-slate-700 font-mono italic">
