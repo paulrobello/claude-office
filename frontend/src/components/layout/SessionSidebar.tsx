@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   History,
   Radio,
@@ -110,6 +110,7 @@ function EditableName({
   const [draft, setDraft] = useState(
     () => session.displayName ?? getProjectKey(session),
   );
+  const committedRef = useRef(false);
 
   if (isEditing) {
     return (
@@ -117,18 +118,25 @@ function EditableName({
         type="text"
         value={draft}
         autoFocus
+        maxLength={64}
         className="text-xs font-bold flex-1 bg-slate-700 text-white px-1 py-0 rounded outline-none border border-purple-500"
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
+            committedRef.current = true;
             onCommit(draft);
           } else if (e.key === "Escape") {
             e.preventDefault();
+            committedRef.current = true;
             onCancel();
           }
         }}
-        onBlur={() => onCommit(draft)}
+        onBlur={() => {
+          if (!committedRef.current) {
+            onCommit(draft);
+          }
+        }}
         onClick={(e) => e.stopPropagation()}
       />
     );
@@ -141,6 +149,7 @@ function EditableName({
       className={className}
       onDoubleClick={(e) => {
         e.stopPropagation();
+        committedRef.current = false;
         setDraft(session.displayName ?? getProjectKey(session));
         onStartEdit();
       }}
