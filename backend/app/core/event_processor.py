@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import delete, select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from app.config import get_settings
 from app.core.beads_poller import get_beads_poller, has_beads, init_beads_poller
@@ -37,6 +38,9 @@ from app.core.handlers import (
     handle_subagent_info,
     handle_subagent_start,
     handle_subagent_stop,
+    handle_task_completed,
+    handle_task_created,
+    handle_teammate_idle,
     handle_user_prompt_submit,
 )
 from app.core.jsonl_parser import get_last_assistant_response
@@ -55,6 +59,44 @@ from app.models.sessions import ConversationEntry, GameState, HistoryEntry
 from app.services.git_service import git_service
 
 logger = logging.getLogger(__name__)
+
+# Prefixes stripped from paths when deriving display names.
+_DISPLAY_NAME_STRIP_PREFIXES = ("repos", "projects", "src", "work", "code", "github")
+
+
+def derive_display_name(working_dir: str | None, project_name: str | None = None) -> str | None:
+    """Derive a human-friendly display name from working directory or project name.
+
+    Priority:
+    1. ``project_name`` if provided
+    2. Last non-generic path segment of ``working_dir``
+
+    Args:
+        working_dir: The working directory path.
+        project_name: Explicit project name (takes priority).
+
+    Returns:
+        A display name string, or None if nothing useful could be derived.
+    """
+    if project_name:
+        return project_name
+
+    if not working_dir:
+        return None
+
+    try:
+        path = Path(working_dir).resolve()
+        # Walk from the deepest segment upward, skipping generic directory names.
+        parts = path.parts
+        for part in reversed(parts):
+            lower = part.lower()
+            if lower in _DISPLAY_NAME_STRIP_PREFIXES or lower.startswith("."):
+                continue
+            return part
+    except (OSError, ValueError):
+        pass
+
+    return None
 
 
 def derive_git_root(working_dir: str) -> str | None:
@@ -248,19 +290,11 @@ class EventProcessor:
 
     async def _process_event_internal(self, event: Event) -> None:
         """Persist, update state machine, build history entry, delegate to handlers."""
-        await self._persist_event(event)
-
-        if event.session_id not in self.sessions:
-            await self._restore_session(event.session_id)
-
-        if event.session_id not in self.sessions:
-            self.sessions[event.session_id] = StateMachine()
-
-        sm = self.sessions[event.session_id]
-
-        sm.transition(event)
-
-        # Resolve floor/room assignment when building has configured floors.
+        # Resolve floor/room assignment BEFORE persisting so the assignment
+        # is written in the same DB session (avoids StaleDataError from a
+        # separate _sync_room_to_db call).
+        resolved_floor_id: str | None = None
+        resolved_room_id: str | None = None
         building_config = get_cached_building_config()
         if building_config.floors:
             mapper = get_product_mapper(building_config)
@@ -273,8 +307,25 @@ class EventProcessor:
                 working_dir=working_dir,
             )
             if assignment:
-                sm.floor_id = assignment.floor_id
-                sm.room_id = assignment.room_id
+                resolved_floor_id = assignment.floor_id
+                resolved_room_id = assignment.room_id
+
+        await self._persist_event(event, resolved_floor_id, resolved_room_id)
+
+        if event.session_id not in self.sessions:
+            await self._restore_session(event.session_id)
+
+        if event.session_id not in self.sessions:
+            self.sessions[event.session_id] = StateMachine()
+
+        sm = self.sessions[event.session_id]
+
+        sm.transition(event)
+
+        # Apply resolved floor/room to in-memory state machine.
+        if resolved_floor_id:
+            sm.floor_id = resolved_floor_id
+            sm.room_id = resolved_room_id
 
         # Sync team fields from event data.
         if event.data:
@@ -416,6 +467,18 @@ class EventProcessor:
         # ------------------------------------------------------------------
         if event.event_type == EventType.PRE_TOOL_USE:
             await handle_pre_tool_use(sm, event, agent_id, self._get_event_summary(event))
+
+        # ------------------------------------------------------------------
+        # TEAM EVENTS
+        # ------------------------------------------------------------------
+        if event.event_type == EventType.TASK_CREATED:
+            await handle_task_created(sm, event)
+
+        if event.event_type == EventType.TASK_COMPLETED:
+            await handle_task_completed(sm, event)
+
+        if event.event_type == EventType.TEAMMATE_IDLE:
+            await handle_teammate_idle(sm, event)
 
     # ------------------------------------------------------------------
     # DB helpers
@@ -565,35 +628,67 @@ class EventProcessor:
 
             self.sessions[session_id] = sm
 
-    async def _persist_event(self, event: Event) -> None:
+    async def _persist_event(
+        self,
+        event: Event,
+        floor_id: str | None = None,
+        room_id: str | None = None,
+    ) -> None:
         """Save event to database and manage session records.
 
-        Uses ``session.merge()`` for dialect-agnostic upsert that avoids
-        UNIQUE constraint race conditions when multiple events arrive
-        concurrently for the same session, or when the session record
-        has been deleted by a concurrent clear-DB operation.
+        Uses ``INSERT ... ON CONFLICT DO UPDATE`` for atomic upsert that
+        avoids UNIQUE constraint race conditions when multiple events arrive
+        concurrently for the same session, or when the session record has
+        been deleted by a concurrent clear-DB operation.
         """
         async with AsyncSessionLocal() as db:
             project_name = event.data.project_name if event.data else None
             project_dir = event.data.project_dir if event.data else None
             working_dir = event.data.working_dir if event.data else None
+            team_name = event.data.team_name if event.data else None
+            teammate_name = event.data.teammate_name if event.data else None
 
             source_dir = project_dir or working_dir
             project_root = derive_git_root(source_dir) if source_dir else None
 
-            # Build a session record and merge (upsert) into the DB.
-            # merge() handles both new inserts and updates to existing rows,
-            # and won't raise StaleDataError if the row was deleted concurrently.
+            # Derive display name from working dir / project name.
+            display = derive_display_name(working_dir=source_dir, project_name=project_name)
+
+            # Determine the final status based on event type.
+            is_session_start = event.event_type == EventType.SESSION_START
+            is_session_end = event.event_type == EventType.SESSION_END
+            status = "active" if not is_session_end else "completed"
             now = datetime.now(UTC)
-            session_rec = SessionRecord(
+
+            # Atomic upsert: INSERT on new, UPDATE on conflict.
+            # This prevents the race condition where two concurrent events
+            # both SELECT (find no row) then both try to INSERT.
+            stmt = sqlite_insert(SessionRecord).values(
                 id=event.session_id,
                 project_name=project_name,
                 project_root=project_root,
-                status="active",
+                status=status,
                 created_at=now,
                 updated_at=now,
             )
-            session_rec = await db.merge(session_rec)
+            # On conflict (session already exists), only update the timestamp.
+            # Other fields are conditionally updated below via the ORM object.
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["id"],
+                set_={"updated_at": now},
+            )
+            await db.execute(stmt)
+
+            # Fetch the persisted record for conditional field updates.
+            result = await db.execute(
+                select(SessionRecord).where(SessionRecord.id == event.session_id)
+            )
+            session_rec = result.scalar_one()
+
+            # Persist floor/room assignment in the same session/transaction.
+            if floor_id and room_id:
+                session_rec.floor_id = floor_id
+                session_rec.room_id = room_id
 
             # Update project info if not yet set on the existing record.
             if project_name and not session_rec.project_name:
@@ -602,7 +697,20 @@ class EventProcessor:
                 session_rec.project_root = project_root
                 logger.info(f"Cached project_root for session {event.session_id}: {project_root}")
 
-            if event.event_type == EventType.SESSION_START:
+            # Derive and store display_name on first encounter.
+            if display and not session_rec.display_name:
+                session_rec.display_name = display
+
+            # Sync team fields to DB record.
+            if team_name and not session_rec.team_name:
+                session_rec.team_name = team_name
+            if teammate_name and not session_rec.teammate_name:
+                session_rec.teammate_name = teammate_name
+            # A session with no teammate_name is the lead.
+            if team_name and session_rec.is_lead is False and not session_rec.teammate_name:
+                session_rec.is_lead = True
+
+            if is_session_start:
                 await db.execute(
                     delete(EventRecord).where(EventRecord.session_id == event.session_id)
                 )
@@ -613,7 +721,18 @@ class EventProcessor:
                     session_rec.project_name = project_name
                 if project_root:
                     session_rec.project_root = project_root
-            elif event.event_type == EventType.SESSION_END:
+                # Always set display_name on session start.
+                if display:
+                    session_rec.display_name = display
+                # Reset team fields on session start.
+                if team_name:
+                    session_rec.team_name = team_name
+                if teammate_name:
+                    session_rec.teammate_name = teammate_name
+                    session_rec.is_lead = False
+                elif team_name:
+                    session_rec.is_lead = True
+            elif is_session_end:
                 session_rec.status = "completed"
                 session_rec.updated_at = datetime.now(UTC)
 
@@ -747,6 +866,19 @@ class EventProcessor:
                 task_id_short = task_id[:7] if len(task_id) > 7 else task_id
                 summary_short = (summary[:40] + "...") if len(summary) > 40 else summary
                 return f"Background task {task_id_short} {status}: {summary_short}"
+            case EventType.TASK_CREATED:
+                subject = data.task_subject or data.task_id or "unknown"
+                if len(subject) > 50:
+                    subject = f"{subject[:47]}..."
+                return f"Task created: {subject}"
+            case EventType.TASK_COMPLETED:
+                subject = data.task_subject or data.task_id or "unknown"
+                if len(subject) > 50:
+                    subject = f"{subject[:47]}..."
+                return f"Task completed: {subject}"
+            case EventType.TEAMMATE_IDLE:
+                name = data.teammate_name or "Teammate"
+                return f"{name} went idle"
             case _:
                 return f"Event: {event.event_type}"
 
