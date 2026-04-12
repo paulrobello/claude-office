@@ -15,6 +15,7 @@ import { MarqueeText } from "./MarqueeText";
 import { ICON_MAP } from "./shared/iconMap";
 import { drawBubble, drawIconBadge } from "./shared/drawBubble";
 import { drawRightArm, drawLeftArm } from "./shared/drawArm";
+import { truncateBubbleText } from "@/utils/bubbleText";
 
 // ============================================================================
 // TYPES
@@ -105,7 +106,8 @@ interface BubbleProps {
 }
 
 function Bubble({ content, yOffset }: BubbleProps): ReactNode {
-  const { text, type = "thought", icon } = content;
+  const { type = "thought", icon } = content;
+  const text = truncateBubbleText(content.text);
 
   // Convert icon name to emoji if needed
   const iconEmoji = icon ? (ICON_MAP[icon] ?? icon) : undefined;
