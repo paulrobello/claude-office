@@ -72,6 +72,9 @@ export interface AgentAnimationState {
   desk: number | null;
   backendState: BackendAgentState;
   currentTask: string | null;
+  characterType: string | null;
+  parentSessionId: string | null;
+  parentId: string | null;
 
   // Phase tracking (frontend owned)
   phase: AgentPhase;
@@ -410,6 +413,9 @@ export const useGameStore = create<GameStore>()(
           desk: backendAgent.desk ?? null,
           backendState: backendAgent.state,
           currentTask: backendAgent.currentTask ?? null,
+          characterType: backendAgent.characterType ?? null,
+          parentSessionId: backendAgent.parentSessionId ?? null,
+          parentId: backendAgent.parentId ?? null,
           phase: "arriving",
           currentPosition: initialPosition,
           targetPosition: initialPosition,

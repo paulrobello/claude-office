@@ -19,7 +19,7 @@ import {
   Sprite,
   Application as PixiApplication,
 } from "pixi.js";
-import { useMemo, useEffect, useRef, type ReactNode } from "react";
+import { useMemo, useEffect, useRef, useCallback, type ReactNode } from "react";
 import {
   TransformWrapper,
   TransformComponent,
@@ -94,6 +94,35 @@ import { OfficeBackground } from "./OfficeBackground";
 
 // Register PixiJS components
 extend({ Container, Text, Graphics, Sprite });
+
+// ============================================================================
+// SUB-COMPONENTS
+// ============================================================================
+
+interface SubagentDotProps {
+  x: number;
+  y: number;
+  color: string;
+}
+
+function SubagentDot({ x, y, color }: SubagentDotProps): ReactNode {
+  const drawDot = useCallback(
+    (g: Graphics) => {
+      g.clear();
+      g.circle(0, 0, 4);
+      // Safe hex parsing with fallback
+      const hex = /^#[0-9a-fA-F]{6}$/.test(color)
+        ? parseInt(color.slice(1), 16)
+        : 0xf59e0b;
+      g.fill({ color: hex });
+      g.circle(0, 0, 4);
+      g.stroke({ color: 0xffffff, alpha: 0.4, width: 1 });
+    },
+    [color],
+  );
+
+  return <pixiGraphics draw={drawDot} x={x} y={y} />;
+}
 
 // ============================================================================
 // MAIN COMPONENT
@@ -210,29 +239,24 @@ export function OfficeGame(): ReactNode {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [debugMode]);
 
-  // Reset the pan/zoom transform whenever the container is resized (e.g. sidebar
-  // open/close). Without this, react-zoom-pan-pinch keeps a stale translate that
-  // was calculated against the old container dimensions, which crops the scene.
+  // Reset pan/zoom only on actual window resize — NOT on container reflows.
+  // ResizeObserver was causing progressive canvas drift because the event log
+  // and sidebar content changes triggered micro-resizes on every update.
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const observer = new ResizeObserver(() => {
-      transformRef.current?.resetTransform(0);
-    });
-    observer.observe(container);
-    return () => observer.disconnect();
+    const handleResize = () => transformRef.current?.resetTransform(0);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-full flex items-center justify-center overflow-hidden relative"
-    >
+    <div ref={containerRef} className="w-full h-full overflow-hidden relative">
       <TransformWrapper
         ref={transformRef}
         initialScale={1}
         minScale={1}
         maxScale={3}
+        centerZoomedOut={false}
+        limitToBounds={false}
         wheel={{ step: 0.1 }}
         pinch={{ step: 5 }}
         doubleClick={{ mode: "reset" }}
@@ -240,9 +264,9 @@ export function OfficeGame(): ReactNode {
         <ZoomControls />
         <TransformComponent
           wrapperClass="w-full h-full"
-          contentClass="w-full h-full flex items-center justify-center"
+          contentClass="w-full h-full"
         >
-          <div className="pixi-canvas-container w-full h-full flex items-center justify-center">
+          <div className="pixi-canvas-container w-full h-full">
             <Application
               key={`pixi-app-${hmrVersion}`}
               width={CANVAS_WIDTH}
@@ -553,6 +577,74 @@ export function OfficeGame(): ReactNode {
                         name={agent.name!}
                         position={agent.currentPosition}
                       />
+                    ))}
+
+                  {/* Character Type Overlays - crown/badge/dot per agent type */}
+                  {Array.from(agents.values())
+                    .filter(
+                      (agent) =>
+                        agent.characterType &&
+                        !isInElevatorZone(agent.currentPosition),
+                    )
+                    .map((agent) => (
+                      <pixiContainer
+                        key={`chartype-${agent.id}`}
+                        zIndex={agent.currentPosition.y + 20}
+                      >
+                        {/* Lead crown overlay */}
+                        {agent.characterType === "lead" && (
+                          <pixiText
+                            text="👑"
+                            style={{ fontSize: 14 }}
+                            x={agent.currentPosition.x - 8}
+                            y={agent.currentPosition.y - 52}
+                          />
+                        )}
+
+                        {/* Teammate badge + nameplate overlay */}
+                        {agent.characterType === "teammate" && (
+                          <>
+                            <pixiText
+                              text="🎖️"
+                              style={{ fontSize: 10 }}
+                              x={agent.currentPosition.x - 6}
+                              y={agent.currentPosition.y - 46}
+                            />
+                            {agent.name && (
+                              <pixiText
+                                text={agent.name}
+                                style={{
+                                  fontSize: 7,
+                                  fill: agent.color ?? "#3b82f6",
+                                  fontFamily: "monospace",
+                                  fontWeight: "bold",
+                                }}
+                                x={agent.currentPosition.x - 18}
+                                y={agent.currentPosition.y - 34}
+                              />
+                            )}
+                          </>
+                        )}
+
+                        {/* Subagent shoulder dot */}
+                        {agent.characterType === "subagent" &&
+                          (() => {
+                            const parentAgent = agent.parentId
+                              ? Array.from(agents.values()).find(
+                                  (a) => a.id === agent.parentId,
+                                )
+                              : null;
+                            const dotColor = parentAgent?.color ?? "#f59e0b";
+                            return (
+                              <SubagentDot
+                                key={`dot-${agent.id}`}
+                                x={agent.currentPosition.x + 10}
+                                y={agent.currentPosition.y - 28}
+                                color={dotColor}
+                              />
+                            );
+                          })()}
+                      </pixiContainer>
                     ))}
 
                   {/* Bubbles Layer - rendered on top of everything */}

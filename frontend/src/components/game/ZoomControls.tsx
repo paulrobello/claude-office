@@ -14,7 +14,7 @@ export function ZoomControls(): ReactNode {
   const { t } = useTranslation();
 
   return (
-    <div className="absolute bottom-3 right-3 flex flex-row gap-1 z-10">
+    <div className="absolute bottom-14 right-4 flex flex-row gap-1 z-10">
       <button
         onClick={() => zoomIn()}
         className="w-10 h-10 bg-slate-800/90 hover:bg-slate-700 text-white rounded-lg flex items-center justify-center text-xl font-bold border border-slate-600 shadow-lg active:scale-95 transition-transform"
