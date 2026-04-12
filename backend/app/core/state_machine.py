@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
@@ -28,6 +29,7 @@ from app.models.sessions import (
     ConversationEntry,
     GameState,
     HistoryEntry,
+    KanbanTask,
     NewsItem,
     WhiteboardData,
 )
@@ -109,6 +111,12 @@ def _empty_agents() -> dict[str, Agent]:
     return cast(dict[str, Agent], {})
 
 
+def _parse_linear_id(subject: str) -> str | None:
+    """Extract a Linear-style ID like REC-42 from a subject string."""
+    m = re.search(r"\[([A-Z]+-\d+)\]", subject)
+    return m.group(1) if m else None
+
+
 def _empty_str_list() -> list[str]:
     return cast(list[str], [])
 
@@ -168,6 +176,14 @@ class StateMachine:
     # Floor/room assignment for multi-floor building navigation
     floor_id: str | None = None
     room_id: str | None = None
+
+    # Agent Teams support (used by RoomOrchestrator)
+    is_lead: bool = True
+    teammate_name: str | None = None
+    team_name: str | None = None
+    kanban_tasks: dict[str, KanbanTask] = field(
+        default_factory=lambda: cast(dict[str, KanbanTask], {})
+    )
 
     # Whiteboard tracking delegated to WhiteboardTracker
     whiteboard: WhiteboardTracker = field(default_factory=WhiteboardTracker)
@@ -319,6 +335,7 @@ class StateMachine:
             coffee_cups=self.whiteboard.coffee_cups,
             file_edits=self.whiteboard.get_file_edits_snapshot(),
             background_tasks=self.whiteboard.get_background_tasks_snapshot(),
+            kanban_tasks=list(self.kanban_tasks.values()),
         )
 
         return GameState(
@@ -688,6 +705,39 @@ class StateMachine:
                 summary_short = (summary[:30] + "...") if summary and len(summary) > 30 else summary
                 headline = f"{status_emoji} Task {task_id_short}: {summary_short or status}"
                 self.whiteboard.add_news_item("agent", headline)
+
+        elif event.event_type == EventType.TASK_CREATED:
+            task_id = event.data.task_id if event.data else None
+            if not task_id:
+                return
+            subject = event.data.task_subject or "" if event.data else ""
+            self.kanban_tasks[task_id] = KanbanTask(
+                task_id=task_id,
+                subject=subject,
+                status="pending",
+                assignee=self.teammate_name,
+                linear_id=_parse_linear_id(subject),
+            )
+
+        elif event.event_type == EventType.TASK_COMPLETED:
+            task_id = event.data.task_id if event.data else None
+            if not task_id:
+                return
+            subject = event.data.task_subject or "" if event.data else ""
+            if task_id in self.kanban_tasks:
+                self.kanban_tasks[task_id].status = "completed"
+            else:
+                self.kanban_tasks[task_id] = KanbanTask(
+                    task_id=task_id,
+                    subject=subject,
+                    status="completed",
+                    assignee=self.teammate_name,
+                    linear_id=_parse_linear_id(subject),
+                )
+
+        elif event.event_type == EventType.TEAMMATE_IDLE:
+            self.boss_state = BossState.IDLE
+            self.boss_bubble = None
 
     def _tool_to_thought(self, event: Event) -> BubbleContent:
         """Convert a tool use event to thought bubble content."""
