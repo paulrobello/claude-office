@@ -8,12 +8,18 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import StaticPool
 
 from app.config import get_settings
 
 settings = get_settings()
 
-_engine: AsyncEngine = create_async_engine(settings.DATABASE_URL, echo=False)
+_engine: AsyncEngine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=False,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
 _session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
     bind=_engine,
     class_=AsyncSession,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useNavigationStore } from "@/stores/navigationStore";
+import { LOBBY_FLOOR_ID } from "@/types/navigation";
 import { useTranslation } from "@/hooks/useTranslation";
 
 /**
@@ -17,7 +18,10 @@ export function Breadcrumb(): React.ReactNode {
   // Only show when in building or floor view
   if (view === "single") return null;
 
-  const floor = buildingConfig?.floors.find((f) => f.id === floorId);
+  const isLobby = floorId === LOBBY_FLOOR_ID;
+  const floor = isLobby
+    ? null
+    : buildingConfig?.floors.find((f) => f.id === floorId);
 
   return (
     <nav
@@ -41,6 +45,16 @@ export function Breadcrumb(): React.ReactNode {
         <span>{"\u{1F3E2}"}</span>
         <span>{buildingConfig?.buildingName ?? t("navigation.building")}</span>
       </button>
+
+      {isLobby && (
+        <>
+          <span className="text-slate-600">/</span>
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded text-white bg-slate-800">
+            <span>{"\u{1F6AA}"}</span>
+            <span>Lobby</span>
+          </span>
+        </>
+      )}
 
       {floor && (
         <>

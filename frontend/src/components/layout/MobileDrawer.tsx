@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import {
   History,
   Radio,
@@ -8,6 +9,8 @@ import {
   RefreshCw,
   Trash2,
   X,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR as dateFnsPtBR, es as dateFnsEs } from "date-fns/locale";
@@ -15,6 +18,43 @@ import { GitStatusPanel } from "@/components/game/GitStatusPanel";
 import { EventLog } from "@/components/game/EventLog";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { Session } from "@/hooks/useSessions";
+
+// ============================================================================
+// GROUPING HELPERS
+// ============================================================================
+
+function getProjectKey(session: Session): string {
+  if (session.projectName) return session.projectName;
+  if (session.projectRoot)
+    return session.projectRoot.split("/").pop() ?? "unknown";
+  return "unknown";
+}
+
+function groupSessionsByProject(sessions: Session[]): Map<string, Session[]> {
+  const groups = new Map<string, Session[]>();
+  for (const s of sessions) {
+    const key = getProjectKey(s);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(s);
+  }
+  for (const list of groups.values()) {
+    list.sort((a, b) => {
+      if (a.status === "active" && b.status !== "active") return -1;
+      if (b.status === "active" && a.status !== "active") return 1;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  }
+  const sorted = [...groups.entries()].sort(([, a], [, b]) => {
+    const aActive = a.some((s) => s.status === "active");
+    const bActive = b.some((s) => s.status === "active");
+    if (aActive && !bActive) return -1;
+    if (bActive && !aActive) return 1;
+    const aNewest = Math.max(...a.map((s) => new Date(s.updatedAt).getTime()));
+    const bNewest = Math.max(...b.map((s) => new Date(s.updatedAt).getTime()));
+    return bNewest - aNewest;
+  });
+  return new Map(sorted);
+}
 
 // ============================================================================
 // TYPES
@@ -60,6 +100,17 @@ export function MobileDrawer({
         ? dateFnsEs
         : undefined;
 
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroup = useCallback((key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
   if (!isOpen) return null;
 
   const handleSimulate = async (): Promise<void> => {
@@ -76,6 +127,8 @@ export function MobileDrawer({
     onClearDB();
     onClose();
   };
+
+  const groups = groupSessionsByProject(sessions);
 
   return (
     <div className="fixed inset-0 z-50">
@@ -135,7 +188,7 @@ export function MobileDrawer({
                 ({sessions.length})
               </span>
             </div>
-            <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
+            <div className="flex flex-col gap-1 max-h-60 overflow-y-auto">
               {sessionsLoading && sessions.length === 0 ? (
                 <div className="p-4 text-center text-slate-600 text-xs italic">
                   {t("sessions.loading")}
@@ -145,59 +198,135 @@ export function MobileDrawer({
                   {t("sessions.noSessions")}
                 </div>
               ) : (
-                sessions.map((session) => {
-                  const isActive = session.id === sessionId;
-                  const isLive = session.status === "active";
+                [...groups.entries()].map(([projectKey, groupSessions]) => {
+                  const hasActive = groupSessions.some(
+                    (s) => s.status === "active",
+                  );
+                  const isActiveSelected = groupSessions.some(
+                    (s) => s.id === sessionId,
+                  );
+                  const isExpanded =
+                    expandedGroups.has(projectKey) || isActiveSelected;
+                  const primary = groupSessions[0];
+                  const rest = groupSessions.slice(1);
+
                   return (
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      key={session.id}
-                      className={`px-3 py-2.5 rounded-md cursor-pointer transition-colors ${
-                        isActive
-                          ? "bg-purple-500/20 border-l-2 border-purple-500"
-                          : "hover:bg-slate-800/50"
-                      }`}
-                      onClick={() => {
-                        onSessionSelect(session.id);
-                        onClose();
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          onSessionSelect(session.id);
+                    <div key={projectKey} className="flex flex-col">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className={`px-3 py-2.5 rounded-md cursor-pointer transition-colors ${
+                          primary.id === sessionId
+                            ? "bg-purple-500/20 border-l-2 border-purple-500"
+                            : "hover:bg-slate-800/50"
+                        }`}
+                        onClick={() => {
+                          onSessionSelect(primary.id);
                           onClose();
-                        }
-                      }}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        {isLive ? (
-                          <Radio
-                            size={10}
-                            className="text-emerald-400 animate-pulse"
-                          />
-                        ) : (
-                          <PlayCircle size={10} className="text-slate-500" />
-                        )}
-                        <span
-                          className={`text-xs font-bold truncate ${
-                            isActive ? "text-purple-300" : "text-slate-300"
-                          }`}
-                        >
-                          {session.projectName || t("sessions.unknownProject")}
-                        </span>
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onSessionSelect(primary.id);
+                            onClose();
+                          }
+                        }}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          {hasActive ? (
+                            <Radio
+                              size={10}
+                              className="text-emerald-400 animate-pulse"
+                            />
+                          ) : (
+                            <PlayCircle size={10} className="text-slate-500" />
+                          )}
+                          <span
+                            className={`text-xs font-bold truncate ${
+                              primary.id === sessionId
+                                ? "text-purple-300"
+                                : "text-slate-300"
+                            }`}
+                          >
+                            {projectKey}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-[10px] text-slate-500">
+                          <span>
+                            {t("sessions.events", {
+                              count: primary.eventCount,
+                            })}
+                          </span>
+                          <span>
+                            {formatDistanceToNow(new Date(primary.updatedAt), {
+                              addSuffix: true,
+                              locale: dateFnsLocale,
+                            })}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-[10px] text-slate-500">
-                        <span>
-                          {t("sessions.events", { count: session.eventCount })}
-                        </span>
-                        <span>
-                          {formatDistanceToNow(new Date(session.updatedAt), {
-                            addSuffix: true,
-                            locale: dateFnsLocale,
-                          })}
-                        </span>
-                      </div>
+
+                      {rest.length > 0 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => toggleGroup(projectKey)}
+                            className="flex items-center gap-1.5 px-3 py-1 text-[10px] text-slate-600 hover:text-slate-400 font-mono transition-colors"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown size={10} />
+                            ) : (
+                              <ChevronRight size={10} />
+                            )}
+                            {rest.length} older session
+                            {rest.length !== 1 ? "s" : ""}
+                          </button>
+
+                          {isExpanded &&
+                            rest.map((session) => (
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                key={session.id}
+                                className={`px-3 py-1.5 pl-7 rounded-md cursor-pointer transition-colors ${
+                                  session.id === sessionId
+                                    ? "bg-purple-500/20 border-l-2 border-purple-500"
+                                    : "hover:bg-slate-800/50"
+                                }`}
+                                onClick={() => {
+                                  onSessionSelect(session.id);
+                                  onClose();
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    onSessionSelect(session.id);
+                                    onClose();
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <PlayCircle
+                                    size={8}
+                                    className="text-slate-600"
+                                  />
+                                  <span className="text-[10px] text-slate-500 font-mono truncate flex-1">
+                                    {session.id.slice(0, 12)}
+                                  </span>
+                                  <span className="text-[10px] text-slate-600">
+                                    {formatDistanceToNow(
+                                      new Date(session.updatedAt),
+                                      {
+                                        addSuffix: true,
+                                        locale: dateFnsLocale,
+                                      },
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                        </>
+                      )}
                     </div>
                   );
                 })

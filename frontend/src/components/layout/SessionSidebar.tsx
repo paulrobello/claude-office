@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import {
   History,
   Radio,
@@ -7,6 +8,8 @@ import {
   Trash2,
   PanelLeftClose,
   PanelLeftOpen,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR as dateFnsPtBR, es as dateFnsEs } from "date-fns/locale";
@@ -27,6 +30,47 @@ const SESSIONS_DEFAULT_HEIGHT = 280;
 
 /** Max height is 70% of viewport to prevent overflow on smaller screens */
 const getMaxPanelHeight = () => Math.floor(window.innerHeight * 0.7);
+
+// ============================================================================
+// GROUPING HELPERS
+// ============================================================================
+
+/** Derive a display name for grouping from a session. */
+function getProjectKey(session: Session): string {
+  if (session.projectName) return session.projectName;
+  if (session.projectRoot)
+    return session.projectRoot.split("/").pop() ?? "unknown";
+  return "unknown";
+}
+
+/** Group sessions by project, sorted: groups with active sessions first, then by most recent update. */
+function groupSessionsByProject(sessions: Session[]): Map<string, Session[]> {
+  const groups = new Map<string, Session[]>();
+  for (const s of sessions) {
+    const key = getProjectKey(s);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(s);
+  }
+  // Sort within each group: active first, then by updatedAt desc
+  for (const list of groups.values()) {
+    list.sort((a, b) => {
+      if (a.status === "active" && b.status !== "active") return -1;
+      if (b.status === "active" && a.status !== "active") return 1;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  }
+  // Sort groups: those with active sessions first, then by most recent update
+  const sorted = [...groups.entries()].sort(([, a], [, b]) => {
+    const aActive = a.some((s) => s.status === "active");
+    const bActive = b.some((s) => s.status === "active");
+    if (aActive && !bActive) return -1;
+    if (bActive && !aActive) return 1;
+    const aNewest = Math.max(...a.map((s) => new Date(s.updatedAt).getTime()));
+    const bNewest = Math.max(...b.map((s) => new Date(s.updatedAt).getTime()));
+    return bNewest - aNewest;
+  });
+  return new Map(sorted);
+}
 
 // ============================================================================
 // TYPES
@@ -68,6 +112,17 @@ export function SessionSidebar({
         ? dateFnsEs
         : undefined;
 
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroup = useCallback((key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
   const {
     size: sidebarWidth,
     isDragging: isWidthDragging,
@@ -93,6 +148,8 @@ export function SessionSidebar({
   });
 
   const isDragging = isWidthDragging || isHeightDragging;
+
+  const groups = groupSessionsByProject(sessions);
 
   return (
     <aside
@@ -145,74 +202,161 @@ export function SessionSidebar({
                   {t("sessions.noSessions")}
                 </div>
               ) : (
-                <div className="flex flex-col gap-2">
-                  {sessions.map((session) => {
-                    const isActive = session.id === sessionId;
-                    const isLive = session.status === "active";
+                <div className="flex flex-col gap-1">
+                  {[...groups.entries()].map(([projectKey, groupSessions]) => {
+                    const hasActive = groupSessions.some(
+                      (s) => s.status === "active",
+                    );
+                    const isActiveSelected = groupSessions.some(
+                      (s) => s.id === sessionId,
+                    );
+                    const isExpanded =
+                      expandedGroups.has(projectKey) || isActiveSelected;
+                    const primary = groupSessions[0];
+                    const rest = groupSessions.slice(1);
+
                     return (
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        key={session.id}
-                        className={`group relative w-full px-3 py-2.5 text-left transition-colors cursor-pointer rounded-md ${
-                          isActive
-                            ? "bg-purple-500/20 border-l-2 border-purple-500"
-                            : "hover:bg-slate-800/50"
-                        }`}
-                        onClick={() => onSessionSelect(session.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            onSessionSelect(session.id);
-                          }
-                        }}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          {isLive ? (
-                            <Radio
-                              size={10}
-                              className="text-emerald-400 animate-pulse flex-shrink-0"
-                            />
-                          ) : (
-                            <PlayCircle
-                              size={10}
-                              className="text-slate-500 flex-shrink-0"
-                            />
-                          )}
-                          <span
-                            className={`text-xs font-bold truncate flex-1 ${
-                              isActive ? "text-purple-300" : "text-slate-300"
-                            }`}
-                          >
-                            {session.projectName ||
-                              t("sessions.unknownProject")}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeleteSession(session);
-                            }}
-                            className="p-1 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded transition-colors opacity-0 group-hover:opacity-100"
-                            aria-label={`${t("sessions.deleteSession")} ${session.id}`}
-                          >
-                            <Trash2 size={12} />
-                          </button>
+                      <div key={projectKey} className="flex flex-col">
+                        {/* Primary session card (always visible) */}
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          className={`group relative w-full px-3 py-2 text-left transition-colors cursor-pointer rounded-md ${
+                            primary.id === sessionId
+                              ? "bg-purple-500/20 border-l-2 border-purple-500"
+                              : "hover:bg-slate-800/50"
+                          }`}
+                          onClick={() => onSessionSelect(primary.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              onSessionSelect(primary.id);
+                            }
+                          }}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            {hasActive ? (
+                              <Radio
+                                size={10}
+                                className="text-emerald-400 animate-pulse flex-shrink-0"
+                              />
+                            ) : (
+                              <PlayCircle
+                                size={10}
+                                className="text-slate-500 flex-shrink-0"
+                              />
+                            )}
+                            <span
+                              className={`text-xs font-bold truncate flex-1 ${
+                                primary.id === sessionId
+                                  ? "text-purple-300"
+                                  : "text-slate-300"
+                              }`}
+                            >
+                              {projectKey}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeleteSession(primary);
+                              }}
+                              className="p-1 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded transition-colors opacity-0 group-hover:opacity-100"
+                              aria-label={`${t("sessions.deleteSession")} ${primary.id}`}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-mono truncate mb-1">
+                            {primary.id}
+                          </div>
+                          <div className="flex justify-between text-[10px] text-slate-500">
+                            <span>
+                              {t("sessions.events", {
+                                count: primary.eventCount,
+                              })}
+                            </span>
+                            <span>
+                              {formatDistanceToNow(
+                                new Date(primary.updatedAt),
+                                {
+                                  addSuffix: true,
+                                  locale: dateFnsLocale,
+                                },
+                              )}
+                            </span>
+                          </div>
                         </div>
-                        <div className="text-[10px] text-slate-500 font-mono truncate mb-1">
-                          {session.id}
-                        </div>
-                        <div className="flex justify-between text-[10px] text-slate-500">
-                          <span>
-                            {t("sessions.events", { count: session.eventCount })}
-                          </span>
-                          <span>
-                            {formatDistanceToNow(new Date(session.updatedAt), {
-                              addSuffix: true,
-                              locale: dateFnsLocale,
-                            })}
-                          </span>
-                        </div>
+
+                        {/* Expand/collapse for older sessions */}
+                        {rest.length > 0 && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => toggleGroup(projectKey)}
+                              className="flex items-center gap-1.5 px-3 py-1 text-[10px] text-slate-600 hover:text-slate-400 font-mono transition-colors"
+                            >
+                              {isExpanded ? (
+                                <ChevronDown size={10} />
+                              ) : (
+                                <ChevronRight size={10} />
+                              )}
+                              {rest.length} older session
+                              {rest.length !== 1 ? "s" : ""}
+                            </button>
+
+                            {isExpanded &&
+                              rest.map((session) => (
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  key={session.id}
+                                  className={`group relative w-full px-3 py-1.5 pl-7 text-left transition-colors cursor-pointer rounded-md ${
+                                    session.id === sessionId
+                                      ? "bg-purple-500/20 border-l-2 border-purple-500"
+                                      : "hover:bg-slate-800/50"
+                                  }`}
+                                  onClick={() => onSessionSelect(session.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      onSessionSelect(session.id);
+                                    }
+                                  }}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <PlayCircle
+                                      size={8}
+                                      className="text-slate-600 flex-shrink-0"
+                                    />
+                                    <span className="text-[10px] text-slate-500 font-mono truncate flex-1">
+                                      {session.id.slice(0, 12)}
+                                    </span>
+                                    <span className="text-[10px] text-slate-600">
+                                      {formatDistanceToNow(
+                                        new Date(session.updatedAt),
+                                        {
+                                          addSuffix: true,
+                                          locale: dateFnsLocale,
+                                        },
+                                      )}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onDeleteSession(session);
+                                      }}
+                                      className="p-0.5 text-slate-600 hover:text-rose-400 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                      aria-label={`${t("sessions.deleteSession")} ${session.id}`}
+                                    >
+                                      <Trash2 size={10} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                          </>
+                        )}
                       </div>
                     );
                   })}

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useNavigationStore } from "@/stores/navigationStore";
+import { LOBBY_FLOOR_ID } from "@/types/navigation";
 import type { FloorConfig } from "@/types/navigation";
 import type { Session } from "@/hooks/useSessions";
 
@@ -115,8 +116,6 @@ export function BuildingView({ sessions }: BuildingViewProps): React.ReactNode {
     [sessions, buildingConfig],
   );
 
-  const [lobbySearch, setLobbySearch] = useState("");
-
   if (!buildingConfig) return null;
 
   const sortedFloors = [...buildingConfig.floors].sort(
@@ -170,60 +169,41 @@ export function BuildingView({ sessions }: BuildingViewProps): React.ReactNode {
           );
         })}
 
-        {/* Lobby / Ground — active unmatched sessions */}
-        <div className="border border-dashed border-slate-800 rounded-lg overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-2.5 bg-slate-900/30">
-            <span className="text-slate-600">{"\u{1F6AA}"}</span>
-            <span className="text-sm text-slate-500 font-bold">Lobby</span>
-            {unmatchedSessions.length > 0 && (
-              <span className="text-xs text-slate-600 font-mono">
-                &middot; {unmatchedSessions.length} active unassigned
-              </span>
-            )}
+        {/* Lobby / Ground — click to view unmatched sessions */}
+        <button
+          onClick={(e) => {
+            useNavigationStore.getState().setTransitionOrigin({
+              x: e.clientX,
+              y: e.clientY,
+            });
+            goToFloor(LOBBY_FLOOR_ID);
+          }}
+          className="group flex items-stretch w-full rounded-lg border border-dashed border-slate-800 hover:border-slate-600 bg-slate-900/30 hover:bg-slate-900/60 transition-all duration-200"
+        >
+          {/* Badge */}
+          <div className="flex items-center justify-center w-16 rounded-l-lg text-2xl">
+            {"\u{1F6AA}"}
           </div>
-          {unmatchedSessions.length > 0 ? (
-            <>
-              <div className="px-3 py-1.5 border-t border-slate-800/50">
-                <input
-                  type="text"
-                  value={lobbySearch}
-                  onChange={(e) => setLobbySearch(e.target.value)}
-                  placeholder="Search sessions..."
-                  className="w-full px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs text-slate-300 font-mono placeholder:text-slate-700 focus:border-slate-600 focus:outline-none transition-colors"
-                />
-              </div>
-              <div className="overflow-y-auto max-h-32 px-5 py-1.5 space-y-1">
-                {unmatchedSessions
-                  .filter((s) => {
-                    if (!lobbySearch) return true;
-                    const q = lobbySearch.toLowerCase();
-                    return (
-                      (s.projectName?.toLowerCase().includes(q) ?? false) ||
-                      s.id.toLowerCase().includes(q) ||
-                      (s.projectRoot?.toLowerCase().includes(q) ?? false)
-                    );
-                  })
-                  .map((session) => (
-                    <div
-                      key={session.id}
-                      className="flex items-center gap-2 text-xs text-slate-400 font-mono"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-emerald-400" />
-                      <span className="truncate">
-                        {session.projectName || session.id.slice(0, 8)}
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            </>
-          ) : (
-            <div className="px-5 py-2">
-              <span className="text-xs text-slate-700 font-mono italic">
-                All sessions assigned
+
+          {/* Info */}
+          <div className="flex-grow flex items-center gap-4 px-5 py-3">
+            <div className="flex flex-col items-start">
+              <span className="text-sm text-slate-400 font-bold group-hover:text-slate-300 transition-colors">
+                Lobby
+              </span>
+              <span className="text-xs text-slate-600 font-mono">
+                {unmatchedSessions.length > 0
+                  ? `${unmatchedSessions.length} active unassigned`
+                  : "All sessions assigned"}
               </span>
             </div>
-          )}
-        </div>
+          </div>
+
+          {/* Arrow */}
+          <div className="flex items-center px-4 text-slate-700 group-hover:text-slate-500 transition-colors">
+            &rarr;
+          </div>
+        </button>
 
         {/* Foundation */}
         <div className="h-2 bg-slate-800 rounded-b-lg mx-4" />

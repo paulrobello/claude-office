@@ -8,6 +8,9 @@
 /** Current view mode */
 export type ViewMode = "single" | "building" | "floor";
 
+/** Sentinel floor ID for the lobby (unmatched sessions) */
+export const LOBBY_FLOOR_ID = "__lobby__";
+
 /** Room configuration mapped to a repository */
 export interface RoomConfig {
   id: string;

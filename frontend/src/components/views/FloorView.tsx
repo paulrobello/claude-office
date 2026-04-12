@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useNavigationStore } from "@/stores/navigationStore";
+import { LOBBY_FLOOR_ID } from "@/types/navigation";
 import { SessionSidebar } from "@/components/layout/SessionSidebar";
 import { RightSidebar } from "@/components/layout/RightSidebar";
 import type { Session } from "@/hooks/useSessions";
@@ -54,22 +55,37 @@ export function FloorView({
 }: FloorViewProps): React.ReactNode {
   const floorId = useNavigationStore((s) => s.floorId);
   const buildingConfig = useNavigationStore((s) => s.buildingConfig);
-  const floor = buildingConfig?.floors.find((f) => f.id === floorId);
+  const isLobby = floorId === LOBBY_FLOOR_ID;
+  const floor = isLobby
+    ? null
+    : buildingConfig?.floors.find((f) => f.id === floorId);
 
-  // Filter sessions to only those belonging to this floor's rooms.
-  // Match by projectRoot basename (real filesystem path) — project_name is
-  // lossy because Claude Code converts slashes to dashes in transcript paths.
-  const matchedSessions =
-    floor && floor.rooms.length > 0
-      ? sessions.filter((s) =>
-          floor.rooms.some((room) => {
+  // Helper: check if a session belongs to any configured floor
+  const sessionMatchesAnyFloor = (s: Session): boolean =>
+    buildingConfig
+      ? buildingConfig.floors.some((f) =>
+          f.rooms.some((room) => {
             if (!room.repoName) return false;
-            // Primary: basename of projectRoot (e.g. "/Users/me/Repos/my-app" → "my-app")
             if (s.projectRoot) {
               const basename = s.projectRoot.split("/").pop();
               if (basename === room.repoName) return true;
             }
-            // Fallback: exact projectName match
+            return s.projectName === room.repoName;
+          }),
+        )
+      : false;
+
+  // Filter sessions based on whether this is the lobby or a regular floor.
+  const matchedSessions = isLobby
+    ? sessions.filter((s) => !sessionMatchesAnyFloor(s))
+    : floor && floor.rooms.length > 0
+      ? sessions.filter((s) =>
+          floor.rooms.some((room) => {
+            if (!room.repoName) return false;
+            if (s.projectRoot) {
+              const basename = s.projectRoot.split("/").pop();
+              if (basename === room.repoName) return true;
+            }
             return s.projectName === room.repoName;
           }),
         )
@@ -107,6 +123,12 @@ export function FloorView({
           <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 px-2 py-1 bg-black/60 rounded text-xs font-mono">
             <span>{floor.icon}</span>
             <span style={{ color: floor.accent }}>{floor.name}</span>
+          </div>
+        )}
+        {isLobby && (
+          <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 px-2 py-1 bg-black/60 rounded text-xs font-mono">
+            <span>{"\u{1F6AA}"}</span>
+            <span className="text-slate-400">Lobby</span>
           </div>
         )}
         <OfficeGame />
