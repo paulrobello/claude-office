@@ -42,6 +42,12 @@ async def _migrate_schema(conn: AsyncConnection) -> None:
 
     new_columns: dict[str, str] = {
         "label": "TEXT DEFAULT NULL",
+        "display_name": "TEXT DEFAULT NULL",
+        "floor_id": "TEXT DEFAULT NULL",
+        "room_id": "TEXT DEFAULT NULL",
+        "team_name": "TEXT DEFAULT NULL",
+        "teammate_name": "TEXT DEFAULT NULL",
+        "is_lead": "BOOLEAN DEFAULT 0",
     }
 
     result = await conn.execute(text("PRAGMA table_info(sessions)"))
