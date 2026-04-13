@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useGameStore } from "@/stores/gameStore";
+import { useAttentionStore } from "@/stores/attentionStore";
 import { agentMachineService } from "@/machines/agentMachineService";
 import {
   getNextSpawnPosition,
@@ -16,7 +17,7 @@ import {
   getQueuePosition,
   resetSpawnIndex,
 } from "@/systems/queuePositions";
-import type { GameState, WebSocketMessage, Position } from "@/types";
+import type { GameState, WebSocketMessage, Position, EventType } from "@/types";
 
 // ============================================================================
 // TYPES
@@ -375,6 +376,27 @@ export function useWebSocketEvents({
               // Trigger compaction animation on context_compaction event
               if (message.event.type === "context_compaction") {
                 useGameStore.getState().triggerCompaction();
+              }
+
+              // Attention toasts - wire event processing into attention store
+              const attentionEventTypes = new Set<EventType>([
+                "permission_request",
+                "error",
+                "stop",
+                "task_completed",
+                "subagent_start",
+                "background_task_notification",
+              ]);
+              if (attentionEventTypes.has(message.event.type as EventType)) {
+                useAttentionStore.getState().processEvent({
+                  type: message.event.type as EventType,
+                  agentId: message.event.agentId ?? null,
+                  agentName: message.event.detail?.agentName ?? null,
+                  taskDescription:
+                    message.event.detail?.taskDescription ?? null,
+                  errorType: message.event.detail?.errorType ?? null,
+                  message: message.event.detail?.message ?? null,
+                });
               }
             }
             break;

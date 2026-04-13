@@ -12,6 +12,8 @@ import { useTick } from "@pixi/react";
 import { Graphics, TextStyle, Texture } from "pixi.js";
 import type { Position, BubbleContent } from "@/types";
 import type { AgentPhase } from "@/stores/gameStore";
+import { useAttentionStore } from "@/stores/attentionStore";
+import { usePreferencesStore } from "@/stores/preferencesStore";
 import { isInElevatorZone } from "@/systems/queuePositions";
 import { ICON_MAP } from "./shared/iconMap";
 import { drawBubble, drawIconBadge } from "./shared/drawBubble";
@@ -165,7 +167,7 @@ function Bubble({ content, yOffset }: BubbleProps): ReactNode {
 // ============================================================================
 
 function AgentSpriteComponent({
-  id: _id,
+  id,
   name,
   color,
   number: _number,
@@ -178,17 +180,37 @@ function AgentSpriteComponent({
   renderLabel = true,
   isTyping: _isTyping = false,
 }: AgentSpriteProps): ReactNode {
+  const clickToFocusEnabled = usePreferencesStore((s) => s.clickToFocusEnabled);
+  const openFocusPopup = useAttentionStore((s) => s.openFocusPopup);
+
   // Memoize draw callback
   const drawCallback = useMemo(
     () => (g: Graphics) => drawAgent(g, color),
     [color],
   );
 
+  // Click handler for focus popup
+  const handlePointerTap = useCallback(() => {
+    if (!clickToFocusEnabled) return;
+    const canvas = document.querySelector(".pixi-canvas-container canvas");
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scale = rect.width / 1280; // CANVAS_WIDTH = 1280
+    const screenX = rect.left + position.x * scale;
+    const screenY = rect.top + position.y * scale;
+    openFocusPopup(id, screenX, screenY);
+  }, [clickToFocusEnabled, id, position.x, position.y, openFocusPopup]);
+
   // Bubble offset for capsule rendering
   const bubbleOffset = -93;
 
   return (
-    <pixiContainer x={position.x} y={position.y}>
+    <pixiContainer
+      x={position.x}
+      y={position.y}
+      onPointerTap={handlePointerTap}
+      interactive={clickToFocusEnabled}
+    >
       {/* Agent capsule body */}
       <pixiGraphics draw={drawCallback} />
 

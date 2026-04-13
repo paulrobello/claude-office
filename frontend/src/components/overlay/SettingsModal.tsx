@@ -24,6 +24,50 @@ interface SettingsModalProps {
 }
 
 // ============================================================================
+// HELPER COMPONENT
+// ============================================================================
+
+function SettingsToggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: () => void;
+}): ReactNode {
+  return (
+    <div
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      tabIndex={0}
+      onClick={onChange}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onChange();
+        }
+      }}
+      className="flex items-center justify-between p-2.5 rounded-lg bg-slate-800 border border-slate-700 cursor-pointer hover:border-slate-600 transition-colors"
+    >
+      <span className="text-slate-300 text-sm">{label}</span>
+      <div
+        className={`w-9 h-5 rounded-full relative transition-colors ${
+          checked ? "bg-purple-500" : "bg-slate-600"
+        }`}
+      >
+        <div
+          className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-md transition-transform ${
+            checked ? "translate-x-[18px]" : "translate-x-0.5"
+          }`}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // COMPONENT
 // ============================================================================
 
@@ -50,6 +94,34 @@ export default function SettingsModal({
   const setLanguage = usePreferencesStore((s) => s.setLanguage);
   const setAutoFollowNewSessions = usePreferencesStore(
     (s) => s.setAutoFollowNewSessions,
+  );
+
+  // Attention settings
+  const commandBarEnabled = usePreferencesStore((s) => s.commandBarEnabled);
+  const clickToFocusEnabled = usePreferencesStore((s) => s.clickToFocusEnabled);
+  const toastFilterPermission = usePreferencesStore(
+    (s) => s.toastFilterPermission,
+  );
+  const toastFilterError = usePreferencesStore((s) => s.toastFilterError);
+  const toastFilterTaskComplete = usePreferencesStore(
+    (s) => s.toastFilterTaskComplete,
+  );
+  const toastFilterArrival = usePreferencesStore((s) => s.toastFilterArrival);
+  const setCommandBarEnabled = usePreferencesStore(
+    (s) => s.setCommandBarEnabled,
+  );
+  const setClickToFocusEnabled = usePreferencesStore(
+    (s) => s.setClickToFocusEnabled,
+  );
+  const setToastFilterPermission = usePreferencesStore(
+    (s) => s.setToastFilterPermission,
+  );
+  const setToastFilterError = usePreferencesStore((s) => s.setToastFilterError);
+  const setToastFilterTaskComplete = usePreferencesStore(
+    (s) => s.setToastFilterTaskComplete,
+  );
+  const setToastFilterArrival = usePreferencesStore(
+    (s) => s.setToastFilterArrival,
   );
 
   const { t } = useTranslation();
@@ -301,6 +373,49 @@ export default function SettingsModal({
                   }`}
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Attention Settings */}
+          <div className="pt-4 border-t border-slate-800">
+            <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">
+              {t("settings.toastFilters")}
+            </label>
+            <div className="space-y-2">
+              <SettingsToggle
+                label={t("settings.commandBar")}
+                checked={commandBarEnabled}
+                onChange={() => setCommandBarEnabled(!commandBarEnabled)}
+              />
+              <SettingsToggle
+                label={t("settings.clickToFocus")}
+                checked={clickToFocusEnabled}
+                onChange={() => setClickToFocusEnabled(!clickToFocusEnabled)}
+              />
+              <SettingsToggle
+                label={t("settings.filterPermission")}
+                checked={toastFilterPermission}
+                onChange={() =>
+                  setToastFilterPermission(!toastFilterPermission)
+                }
+              />
+              <SettingsToggle
+                label={t("settings.filterError")}
+                checked={toastFilterError}
+                onChange={() => setToastFilterError(!toastFilterError)}
+              />
+              <SettingsToggle
+                label={t("settings.filterTaskComplete")}
+                checked={toastFilterTaskComplete}
+                onChange={() =>
+                  setToastFilterTaskComplete(!toastFilterTaskComplete)
+                }
+              />
+              <SettingsToggle
+                label={t("settings.filterArrival")}
+                checked={toastFilterArrival}
+                onChange={() => setToastFilterArrival(!toastFilterArrival)}
+              />
             </div>
           </div>
 

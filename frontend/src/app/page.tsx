@@ -45,6 +45,10 @@ import { ViewTransition } from "@/components/navigation/ViewTransition";
 import { BuildingView } from "@/components/views/BuildingView";
 import { FloorView } from "@/components/views/FloorView";
 import { TourOverlay } from "@/components/tour/TourOverlay";
+import CommandBar from "@/components/attention/CommandBar";
+import AttentionToasts from "@/components/attention/AttentionToasts";
+import AgentPopup from "@/components/attention/AgentPopup";
+import { useAttentionStore } from "@/stores/attentionStore";
 import { usePreferencesStore } from "@/stores/preferencesStore";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { Session } from "@/hooks/useSessions";
@@ -206,6 +210,26 @@ export default function V2TestPage(): React.ReactNode {
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // ------------------------------------------------------------------
+  // Cmd+K / Ctrl+K command bar toggle
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        const { isCommandBarOpen, closeCommandBar, openCommandBar } =
+          useAttentionStore.getState();
+        if (isCommandBarOpen) {
+          closeCommandBar();
+        } else {
+          openCommandBar();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   // ------------------------------------------------------------------
@@ -485,6 +509,13 @@ export default function V2TestPage(): React.ReactNode {
           }
         />
       )}
+
+      {/* ----------------------------------------------------------------
+          Attention System
+      ---------------------------------------------------------------- */}
+      <CommandBar />
+      <AttentionToasts />
+      <AgentPopup />
 
       {/* ----------------------------------------------------------------
           Tour Overlay

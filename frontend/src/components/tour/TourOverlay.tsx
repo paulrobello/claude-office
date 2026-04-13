@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { useTourStore } from "@/stores/tourStore";
 import { useNavigationStore } from "@/stores/navigationStore";
 import { useGameStore } from "@/stores/gameStore";
+import { useAttentionStore } from "@/stores/attentionStore";
 import { NarratorBar } from "./NarratorBar";
 import { PointerRing } from "./PointerRing";
 import { SpotlightDim } from "./SpotlightDim";
@@ -69,6 +70,16 @@ export function TourOverlay(): ReactNode {
     };
     document.addEventListener("click", handleClick, true);
     return () => document.removeEventListener("click", handleClick, true);
+  }, [step, advanceStep]);
+
+  // Advance on focus-popup (agent clicked)
+  useEffect(() => {
+    if (!step || step.advanceOn.kind !== "focus-popup") return;
+    return useAttentionStore.subscribe((state, prevState) => {
+      if (state.focusPopup && !prevState.focusPopup) {
+        setTimeout(advanceStep, 100);
+      }
+    });
   }, [step, advanceStep]);
 
   // Navigate to step's expected view if needed

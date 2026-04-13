@@ -9,10 +9,12 @@ import {
   HelpCircle,
   Settings,
   Map,
+  Bell,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useNavigationStore } from "@/stores/navigationStore";
 import { useTourStore } from "@/stores/tourStore";
+import { useAttentionStore, selectUnreadCount } from "@/stores/attentionStore";
 
 // ============================================================================
 // TYPES
@@ -56,6 +58,8 @@ export function HeaderControls({
   const buildingConfig = useNavigationStore((s) => s.buildingConfig);
   const hasSeenTour = useTourStore((s) => s.hasSeenTour);
   const startTour = useTourStore((s) => s.startTour); // (mode: "single" | "building") => void
+  const unreadCount = useAttentionStore(selectUnreadCount);
+  const openCommandBar = useAttentionStore((s) => s.openCommandBar);
   const hasBuildingConfig =
     buildingConfig !== null && (buildingConfig?.floors.length ?? 0) > 0;
 
@@ -97,6 +101,19 @@ export function HeaderControls({
         <Bug size={14} />
         {debugMode ? t("header.debugOn") : t("header.debugOff")}
       </button>
+
+      {unreadCount > 0 && (
+        <button
+          onClick={openCommandBar}
+          className="relative flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 border border-orange-500/30 rounded text-xs font-bold transition-colors"
+          title="Attention Queue"
+        >
+          <Bell className="w-3.5 h-3.5" />
+          <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        </button>
+      )}
 
       {/* Tour button */}
       {!hasSeenTour && (
