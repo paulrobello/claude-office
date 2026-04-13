@@ -260,6 +260,15 @@ export function OfficeGame(): ReactNode {
         wheel={{ step: 0.1 }}
         pinch={{ step: 5 }}
         doubleClick={{ mode: "reset" }}
+        onTransform={(ref, state) => {
+          // Auto-reset pan offset when zooming back out to 1:1
+          if (
+            state.scale <= 1 &&
+            (state.positionX !== 0 || state.positionY !== 0)
+          ) {
+            ref.resetTransform(0);
+          }
+        }}
       >
         <ZoomControls />
         <TransformComponent
