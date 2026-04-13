@@ -1,11 +1,8 @@
 "use client";
 
 import { useEffect, useCallback, type ReactNode } from "react";
-import {
-  useAttentionStore,
-  selectActiveToasts,
-  type UrgencyLevel,
-} from "@/stores/attentionStore";
+import { useShallow } from "zustand/react/shallow";
+import { useAttentionStore, type UrgencyLevel } from "@/stores/attentionStore";
 
 const URGENCY_COLORS: Record<UrgencyLevel, string> = {
   critical: "border-red-500 bg-red-500/10 text-red-400",
@@ -22,7 +19,9 @@ const URGENCY_ICONS: Record<UrgencyLevel, string> = {
 };
 
 export default function AttentionToasts(): ReactNode {
-  const toasts = useAttentionStore(selectActiveToasts);
+  const toasts = useAttentionStore(
+    useShallow((s) => s.toastQueue.filter((t) => !t.dismissed)),
+  );
   const dismissToast = useAttentionStore((s) => s.dismissToast);
   const openFocusPopup = useAttentionStore((s) => s.openFocusPopup);
 
