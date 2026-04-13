@@ -10,6 +10,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useGameStore } from "@/stores/gameStore";
 import { useAttentionStore } from "@/stores/attentionStore";
+import { usePreferencesStore } from "@/stores/preferencesStore";
 import { agentMachineService } from "@/machines/agentMachineService";
 import {
   getNextSpawnPosition,
@@ -379,6 +380,7 @@ export function useWebSocketEvents({
               }
 
               // Attention toasts - wire event processing into attention store
+              // Check toast filter preferences before generating toasts
               const attentionEventTypes = new Set<EventType>([
                 "permission_request",
                 "error",
@@ -388,15 +390,26 @@ export function useWebSocketEvents({
                 "background_task_notification",
               ]);
               if (attentionEventTypes.has(message.event.type as EventType)) {
-                useAttentionStore.getState().processEvent({
-                  type: message.event.type as EventType,
-                  agentId: message.event.agentId ?? null,
-                  agentName: message.event.detail?.agentName ?? null,
-                  taskDescription:
-                    message.event.detail?.taskDescription ?? null,
-                  errorType: message.event.detail?.errorType ?? null,
-                  message: message.event.detail?.message ?? null,
-                });
+                const prefs = usePreferencesStore.getState();
+                const filterMap: Record<string, boolean> = {
+                  permission_request: prefs.toastFilterPermission,
+                  error: prefs.toastFilterError,
+                  stop: prefs.toastFilterError,
+                  task_completed: prefs.toastFilterTaskComplete,
+                  subagent_start: prefs.toastFilterArrival,
+                  background_task_notification: prefs.toastFilterArrival,
+                };
+                if (filterMap[message.event.type as string] !== false) {
+                  useAttentionStore.getState().processEvent({
+                    type: message.event.type as EventType,
+                    agentId: message.event.agentId ?? null,
+                    agentName: message.event.detail?.agentName ?? null,
+                    taskDescription:
+                      message.event.detail?.taskDescription ?? null,
+                    errorType: message.event.detail?.errorType ?? null,
+                    message: message.event.detail?.message ?? null,
+                  });
+                }
               }
             }
             break;

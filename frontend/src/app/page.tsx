@@ -219,6 +219,8 @@ export default function V2TestPage(): React.ReactNode {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
+        const prefs = usePreferencesStore.getState();
+        if (!prefs.commandBarEnabled) return;
         const { isCommandBarOpen, closeCommandBar, openCommandBar } =
           useAttentionStore.getState();
         if (isCommandBarOpen) {

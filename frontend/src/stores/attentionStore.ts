@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import type { EventType } from "@/types";
+import { usePreferencesStore } from "@/stores/preferencesStore";
 
 // ============================================================================
 // TYPES
@@ -72,6 +73,7 @@ function scoreEvent(eventType: EventType): {
   level: UrgencyLevel;
   autoDismissMs: number | null;
 } {
+  const prefs = usePreferencesStore.getState();
   switch (eventType) {
     case "permission_request":
       return { urgency: 90, level: "critical", autoDismissMs: null };
@@ -79,12 +81,24 @@ function scoreEvent(eventType: EventType): {
     case "stop":
       return { urgency: 70, level: "high", autoDismissMs: null };
     case "task_completed":
-      return { urgency: 30, level: "low", autoDismissMs: 5000 };
+      return {
+        urgency: 30,
+        level: "low",
+        autoDismissMs: prefs.toastAutoDismissLow,
+      };
     case "subagent_start":
     case "background_task_notification":
-      return { urgency: 10, level: "info", autoDismissMs: 3000 };
+      return {
+        urgency: 10,
+        level: "info",
+        autoDismissMs: prefs.toastAutoDismissInfo,
+      };
     default:
-      return { urgency: 5, level: "info", autoDismissMs: 3000 };
+      return {
+        urgency: 5,
+        level: "info",
+        autoDismissMs: prefs.toastAutoDismissInfo,
+      };
   }
 }
 
