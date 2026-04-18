@@ -29,7 +29,7 @@ Verify that the WebSocket manager supports frontend subscription to
 
 ---
 
-### ⬜ Task 2: Run state store (`useRunStore`)
+### 🔧 Task 2: Run state store (`useRunStore`)
 
 **Files:** `frontend/src/stores/runStore.ts` (new), `frontend/src/types/run.ts` (new)
 
