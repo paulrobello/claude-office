@@ -19,12 +19,14 @@ from app.models.sessions import GameState, HistoryEntry
 logger = logging.getLogger(__name__)
 
 _RUN_ID_RE = re.compile(r"^ral-[0-9]{8}-[0-9a-f]{4}$")
+RUN_ID_RE = _RUN_ID_RE  # public alias for cross-module validation
 
 if TYPE_CHECKING:
     from app.core.room_orchestrator import RoomOrchestrator
     from app.models.runs import Run
 
 __all__ = [
+    "RUN_ID_RE",
     "broadcast_state",
     "broadcast_event",
     "broadcast_error",

@@ -71,21 +71,23 @@ async def test_plan_watcher_warn_debug_recovery_cadence(tmp_path: Path, caplog):
         missing.write_text("- [ ] plan-task-1: test\n")
         await w._poll_one(state)  # poll 4: file healed → INFO recovery
 
-    watcher_records = [(r.levelname, r.message) for r in caplog.records
-                       if r.name == "app.core.plan_watcher"]
+    watcher_records = [
+        (r.levelname, r.message) for r in caplog.records if r.name == "app.core.plan_watcher"
+    ]
 
     assert watcher_records[0][0] == "WARNING", f"expected WARNING first, got {watcher_records}"
     assert watcher_records[1][0] == "DEBUG", f"expected DEBUG second, got {watcher_records}"
     assert watcher_records[2][0] == "DEBUG", f"expected DEBUG third, got {watcher_records}"
-    assert any(
-        r[0] == "INFO" and "recover" in r[1].lower() for r in watcher_records[3:]
-    ), f"expected INFO recovery after heal, got {watcher_records}"
+    assert any(r[0] == "INFO" and "recover" in r[1].lower() for r in watcher_records[3:]), (
+        f"expected INFO recovery after heal, got {watcher_records}"
+    )
 
 
 @pytest.mark.asyncio
 async def test_plan_watcher_mtime_size_fastpath_skips_hash(tmp_path: Path, monkeypatch):
     """Unchanged file: hash must be computed at most once across 3 polls."""
     import hashlib as _hashlib
+
     plan = tmp_path / "PLAN.md"
     plan.write_text("- [ ] plan-task-1: stable\n")
 
@@ -121,7 +123,7 @@ async def test_plan_watcher_rejects_oversized_file(tmp_path: Path, caplog):
     plan = tmp_path / "PLAN.md"
     # Generate 2 MiB of plausible-looking task lines
     line = "- [ ] plan-task-1: some task title that looks realistic\n"
-    plan.write_bytes((line * (2 * 1024 * 1024 // len(line) + 1)).encode()[:2 * 1024 * 1024])
+    plan.write_bytes((line * (2 * 1024 * 1024 // len(line) + 1)).encode()[: 2 * 1024 * 1024])
 
     updates: list = []
 
@@ -137,13 +139,12 @@ async def test_plan_watcher_rejects_oversized_file(tmp_path: Path, caplog):
 
     assert updates == [], "callback must not be invoked for oversized file"
     warn_records = [
-        r for r in caplog.records
+        r
+        for r in caplog.records
         if r.levelno == logging.WARNING and r.name == "app.core.plan_watcher"
     ]
     assert warn_records, "expected a WARNING log for oversized file"
     assert any(
-        str(MAX_PLAN_BYTES) in r.message
-        or "MiB" in r.message
-        or "size" in r.message.lower()
+        str(MAX_PLAN_BYTES) in r.message or "MiB" in r.message or "size" in r.message.lower()
         for r in warn_records
     ), f"WARN log must mention size cap, got: {[r.message for r in warn_records]}"

@@ -50,14 +50,12 @@ def test_parse_plan_md_debug_logs_malformed_task_lines(caplog):
     import logging
 
     malformed = [
-        "- [ ] plan-task-: missing id number",      # id part fails \d+
-        "- [ ] plan-task-42",                        # no colon+title
-        "- [x] plan-task-99:",                       # empty title (.+? requires ≥1 char)
+        "- [ ] plan-task-: missing id number",  # id part fails \d+
+        "- [ ] plan-task-42",  # no colon+title
+        "- [x] plan-task-99:",  # empty title (.+? requires ≥1 char)
     ]
     content = (
-        "- [x] plan-task-1: valid one\n"
-        + "\n".join(malformed)
-        + "\n- [ ] plan-task-2: valid two\n"
+        "- [x] plan-task-1: valid one\n" + "\n".join(malformed) + "\n- [ ] plan-task-2: valid two\n"
     )
 
     with caplog.at_level(logging.DEBUG, logger="app.core.plan_parser"):

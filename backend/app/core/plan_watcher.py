@@ -107,11 +107,7 @@ class PlanWatcher:
                 state.path,
             )
             return
-        if (
-            st is not None
-            and st.st_mtime == state.last_mtime
-            and st.st_size == state.last_size
-        ):
+        if st is not None and st.st_mtime == state.last_mtime and st.st_size == state.last_size:
             return
         try:
             content = state.path.read_text()

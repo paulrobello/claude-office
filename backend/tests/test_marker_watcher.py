@@ -98,8 +98,7 @@ def test_register_lru_evicts_oldest(tmp_path, caplog):
         assert d.resolve() in w._paths, f"{d} should still be tracked"
 
     warn_records = [
-        r for r in caplog.records
-        if r.levelno == logging.WARNING and "evict" in r.message.lower()
+        r for r in caplog.records if r.levelno == logging.WARNING and "evict" in r.message.lower()
     ]
     assert len(warn_records) == 1, f"Expected exactly 1 eviction WARNING, got {len(warn_records)}"
 
@@ -126,8 +125,7 @@ def test_reregister_existing_path_does_not_evict(tmp_path, caplog):
 
     assert len(w._paths) == MAX_WATCHED_PATHS
     warn_records = [
-        r for r in caplog.records
-        if r.levelno == logging.WARNING and "evict" in r.message.lower()
+        r for r in caplog.records if r.levelno == logging.WARNING and "evict" in r.message.lower()
     ]
     assert len(warn_records) == 0
 

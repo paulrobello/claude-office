@@ -6,6 +6,7 @@ Two assertions:
    proving they overlap in threads rather than serialising on the event loop.
    This test FAILS before the asyncio.to_thread fix is applied.
 """
+
 from __future__ import annotations
 
 import asyncio

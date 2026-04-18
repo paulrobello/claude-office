@@ -8,7 +8,9 @@
 
 ## Phase 1: Foundation (Tasks 1–4)
 
-### 🔧 Task 1: Backend discovery endpoint + WebSocket channel verification
+### ✅ Task 1: Backend discovery endpoint + WebSocket channel verification
+
+Session: completed cleanly. Route registered in main.py (not __init__.py — PLAN was incorrect about location). `_RUN_ID_RE` exported as public `RUN_ID_RE` alias to avoid Pyright private-usage error. WS tests use unit/mock approach (TestClient.websocket_connect() causes lifespan teardown isolation issues). Pre-existing pyright failures in backend — not introduced by this task (reduced from 548→547 errors).
 
 **Files:** `backend/app/api/routes/runs.py` (new), `backend/app/api/routes/__init__.py`, `backend/app/api/websocket.py`
 

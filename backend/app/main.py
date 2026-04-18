@@ -11,9 +11,10 @@ from fastapi.staticfiles import StaticFiles
 from rich.logging import RichHandler
 from sqlalchemy import text
 
-from app.api.routes import events, floors, preferences, sessions
+from app.api.routes import events, floors, preferences, runs, sessions
 from app.api.websocket import manager
 from app.config import get_settings
+from app.core.broadcast_service import RUN_ID_RE
 from app.core.event_processor import event_processor
 from app.core.summary_service import get_summary_service
 from app.db.database import Base, get_engine
@@ -96,6 +97,7 @@ app.include_router(events.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(preferences.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(sessions.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(floors.router, prefix=f"{settings.API_V1_STR}")
+app.include_router(runs.router, prefix=f"{settings.API_V1_STR}")
 
 
 @app.get("/health")
@@ -115,6 +117,12 @@ async def get_status() -> dict[str, bool | str | None]:
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
+    if session_id.startswith("_run:"):
+        run_id = session_id[len("_run:") :]
+        if not RUN_ID_RE.match(run_id):
+            await websocket.accept()
+            await websocket.close(code=1008, reason="Invalid run ID format")
+            return
     await manager.connect(websocket, session_id)
 
     current_state = await event_processor.get_current_state(session_id)

@@ -36,6 +36,30 @@ The WebSocket broadcast channel exists but there's no REST discovery
 endpoint. Without it, the frontend can't populate the campus on page load
 (before any WS events arrive). Scoped as Task 1 (~20 lines, minimal).
 
+## Task 1 implementation notes (Plan 2)
+
+### Route registration is in `main.py`, not `__init__.py`
+PLAN.md said "Register the route in `backend/app/api/routes/__init__.py`" but the
+actual pattern (matching all other routes: events, sessions, floors, preferences) is
+to register in `main.py`. `__init__.py` is empty. Used `main.py`.
+
+### `_RUN_ID_RE` exported as `RUN_ID_RE` public alias
+Task said "reuse `_RUN_ID_RE` from broadcast_service.py". Added `RUN_ID_RE = _RUN_ID_RE`
+as a public alias + added to `__all__`. This avoids Pyright's `reportPrivateUsage`
+without duplicating the regex pattern.
+
+### Backend pyright was already failing (pre-existing)
+`make checkall` fails due to pyright returning exit code 1 with 547 errors — all
+pre-existing in `event_processor.py`, `test_simulation_pipeline.py`, and other files
+that existed before Task 1. My changes REDUCED the count from 548 → 547. Frontend
+checkall passes cleanly.
+
+### WS test isolation
+WS integration tests via `TestClient.websocket_connect()` trigger the ASGI lifespan
+teardown which disposes the in-memory SQLite DB, breaking subsequent tests. Used unit
+tests (RUN_ID_RE validation + mock WebSocket endpoint tests) instead, matching the
+pattern in `test_websocket_room.py`.
+
 ## Observations
 
 - The existing `useWebSocketEvents` hook is 500+ lines and tightly coupled

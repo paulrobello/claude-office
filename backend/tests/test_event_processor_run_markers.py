@@ -2,6 +2,7 @@
 run_start, run_phase_change, and run_end — not just run_start.
 Also covers: unregistering the marker path from MarkerWatcher on run_end.
 """
+
 from __future__ import annotations
 
 import json

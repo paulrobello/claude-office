@@ -7,6 +7,7 @@ Verifies that:
 
 These tests FAIL before the _RUN_ID_RE validation is applied.
 """
+
 from __future__ import annotations
 
 import logging
@@ -34,8 +35,7 @@ async def test_malicious_run_id_no_broadcast(caplog):
 
     mock_broadcast.assert_not_called()
     assert any(
-        "run_id" in r.message.lower() or "invalid" in r.message.lower()
-        for r in caplog.records
+        "run_id" in r.message.lower() or "invalid" in r.message.lower() for r in caplog.records
     )
 
 
@@ -50,8 +50,7 @@ async def test_spoof_run_id_no_broadcast(caplog):
 
     mock_broadcast.assert_not_called()
     assert any(
-        "run_id" in r.message.lower() or "invalid" in r.message.lower()
-        for r in caplog.records
+        "run_id" in r.message.lower() or "invalid" in r.message.lower() for r in caplog.records
     )
 
 
@@ -66,8 +65,7 @@ async def test_empty_run_id_no_broadcast(caplog):
 
     mock_broadcast.assert_not_called()
     assert any(
-        "run_id" in r.message.lower() or "invalid" in r.message.lower()
-        for r in caplog.records
+        "run_id" in r.message.lower() or "invalid" in r.message.lower() for r in caplog.records
     )
 
 
