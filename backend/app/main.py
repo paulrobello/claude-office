@@ -54,9 +54,7 @@ async def _migrate_schema(conn) -> None:  # type: ignore[type-arg]
     ]
     for col_name, col_def in new_columns:
         if col_name not in existing:
-            await conn.execute(
-                text(f"ALTER TABLE sessions ADD COLUMN {col_name} {col_def}")
-            )
+            await conn.execute(text(f"ALTER TABLE sessions ADD COLUMN {col_name} {col_def}"))
             logging.getLogger(__name__).info("DB migration: added column sessions.%s", col_name)
 
 
@@ -70,9 +68,11 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         await _migrate_schema(conn)
 
     git_service.start()
+    await event_processor.start_watchers()
 
     yield
 
+    await event_processor.stop_watchers()
     await git_service.stop()
     await get_engine().dispose()
 

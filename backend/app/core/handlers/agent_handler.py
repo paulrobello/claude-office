@@ -243,9 +243,7 @@ async def handle_agent_update(
         # Summarize long bubble text using AI if available
         summary_svc = get_summary_service()
         if summary_svc.enabled and bubble.text and len(bubble.text) > 60:
-            summarized = await summary_svc.summarize_bubble_text(
-                bubble.text, bubble.type
-            )
+            summarized = await summary_svc.summarize_bubble_text(bubble.text, bubble.type)
             bubble = BubbleContent(
                 type=bubble.type,
                 text=summarized,

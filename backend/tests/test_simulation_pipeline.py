@@ -121,7 +121,11 @@ class TestSimulationEventTypes:
             post_event(
                 sid,
                 "post_tool_use",
-                {"tool_name": tool, "tool_input": {"file_path": "src/auth/login.py"}, "agent_id": "main"},
+                {
+                    "tool_name": tool,
+                    "tool_input": {"file_path": "src/auth/login.py"},
+                    "agent_id": "main",
+                },
             )
         # TodoWrite
         post_event(
@@ -191,7 +195,9 @@ class TestSimulationEventTypes:
         post_event(sid, "session_start")
         post_event(sid, "task_created", {"id": "task-01", "content": "[PROJ-1] Fix login timeout"})
         post_event(sid, "task_created", {"id": "task-02", "content": "[PROJ-2] Add rate limiting"})
-        post_event(sid, "task_completed", {"id": "task-01", "content": "[PROJ-1] Fix login timeout"})
+        post_event(
+            sid, "task_completed", {"id": "task-01", "content": "[PROJ-1] Fix login timeout"}
+        )
         post_event(sid, "session_end")
 
     def test_background_task_notification(self) -> None:
@@ -275,10 +281,12 @@ class TestSimulationQuickScenario:
                 "tool_input": {
                     "todos": [
                         {"content": s, "status": "in_progress" if i == 0 else "pending"}
-                        for i, s in enumerate([
-                            "[PROJ-1] Fix login timeout for inactive sessions",
-                            "[PROJ-2] Add rate limiting to /api/v1/auth",
-                        ])
+                        for i, s in enumerate(
+                            [
+                                "[PROJ-1] Fix login timeout for inactive sessions",
+                                "[PROJ-2] Add rate limiting to /api/v1/auth",
+                            ]
+                        )
                     ]
                 },
                 "agent_id": "main",
@@ -316,7 +324,11 @@ class TestSimulationQuickScenario:
         )
 
         # Kanban completion
-        post_event(sid, "task_completed", {"id": "qt-01", "content": "[PROJ-1] Fix login timeout for inactive sessions"})
+        post_event(
+            sid,
+            "task_completed",
+            {"id": "qt-01", "content": "[PROJ-1] Fix login timeout for inactive sessions"},
+        )
 
         # Two subagents
         for agent_id, task in [
@@ -349,7 +361,11 @@ class TestSimulationQuickScenario:
                 post_event(
                     sid,
                     "post_tool_use",
-                    {"tool_name": tool, "tool_input": {"file_path": "src/auth/login.py"}, "agent_id": agent_id},
+                    {
+                        "tool_name": tool,
+                        "tool_input": {"file_path": "src/auth/login.py"},
+                        "agent_id": agent_id,
+                    },
                 )
             post_event(
                 sid,
@@ -362,8 +378,16 @@ class TestSimulationQuickScenario:
             )
 
         # Remaining kanban completions
-        post_event(sid, "task_completed", {"id": "qt-02", "content": "[PROJ-2] Add rate limiting to /api/v1/auth"})
-        post_event(sid, "task_completed", {"id": "qt-03", "content": "[PROJ-3] Update dashboard component styles"})
+        post_event(
+            sid,
+            "task_completed",
+            {"id": "qt-02", "content": "[PROJ-2] Add rate limiting to /api/v1/auth"},
+        )
+        post_event(
+            sid,
+            "task_completed",
+            {"id": "qt-03", "content": "[PROJ-3] Update dashboard component styles"},
+        )
 
         # Final TodoWrite — all complete
         post_event(
@@ -371,9 +395,7 @@ class TestSimulationQuickScenario:
             "pre_tool_use",
             {
                 "tool_name": "TodoWrite",
-                "tool_input": {
-                    "todos": [{"content": "All done", "status": "completed"}]
-                },
+                "tool_input": {"todos": [{"content": "All done", "status": "completed"}]},
                 "agent_id": "main",
             },
         )
@@ -397,7 +419,9 @@ class TestSimulationQuickScenario:
         # Session must appear in the DB listing
         resp = client.get("/api/v1/sessions")
         assert resp.status_code == 200
-        assert any(s["id"] == sid for s in resp.json()), "Session missing from list after quick scenario"
+        assert any(s["id"] == sid for s in resp.json()), (
+            "Session missing from list after quick scenario"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -625,7 +649,9 @@ class TestSimulationStateVerification:
             },
         )
         pre_compaction = get_replay_state(sid).get("office", {}).get("contextUtilization", 0.0)
-        assert pre_compaction > 0.8, f"Expected high utilization before compaction, got {pre_compaction}"
+        assert pre_compaction > 0.8, (
+            f"Expected high utilization before compaction, got {pre_compaction}"
+        )
 
         # Compaction event
         post_event(

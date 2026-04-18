@@ -23,6 +23,7 @@ from app.core.broadcast_service import (
     broadcast_error,
     broadcast_event,
     broadcast_room_state,
+    broadcast_run_state,
     broadcast_state,
 )
 from app.core.handlers import (
@@ -39,8 +40,12 @@ from app.core.handlers import (
     handle_user_prompt_submit,
 )
 from app.core.jsonl_parser import get_last_assistant_response
+from app.core.marker_file import marker_path_for_cwd, read_marker
+from app.core.marker_watcher import get_marker_watcher, init_marker_watcher
+from app.core.plan_watcher import get_plan_watcher, init_plan_watcher
 from app.core.product_mapper import get_product_mapper
 from app.core.room_orchestrator import RoomOrchestrator
+from app.core.run_aggregator import RunAggregator
 from app.core.state_machine import StateMachine
 from app.core.task_file_poller import init_task_file_poller
 from app.core.task_persistence import load_tasks, save_tasks
@@ -90,9 +95,7 @@ def derive_git_root(working_dir: str) -> str | None:
     return None
 
 
-def _derive_display_name(
-    working_dir: str | None, project_root: str | None
-) -> str | None:
+def _derive_display_name(working_dir: str | None, project_root: str | None) -> str | None:
     """Derive a human-friendly display name for a session.
 
     Uses the relative path from the git root to the working directory,
@@ -112,7 +115,8 @@ def _derive_display_name(
             if cwd != root and str(cwd).startswith(str(root)):
                 return str(cwd.relative_to(root))
         return cwd.name
-    except (OSError, ValueError):
+    except (OSError, ValueError) as exc:
+        logger.debug("_derive_display_name failed for %r: %s", working_dir, exc)
         return None
 
 
@@ -149,6 +153,9 @@ class EventProcessor:
         self._task_poller_initialized = False
         self._beads_poller_initialized = False
         self._beads_sessions: set[str] = set()  # Sessions with active beads polling
+        self._run_aggregator = RunAggregator()
+        self._marker_watcher_initialized = False
+        self._plan_watcher_initialized = False
 
     # ------------------------------------------------------------------
     # Poller lifecycle helpers
@@ -171,6 +178,42 @@ class EventProcessor:
         if not self._beads_poller_initialized:
             init_beads_poller(self._handle_beads_update)
             self._beads_poller_initialized = True
+
+    def _ensure_marker_watcher(self) -> None:
+        """Initialise the marker watcher singleton if not already done."""
+        if not self._marker_watcher_initialized:
+            init_marker_watcher(self._handle_marker_event)
+            self._marker_watcher_initialized = True
+
+    def _ensure_plan_watcher(self) -> None:
+        """Initialise the plan watcher singleton if not already done."""
+        if not self._plan_watcher_initialized:
+            init_plan_watcher(self._handle_plan_update)
+            self._plan_watcher_initialized = True
+
+    async def start_watchers(self) -> None:
+        """Start marker and plan watchers. Call once from the FastAPI lifespan."""
+        self._ensure_marker_watcher()
+        self._ensure_plan_watcher()
+        mw = get_marker_watcher()
+        pw = get_plan_watcher()
+        if mw is not None:
+            await mw.start()
+        if pw is not None:
+            await pw.start()
+
+    async def stop_watchers(self) -> None:
+        """Stop marker and plan watchers. Call from the FastAPI lifespan teardown."""
+        mw = get_marker_watcher()
+        pw = get_plan_watcher()
+        if mw is not None:
+            await mw.stop()
+        if pw is not None:
+            await pw.stop()
+
+    def get_run_aggregator(self) -> RunAggregator:
+        """Return the singleton RunAggregator for Ralph run tracking."""
+        return self._run_aggregator
 
     # ------------------------------------------------------------------
     # Callbacks for pollers
@@ -207,6 +250,65 @@ class EventProcessor:
             f"tool={event.data.tool_name}"
         )
         await self._process_event_internal(event)
+
+    async def _handle_marker_event(self, event_type: str, payload: dict) -> None:
+        """Handle marker-file change events from the MarkerWatcher.
+
+        Synthesizes an Event and feeds it through the normal process_event path
+        so StateMachine transitions and WebSocket broadcast both see it.
+        Also manages plan_watcher registration for the run lifetime.
+        """
+        run_id: str = payload["run_id"]
+        session_id = payload.get("orchestrator_session_id") or f"_run:{run_id}"
+
+        ev = Event(
+            event_type=EventType(event_type),
+            session_id=session_id,
+            data=EventData(
+                run_id=run_id,
+                orchestrator_session_id=payload.get("orchestrator_session_id"),
+                primary_repo=payload.get("primary_repo"),
+                workdocs_dir=payload.get("workdocs_dir"),
+                to_phase=payload.get("phase"),
+                from_phase=payload.get("from_phase"),
+                model_config_dict=payload.get("model_config"),
+            ),
+        )
+        await self.process_event(ev)
+
+        primary_repo = payload.get("primary_repo")
+        if primary_repo and event_type in {"run_start", "run_phase_change", "run_end"}:
+            try:
+                marker_path = marker_path_for_cwd(Path(primary_repo))
+            except ValueError as exc:
+                logger.warning("Rejected unsafe primary_repo %r: %s", primary_repo, exc)
+                marker_path = None
+            if marker_path is not None:
+                marker = await asyncio.to_thread(read_marker, marker_path)
+                if marker is not None:
+                    self._run_aggregator.upsert_from_marker(marker)
+
+        if event_type == "run_end" and primary_repo:
+            mw = get_marker_watcher()
+            if mw is not None:
+                mw.unregister(Path(primary_repo))
+
+        pw = get_plan_watcher()
+        if pw is None:
+            return
+
+        workdocs_dir = payload.get("workdocs_dir")
+        if event_type == "run_start" and workdocs_dir:
+            pw.register(run_id, Path(workdocs_dir) / "PLAN.md")
+        elif event_type == "run_end":
+            pw.unregister(run_id)
+
+    async def _handle_plan_update(self, run_id: str, tasks: list) -> None:
+        """Handle PLAN.md change notifications from the PlanWatcher."""
+        run = self._run_aggregator.get(run_id)
+        if run is not None:
+            run.plan_tasks = list(tasks)
+            await broadcast_run_state(run_id, run)
 
     # ------------------------------------------------------------------
     # Session management
@@ -363,7 +465,9 @@ class EventProcessor:
         # SESSION_START – start task-file polling + beads polling
         # ------------------------------------------------------------------
         if event.event_type == EventType.SESSION_START:
-            await handle_session_start(sm, event, self._ensure_task_file_poller)
+            await handle_session_start(
+                sm, event, self._ensure_task_file_poller, run_aggregator=self._run_aggregator
+            )
             await self._start_beads_if_available(event.session_id)
 
         # ------------------------------------------------------------------
@@ -381,7 +485,7 @@ class EventProcessor:
         # SESSION_END – stop task-file polling + beads polling
         # ------------------------------------------------------------------
         if event.event_type == EventType.SESSION_END:
-            await handle_session_end(sm, event)
+            await handle_session_end(sm, event, run_aggregator=self._run_aggregator)
             beads = get_beads_poller()
             if beads:
                 await beads.stop_polling(event.session_id)

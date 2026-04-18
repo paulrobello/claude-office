@@ -272,9 +272,7 @@ async def focus_session(
             try:
                 if os.name == "posix":
                     if os.path.exists("/usr/bin/pbcopy"):
-                        proc = subprocess.Popen(
-                            ["pbcopy"], stdin=subprocess.PIPE, close_fds=True
-                        )
+                        proc = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE, close_fds=True)
                         proc.communicate(input=message.encode())
                     elif os.path.exists("/usr/bin/xclip"):
                         proc = subprocess.Popen(

@@ -40,6 +40,11 @@ class EventType(StrEnum):
     TASK_CREATED = "task_created"
     TASK_COMPLETED = "task_completed"
     TEAMMATE_IDLE = "teammate_idle"
+    # Ralph run events (Spec A)
+    RUN_START = "run_start"
+    RUN_PHASE_CHANGE = "run_phase_change"
+    RUN_END = "run_end"
+    ROLE_SESSION_JOINED = "role_session_joined"
 
 
 class EventData(BaseModel):
@@ -89,6 +94,17 @@ class EventData(BaseModel):
     # Task-specific fields for TaskCreated/TaskCompleted events
     task_id: str | None = None
     task_subject: str | None = None
+    # Ralph run fields (Spec A)
+    run_id: str | None = None
+    orchestrator_session_id: str | None = None
+    primary_repo: str | None = None
+    workdocs_dir: str | None = None
+    from_phase: str | None = None
+    to_phase: str | None = None
+    outcome: str | None = None
+    ralph_role: str | None = None
+    ralph_task_id: str | None = None
+    model_config_dict: dict[str, str] | None = None
 
 
 class Event(BaseModel):

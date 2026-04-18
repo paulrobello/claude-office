@@ -89,10 +89,22 @@ def _build_agent_transcript_path(main_transcript: str | None, native_agent_id: s
     return f"{session_dir}/subagents/agent-{native_agent_id}.jsonl"
 
 
+_RALPH_ENV_MAP = {
+    "RALPH_RUN_ID": "run_id",
+    "RALPH_ROLE": "ralph_role",
+    "RALPH_TASK_ID": "ralph_task_id",
+    "RALPH_PRIMARY_REPO": "primary_repo",
+}
+
+
 def _handle_session_start(raw_data: dict[str, Any], data: dict[str, Any]) -> None:
     """Populate *data* for a session_start event."""
     source = raw_data.get("source", "unknown")
     data["summary"] = f"Session started ({source})"
+    for env_key, data_key in _RALPH_ENV_MAP.items():
+        value = os.environ.get(env_key)
+        if value:
+            data[data_key] = value
 
 
 def _handle_pre_compact(payload: dict[str, Any], data: dict[str, Any]) -> None:

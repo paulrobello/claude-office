@@ -12,6 +12,10 @@ import logging
 from pathlib import Path
 
 from app.core.broadcast_service import broadcast_state
+from app.core.marker_file import MarkerFileReadError, marker_path_for_cwd, read_marker
+from app.core.marker_watcher import get_marker_watcher
+from app.core.run_aggregator import RunAggregator
+from app.core.session_tagger import classify_session
 from app.core.state_machine import StateMachine
 from app.core.task_file_poller import get_task_file_poller
 from app.models.events import Event, EventType
@@ -29,40 +33,106 @@ async def handle_session_start(
     sm: StateMachine,
     event: Event,
     ensure_task_file_poller_fn: EnsurePollFn,
+    run_aggregator: RunAggregator | None = None,
 ) -> None:
     """Handle a SESSION_START event.
 
-    Starts task-file polling for the new session.
+    Starts task-file polling for the new session and optionally tags the
+    session with Ralph run attribution if a RunAggregator is provided.
 
     Args:
         sm: The StateMachine for this session.
         event: The SESSION_START event.
         ensure_task_file_poller_fn: Callable that initialises the task-file
             poller if it has not been started yet.
+        run_aggregator: Optional RunAggregator for Ralph run tracking.
     """
     ensure_task_file_poller_fn()
     task_poller = get_task_file_poller()
     if task_poller:
         task_list_id = event.data.task_list_id if event.data else None
         await task_poller.start_polling(event.session_id, task_list_id=task_list_id)
+
+    if run_aggregator is not None and event.data is not None:
+        await _tag_and_register_run_member(sm, event, run_aggregator)
+
     await broadcast_state(event.session_id, sm)
+
+
+async def _tag_and_register_run_member(
+    sm: StateMachine,
+    event: Event,
+    aggregator: RunAggregator,
+) -> None:
+    data = event.data
+    cwd = Path(data.project_dir or data.working_dir or ".").resolve()
+
+    env: dict[str, str] = {}
+    if data.run_id:
+        env["RALPH_RUN_ID"] = data.run_id
+    if data.ralph_role:
+        env["RALPH_ROLE"] = data.ralph_role
+    if data.ralph_task_id:
+        env["RALPH_TASK_ID"] = data.ralph_task_id
+
+    try:
+        marker = read_marker(marker_path_for_cwd(cwd))
+    except ValueError as e:
+        logger.warning("Rejected unsafe cwd %r in session_start: %s", cwd, e)
+        marker = None
+    except MarkerFileReadError as e:
+        logger.debug("session_start marker read failed for %s: %s", cwd, e)
+        marker = None
+
+    tag = classify_session(session_id=event.session_id, cwd=cwd, env=env, marker=marker)
+    if tag is None:
+        return
+
+    sm.run_id = tag.run_id
+    sm.role = tag.role
+    sm.task_id = tag.task_id
+
+    if aggregator.get(tag.run_id) is None and marker is not None:
+        aggregator.upsert_from_marker(marker)
+
+    if marker is not None:
+        mw = get_marker_watcher()
+        if mw is not None:
+            mw.register(cwd)
+
+    aggregator.add_member(
+        tag.run_id,
+        session_id=event.session_id,
+        role=tag.role,
+        task_id=tag.task_id,
+        is_orchestrator=tag.is_orchestrator,
+    )
 
 
 async def handle_session_end(
     sm: StateMachine,
     event: Event,
+    run_aggregator: RunAggregator | None = None,
 ) -> None:
     """Handle a SESSION_END event.
 
-    Stops task-file polling for the ending session.
+    Stops task-file polling for the ending session and optionally removes
+    the session from the Ralph run aggregator.
 
     Args:
         sm: The StateMachine for this session.
         event: The SESSION_END event.
+        run_aggregator: Optional RunAggregator for Ralph run tracking.
     """
     task_poller = get_task_file_poller()
     if task_poller:
         await task_poller.stop_polling(event.session_id)
+
+    if run_aggregator is not None:
+        if sm.run_id:
+            run_aggregator.remove_member(sm.run_id, session_id=event.session_id)
+        run_aggregator.end_if_orchestrator_stopped(event.session_id)
+
     await broadcast_state(event.session_id, sm)
 
 

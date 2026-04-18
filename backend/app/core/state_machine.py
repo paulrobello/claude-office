@@ -23,6 +23,7 @@ from app.models.agents import (
 )
 from app.models.common import BubbleContent, BubbleType, TodoItem, TodoStatus
 from app.models.events import Event, EventData, EventType
+from app.models.runs import Role
 from app.models.sessions import (
     AgentLifespan,
     BackgroundTask,
@@ -185,6 +186,11 @@ class StateMachine:
     teammate_name: str | None = None
     is_lead: bool = False
     kanban_tasks: dict[str, KanbanTask] = field(default_factory=_empty_kanban_tasks)
+
+    # Ralph run attribution (set by session_handler on SESSION_START)
+    run_id: str | None = None
+    role: Role | None = None
+    task_id: str | None = None
 
     # Whiteboard tracking delegated to WhiteboardTracker
     whiteboard: WhiteboardTracker = field(default_factory=WhiteboardTracker)

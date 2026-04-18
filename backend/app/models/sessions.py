@@ -6,6 +6,7 @@ from pydantic.alias_generators import to_camel
 
 from app.models.agents import Agent, Boss, OfficeState
 from app.models.common import TodoItem
+from app.models.runs import Role
 
 __all__ = [
     "ConversationEntry",
@@ -118,12 +119,17 @@ class WhiteboardData(BaseModel):
 class Session(BaseModel):
     """A Claude Code session summary."""
 
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     id: str
     created_at: datetime
     updated_at: datetime
     status: str  # "active" | "completed" | "error"
     event_count: int
     agent_count: int
+    run_id: str | None = None
+    role: Role | None = None
+    task_id: str | None = None
 
 
 class HistoryEntry(TypedDict):
