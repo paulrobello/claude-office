@@ -8,7 +8,7 @@
 
 ## Phase 1: Foundation (Tasks 1–4)
 
-### ⬜ Task 1: Backend discovery endpoint + WebSocket channel verification
+### 🔧 Task 1: Backend discovery endpoint + WebSocket channel verification
 
 **Files:** `backend/app/api/routes/runs.py` (new), `backend/app/api/routes/__init__.py`, `backend/app/api/websocket.py`
 
