@@ -29,18 +29,20 @@ Verify that the WebSocket manager supports frontend subscription to
 
 ---
 
-### 🔧 Task 2: Run state store (`useRunStore`)
+### ✅ Task 2: Run state store (`useRunStore`)
 
-**Files:** `frontend/src/stores/runStore.ts` (new), `frontend/src/types/run.ts` (new)
+Session: completed cleanly. Colocated test at `frontend/src/stores/runStore.test.ts` (10 tests, all pass). Pre-existing lint/pyright failures in backend and WIP files are unchanged. Frontend typecheck clean.
+
+**Files:** `frontend/src/stores/runStore.ts` (new), `frontend/src/types/run.ts` (new), `frontend/src/stores/runStore.test.ts` (new)
 
 Create Zustand store per SPEC.md `RunState` interface. Define TypeScript
 types for `Run`, `PlanTask`, `RunStats`. Export selectors:
 `selectRuns`, `selectActiveRun`, `selectHotDeskSessions`.
 
 **Success criteria:**
-- Store unit test: setRun adds a run, removeRun deletes it.
-- `selectHotDeskSessions` correctly filters sessions with `run_id == null`.
-- TypeScript compiles cleanly.
+- Store unit test: setRun adds a run, removeRun deletes it. ✅
+- `selectHotDeskSessions` correctly filters sessions with `run_id == null`. ✅
+- TypeScript compiles cleanly. ✅
 
 **Dependencies:** None.
 
