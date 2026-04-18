@@ -1,103 +1,88 @@
-# USER_PROMPT — Chained Ralph run (refinement)
+# USER_PROMPT — Spec A Plan 2 (frontend)
 
 ## Context
 
-This is a **refinement chain** run. The prior run (Spec A, Plan 1 — backend) built the
-Ralph run-visualization backend and opened draft PR #4:
-https://github.com/Tesseron-Chile/panoptica/pull/4 on branch
-`feature/ralph-panoptica-spec-a`.
+Phased chain. Prior run merged to main as PR #4 (squash commit `7df4a2c`) —
+backend plumbing for Ralph run visualization is in. This run implements the
+**frontend** that consumes those contracts.
 
-Three parallel AI reviews (code, silent-failure, security) on that PR surfaced
-multiple issues. This chained run fixes **every Critical / High / Major** finding
-and documents deferred Minors. It does **not** expand scope beyond the reviews.
+Spec A (overall design) lives on `ralph/workdocs_archive` branch under
+`archive/2026-04-18-spec-a-plan1/SPEC.md`. Designer must read it.
 
-Prior workdocs archived on `ralph/workdocs_archive` branch under
-`archive/2026-04-18-spec-a-plan1/`.
+## Goal
 
-## Scope (fix-it list — from the three reviews)
+Build the Panoptica frontend pieces of Spec A: a pixel-art campus view where
+each live Ralph run is a private office, unrelated Claude Code sessions live
+on a shared hot-desk floor, role-specific nooks inside each run office
+(Orchestrator, Designer, Coder, Verifier, Reviewer), and demo-legible
+animations on the three highest-signal transitions.
 
-### Merge-blockers (Critical)
+Reuse existing single-session rendering code as the per-nook drill-down zoom
+level (Spec A demotes it to a degenerate case).
 
-- **code-C1** — `backend/app/core/handlers/session_handler.py:88-92, 131-134` uses
-  `getattr(sm, "session", None)` but `StateMachine` has no `session` attribute.
-  Ralph attribution silently drops in production; tests only pass via
-  SimpleNamespace mock. Either: (a) store the Ralph tag on the runtime `Session`
-  model that the StateMachine wraps, or (b) persist `sm.ralph_tag` explicitly.
-  Frontend Plan 2 depends on this field being on the Session the WebSocket
-  emits. Add a test that exercises the **real** StateMachine, not a mock.
+## Backend contracts (available today on main)
 
-- **code-M2 / silent-failure-C1** — `event_processor._handle_marker_event` only
-  calls `RunAggregator.upsert_from_marker` on `run_start`. Phase-change and
-  run_end marker updates are silently dropped. Fix: call `upsert_from_marker`
-  on every marker event, not just `run_start`. Add regression tests.
+- **WebSocket channel** `_run:<run_id>` (validated regex `^ral-[0-9]{8}-[0-9a-f]{4}$`)
+  broadcasts `Run` state changes. Subscribe from frontend.
+- **Session** model exposes `run_id`, `role`, `task_id` when the session is
+  part of a Ralph run (null otherwise → hot-desk).
+- **Synthetic events** on the regular event stream: `run_start`,
+  `run_phase_change`, `run_end`, `role_session_joined`. Use for animation
+  triggers.
+- **Run domain type** (`backend/app/models/runs.py`): `Run.phase` in
+  `{A, B, C, D}`, `Run.outcome`, `Run.plan_tasks` with statuses
+  `{todo, in_progress, done, stuck}`, `Run.member_session_ids` for roster.
 
-- **silent-failure-C2** — `plan_watcher` lacks the first-failure
-  WARN-then-DEBUG pattern used by `beads_poller.py`. Noisy logs on transient
-  failures. Port the pattern.
+## Must-haves (MVP)
 
-- **silent-failure-C3** — `plan_parser.parse_plan_md` drops malformed lines
-  silently. Emit a DEBUG log (or structured warning at a sane rate) for lines
-  that fail to parse so operators can diagnose spec drift.
+1. **Campus view** — all live runs as offices + hot-desk area. Glanceable.
+2. **Per-run office** — orchestrator desk + one nook per active role;
+   occupancy matches member_session_ids filtered by role.
+3. **Drill-down** — clicking a nook zooms to the existing single-session
+   renderer (reuse, don't rebuild).
+4. **Three animations**: run_start (office appears + move-in), phase_change
+   (A→B→C→D banner/transition), plan-task status change (task checkbox
+   flip or equivalent).
+5. **Hot-desk area** — ad-hoc Claude Code sessions (run_id == null) render
+   here, never inside a run office.
 
-- **security-H1** — Path traversal via `working_dir` passed from hooks.
-  `marker_path_for_cwd` takes hook-supplied `working_dir` without
-  canonicalization. Validate with `Path.resolve()` and reject paths that escape
-  a configured root or are not absolute. Test with `..` payloads.
+## Non-goals
 
-- **security-H2** — `MarkerWatcher` registration is unbounded — a misbehaving
-  hook could register arbitrary paths. Cap the number of watched paths
-  (constant, e.g. 256) and evict LRU on overflow. Log the eviction at WARN.
-
-### Major (non-blocking but ship together)
-
-- **code-M3** — `_WatchedPath` entries are never unregistered after `run_end`.
-  Memory leak in long-lived backend. Remove the path on `run_end` and on
-  aggregator eviction.
-
-- **code-M4** — `read_marker` is synchronous and called inside async handler
-  path. Wrap with `asyncio.to_thread` / `run_in_executor`.
-
-- **silent-failure major findings (5)** — see PR #4 review thread. All variants
-  of "except: pass" or returning None on error without a log. Add a DEBUG log
-  per swallow site with enough context to trace.
-
-- **security medium findings (3)** —
-  - run_id used as WebSocket channel name allows channel smuggling: validate
-    run_id matches `^ral-[0-9]{8}-[0-9a-f]{4}$` before using as a channel.
-  - PLAN.md read without a size cap: reject files > 1 MiB with a WARN log.
-  - Full-file hash per poll tick is expensive: switch to mtime+size quick
-    check, fall back to hash only on change.
-
-### Deferred (Minor — document but don't fix in this run)
-
-- `model_config_` alias round-trip edge case when input uses the Python name.
-- Import-at-bottom with `noqa` in `event_processor.py`.
-- Remaining silent-failure minors / security lows — list them in TAKEAWAYS
-  with filed issue numbers.
+- Token/cost dashboards (Spec B).
+- Ralph wizard / Linear (Spec C).
+- Historical run replay (live-only for MVP).
 
 ## Constraints
 
-- **Branch:** `feature/ralph-panoptica-spec-a` (same branch — PR #4 is the target).
-- **Do not modify frontend code.** Frontend changes are for Plan 2.
-- **Do not bump the pyright baseline.** Backend `make lint` and `make test`
-  must remain green.
-- **Every fix gets a regression test** before the implementation lands.
-- **File an issue** (one GitHub issue per deferred Minor, `ralph-wip` label).
+- **Branch:** `feature/ralph-panoptica-spec-a-plan2` (already created).
+- **Framework:** existing Panoptica frontend — Next.js / React + pixel-art
+  assets already in `frontend/src/`. Designer must read `frontend/CLAUDE.md`
+  and `frontend/src/` before proposing structure.
+- **Reuse existing rendering.** Do not rewrite single-session view; wrap it.
+- **No backend changes** in this run unless a contract gap is discovered.
+- **Preserve test green.** Frontend tests (if any — designer must check)
+  must stay green.
 
-## Success criteria
+## Success criteria (programmatic)
 
-- All Critical / High / Major items above have commits on the feature branch
-  with regression tests.
-- `cd backend && uv run pytest tests/ -q` passes.
-- `make lint` (backend + hooks) passes.
-- Hooks tests green (`cd hooks && uv run pytest`).
-- PR #4 updated with a "Review fixes (chain 2)" description section listing
-  each fix with commit SHA.
-- TAKEAWAYS.md documents deferred minors with issue numbers.
+- `make dev-tmux` brings up a campus view on `http://localhost:3000`.
+- With no live runs: campus shows hot-desk area only, no ghost offices.
+- Injecting a synthetic `run_start` via the backend simulation script shows
+  an office appearing with a move-in animation within 2s.
+- Phase change and plan-task updates are visible without page reload.
+- Drill-down click on a nook opens the single-session renderer wrapping the
+  correct session.
 
 ## Interview
 
-Skip human interview. Orchestrator is warmed up from prior run; acts as
-interviewee for the designer. User has already specified: "fix everything in a
-chained ralph" — interpret as "all Critical + High + Major; defer Minor with
-issues".
+**Skip human interview.** Orchestrator is warmed up (just completed Plan 1
+and chain 2). Acts as interviewee for the designer — designer should ask
+concrete architectural questions about component tree, state management, and
+animation strategy; orchestrator answers from project context + memory.
+
+## References for the designer
+
+- `ralph/workdocs_archive` branch — `archive/2026-04-18-spec-a-plan1/SPEC.md`
+- `frontend/src/` — current single-session renderer
+- `frontend/CLAUDE.md` — frontend-specific guidance
+- PR #4 (merged) — backend types and WebSocket channels
