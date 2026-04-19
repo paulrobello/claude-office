@@ -201,7 +201,7 @@ Session: completed cleanly. Index-based role assignment (memberSessionIds[0]=Des
 
 ---
 
-### 🔧 Task 10: TaskWhiteboard component (sticky columns)
+### ✅ Task 10: TaskWhiteboard component (sticky columns)
 
 **Files:** `frontend/src/components/office/TaskWhiteboard.tsx` (new)
 
@@ -215,6 +215,8 @@ a sticky note (colored by status). Data from `Run.planTasks` in store.
 - TypeScript compiles cleanly.
 
 **Dependencies:** Task 2.
+
+Session: completed cleanly. Pure DOM/CSS three-column whiteboard. StickyCard colored by status (yellow=todo, amber=in_progress, green=done). Empty columns show "— empty —" placeholder. Wired into RunOfficeView below the header. Frontend TSC + lint + 35 tests pass. Root make checkall fails only on pre-existing backend pyright (unchanged).
 
 ---
 

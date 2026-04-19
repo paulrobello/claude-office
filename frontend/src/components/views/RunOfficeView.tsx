@@ -4,6 +4,7 @@ import { useNavigationStore } from "@/stores/navigationStore";
 import { useRunStore } from "@/stores/runStore";
 import { OrchestratorStation } from "@/components/office/OrchestratorStation";
 import { RoleNook, type NookRole } from "@/components/office/RoleNook";
+import { TaskWhiteboard } from "@/components/office/TaskWhiteboard";
 import type { RunPhase } from "@/types/run";
 
 const PHASE_COLORS: Record<RunPhase | "done", string> = {
@@ -108,6 +109,11 @@ export function RunOfficeView(): React.ReactNode {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Task whiteboard */}
+      <div className="shrink-0">
+        <TaskWhiteboard tasks={run.planTasks} />
       </div>
 
       {/* Office grid — 3×3: nooks in corners, orchestrator center */}
