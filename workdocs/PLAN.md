@@ -241,7 +241,7 @@ Session: completed cleanly. `task-animations.css` new file with `sticky-slide-in
 
 ---
 
-### ⬜ Task 12: Role character animations (arrive/leave)
+### 🔧 Task 12: Role character animations (arrive/leave)
 
 **Files:** `frontend/src/components/office/RoleNook.tsx`, `frontend/src/styles/nook-animations.css` (new)
 
