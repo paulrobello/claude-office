@@ -135,7 +135,7 @@ summary stats. All data-driven from `useRunStore` + sessions.
 
 ---
 
-### ⬜ Task 7: CampusView animations (office appear + phase tint)
+### 🔧 Task 7: CampusView animations (office appear + phase tint)
 
 **Files:** `frontend/src/components/campus/RunOfficeCard.tsx`, `frontend/src/styles/campus-animations.css` (new)
 
