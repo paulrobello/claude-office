@@ -70,7 +70,7 @@ Session: completed cleanly. Hook uses `active` flag (not connectionId ref) to pr
 
 ---
 
-### ⬜ Task 4: Run list hook (`useRunList`)
+### 🔧 Task 4: Run list hook (`useRunList`)
 
 **Files:** `frontend/src/hooks/useRunList.ts` (new)
 
