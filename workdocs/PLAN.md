@@ -178,7 +178,7 @@ Session: completed cleanly. Default view flipped to "campus" in navigationStore.
 
 ## Phase 3: Run Office View (Tasks 9–12)
 
-### ⬜ Task 9: RunOfficeView component (static layout)
+### 🔧 Task 9: RunOfficeView component (static layout)
 
 **Files:** `frontend/src/components/views/RunOfficeView.tsx` (new), `frontend/src/components/office/OrchestratorStation.tsx` (new), `frontend/src/components/office/RoleNook.tsx` (new)
 
