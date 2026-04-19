@@ -307,7 +307,7 @@ Uses `goToNook(null, sessionId)` — null runId indicates hot-desk.
 
 ## Phase 5: Integration + Polish (Tasks 15–18)
 
-### ⬜ Task 15: Breadcrumb + navigation polish
+### ✅ Task 15: Breadcrumb + navigation polish
 
 **Files:** `frontend/src/components/navigation/Breadcrumb.tsx`
 
@@ -322,6 +322,8 @@ Update Breadcrumb to reflect 3-tier navigation:
 - TypeScript compiles cleanly.
 
 **Dependencies:** Tasks 5, 8.
+
+Session: completed cleanly. Breadcrumb now handles 4 branches: campus (static label), run-office (Campus → goToCampus, Run ral-xxx (Phase X) current), nook (Campus → goToCampus, Run segment → goToRunOffice, role/Hot-desk current), legacy building/floor (unchanged). Short runId = first 12 chars. Role derived from memberSessionIds index (same convention as RoleNook/NookSidebar). Frontend TSC + lint pass clean (0 errors, 0 warnings).
 
 ---
 
