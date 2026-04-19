@@ -82,6 +82,17 @@ When a `run_state` message arrives with `outcome !== "in_progress"`, the handler
 ### Empty useEffect deps is intentional
 The effect runs once on mount. All state is in refs (`wsMapRef`) or accessed via `useRunStore.getState()` (store getter, not reactive). No external values need tracking.
 
+## Task 6 implementation notes (Plan 2)
+
+### HotDeskSession interface defined in HotDeskArea (not Session type extension)
+`useSessions.ts` is a pre-existing WIP file (not stageable). Defined `HotDeskSession` interface locally in `HotDeskArea.tsx` with `{ id, displayName, projectName, status, runId? }`. `selectHotDeskSessions` is generic and works with this type. When `useSessions.ts` is eventually updated to include `runId`, the caller can pass `Session[]` directly since it satisfies `HotDeskSession`'s shape.
+
+### Nook indicators use memberSessionIds count (not per-role)
+`Run.memberSessionIds` is a flat list — no per-role info in the Run type. Lit count = `min(memberSessionIds.length, 4)`. Per-role indicators would require cross-referencing with session data (not available at this component level). Sufficient for MVP glanceability; Task 9 (RunOfficeView) will have full role context.
+
+### CampusView not wired to page.tsx yet (Task 8 handles that)
+CampusView accepts optional `sessions` prop (defaults to `[]`) so it's independently renderable and testable without the page.tsx wiring.
+
 ## Observations
 
 - The existing `useWebSocketEvents` hook is 500+ lines and tightly coupled

@@ -113,7 +113,9 @@ Session: completed cleanly. Extended `ViewMode` in `types/navigation.ts` to incl
 
 ---
 
-### 🔧 Task 6: CampusView component (static layout)
+### ✅ Task 6: CampusView component (static layout)
+
+Session: completed cleanly. `HotDeskSession` interface defined in `HotDeskArea.tsx` (extends `{ runId?: string | null }`) for forward-compat with future Session type update. Nook indicators (D/C/V/R) light up based on memberSessionIds count (not per-role, since Run type carries only IDs). `selectHotDeskSessions` generic works without Session type change. Frontend TSC + lint pass clean. Backend pyright errors pre-existing.
 
 **Files:** `frontend/src/components/views/CampusView.tsx` (new), `frontend/src/components/campus/RunOfficeCard.tsx` (new), `frontend/src/components/campus/HotDeskArea.tsx` (new), `frontend/src/components/campus/CampusSidebar.tsx` (new)
 
