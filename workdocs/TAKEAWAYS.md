@@ -93,6 +93,17 @@ The effect runs once on mount. All state is in refs (`wsMapRef`) or accessed via
 ### CampusView not wired to page.tsx yet (Task 8 handles that)
 CampusView accepts optional `sessions` prop (defaults to `[]`) so it's independently renderable and testable without the page.tsx wiring.
 
+## Task 7 implementation notes (Plan 2)
+
+### CSS transitions handle border-color automatically — no useRef needed for that
+`transition: border-color 600ms ease` in `office-phase-transition` fires whenever the inline `border` style changes (i.e., when `phaseColor` updates). No ref tracking needed for this. `useRef(prevPhase)` is used for the separate `phase-ping` keyframe re-trigger (subtle scale pulse as a reinforcement signal on phase change).
+
+### `office-appear` plays once on mount via CSS animation-fill-mode: both
+The `both` fill mode means the element starts in the `from` state (scale 0, opacity 0) before the animation fires, so there's no flash of the full-size card. Plays once naturally on DOM insertion.
+
+### Styles directory created (was absent)
+`frontend/src/styles/` did not exist. Created it with `campus-animations.css`. Task 8 (page.tsx wiring) and later tasks can add more CSS files here.
+
 ## Observations
 
 - The existing `useWebSocketEvents` hook is 500+ lines and tightly coupled

@@ -1,0 +1,30 @@
+/* GPU-composited only: transform, opacity, border-color */
+
+@keyframes office-appear {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes phase-ping {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+.office-appear {
+  animation: office-appear 300ms ease-out both;
+}
+
+.office-phase-transition {
+  transition: border-color 600ms ease, opacity 300ms ease;
+}
+
+.office-phase-ping {
+  animation: phase-ping 400ms ease-in-out;
+}

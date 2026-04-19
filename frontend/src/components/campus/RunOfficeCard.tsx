@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import type { Run, RunPhase } from "@/types/run";
 import { useNavigationStore } from "@/stores/navigationStore";
+import "@/styles/campus-animations.css";
 
 const PHASE_COLORS: Record<RunPhase | "done", string> = {
   A: "#6366f1",
@@ -65,13 +67,35 @@ export function RunOfficeCard({ run }: RunOfficeCardProps): React.ReactNode {
   const goToRunOffice = useNavigationStore((s) => s.goToRunOffice);
   const phaseColor = PHASE_COLORS[run.phase];
   const isEnded = run.outcome !== "in_progress";
-
   const occupiedCount = Math.min(run.memberSessionIds.length, 4);
+
+  // Detect phase transitions to re-trigger the ping keyframe
+  const prevPhaseRef = useRef<RunPhase | "done">(run.phase);
+  const [pinging, setPinging] = useState(false);
+
+  useEffect(() => {
+    if (prevPhaseRef.current !== run.phase) {
+      prevPhaseRef.current = run.phase;
+      setPinging(true);
+    }
+  }, [run.phase]);
+
+  const className = [
+    "office-appear",
+    "office-phase-transition",
+    pinging ? "office-phase-ping" : "",
+    "flex flex-col gap-3 rounded-lg p-4 text-left cursor-pointer",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <button
       onClick={() => goToRunOffice(run.runId)}
-      className="flex flex-col gap-3 rounded-lg p-4 text-left transition-opacity cursor-pointer"
+      className={className}
+      onAnimationEnd={(e) => {
+        if (e.animationName === "phase-ping") setPinging(false);
+      }}
       style={{
         background: "#0f172a",
         border: `2px solid ${phaseColor}`,

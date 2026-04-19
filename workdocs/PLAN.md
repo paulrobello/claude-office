@@ -135,7 +135,7 @@ summary stats. All data-driven from `useRunStore` + sessions.
 
 ---
 
-### 🔧 Task 7: CampusView animations (office appear + phase tint)
+### ✅ Task 7: CampusView animations (office appear + phase tint)
 
 **Files:** `frontend/src/components/campus/RunOfficeCard.tsx`, `frontend/src/styles/campus-animations.css` (new)
 
@@ -151,6 +151,8 @@ Add CSS keyframe animations per SPEC:
 - No animation jank (GPU-composited properties only: transform, opacity).
 
 **Dependencies:** Task 6.
+
+Session: completed cleanly. `frontend/src/styles/campus-animations.css` new file with `office-appear` (scale 0→1 + opacity, 300ms ease-out), `office-phase-transition` (border-color 600ms + opacity 300ms transitions), and `office-phase-ping` (subtle scale pulse keyframe). RunOfficeCard: `useRef(prevPhase)` detects phase changes → sets `pinging` state → adds `office-phase-ping` class → cleared on `onAnimationEnd`. Border-color transition handles smooth tint automatically via CSS. Opacity dim handled by the same transition class. Frontend TSC + lint clean; 35 tests pass.
 
 ---
 
