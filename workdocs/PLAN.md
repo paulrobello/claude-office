@@ -156,7 +156,7 @@ Session: completed cleanly. `frontend/src/styles/campus-animations.css` new file
 
 ---
 
-### ⬜ Task 8: Wire CampusView into page.tsx + ViewTransition
+### 🔧 Task 8: Wire CampusView into page.tsx + ViewTransition
 
 **Files:** `frontend/src/app/page.tsx`, `frontend/src/components/navigation/ViewTransition.tsx`
 
