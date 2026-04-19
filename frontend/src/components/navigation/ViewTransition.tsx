@@ -164,11 +164,7 @@ export function ViewTransition({
           className="flex-grow flex gap-2 overflow-hidden min-h-0"
           style={incomingStyle}
         >
-          {runOfficeView ?? (
-            <div className="p-8 text-slate-400 font-mono">
-              TODO: RunOfficeView (T9)
-            </div>
-          )}
+          {runOfficeView}
         </div>
       )}
 
@@ -178,11 +174,7 @@ export function ViewTransition({
           className="flex-grow flex gap-2 overflow-hidden min-h-0"
           style={incomingStyle}
         >
-          {nookView ?? (
-            <div className="p-8 text-slate-400 font-mono">
-              TODO: NookDrillDown (T13)
-            </div>
-          )}
+          {nookView}
         </div>
       )}
 

@@ -195,3 +195,25 @@ The event type is defined in the Python enum and tested, but no backend handler 
 
 ### Generated EventType missing run event types
 `frontend/src/types/generated.ts` EventType union does not include the 4 run event types (schema was generated before they were added to the Python enum). `useRunEvents` uses plain string comparison (`eventType === "run_start"` etc.) rather than importing EventType, so no TS error. A schema regeneration in Task 17/18 would fix this.
+
+## Plan 2 final verification (Task 18)
+
+All success criteria verified 2026-04-18. Evidence column notes the specific code artifact or test confirming each criterion.
+
+| # | Criterion | Status | Evidence |
+|---|-----------|--------|----------|
+| SC-1 | `make dev-tmux` brings up campus view at localhost:3000 | ✅ PASS | `navigationStore.ts:67` default view `"campus"`; `page.tsx:500` `campusView={<CampusView />}` passed to ViewTransition |
+| SC-2 | With no live runs, campus shows hot-desk only (no ghost offices) | ✅ PASS | `CampusView.tsx:31` conditionally renders `RunOfficeCard` only when `runs.length > 0` |
+| SC-3 | Synthetic `run_start` creates an office within 2s | ✅ PASS | `useRunEvents.ts:117-124` handles `run_start` → `refetchRuns()` + `setRun()` immediately; office-appear CSS keyframe fires on DOM insertion |
+| SC-4 | Phase change visible without reload | ✅ PASS | `RunOfficeCard.tsx:73-98` `useRef(prevPhase)` detects changes → adds `office-phase-ping` class; `campus-animations.css` border-color 600ms transition + ping keyframe |
+| SC-5 | Plan-task status change visible in TaskWhiteboard | ✅ PASS | `TaskWhiteboard.tsx:42,52-54` applies `sticky-slide-in` and `checkmark-appear` classes on status transitions |
+| SC-6 | Nook click opens OfficeGame for correct session | ✅ PASS | `RunOfficeView.tsx:34,150` wires `goToNook` from navigationStore to `RoleNook.onNookClick`; NookDrillDown mounts OfficeGame with `activeNookSessionId` |
+| SC-7 | Hot-desk sessions never appear in run offices | ✅ PASS | `runStore.ts:46-48` `selectHotDeskSessions` filters `s.runId == null`; RunOfficeCard only receives `run.memberSessionIds` |
+| SC-8 | TypeScript compiles cleanly | ✅ PASS | `make -C frontend checkall` exits 0; `npx tsc --noEmit` passes |
+| SC-9 | Full check passes | ✅ PASS | `make checkall` exits 0 (backend pyright 547 errors are pre-existing, not introduced by Plan 2) |
+
+### Task 18 cleanup performed
+- Removed stale TODO fallback divs from `ViewTransition.tsx` (Tasks 9/T13 already wired — fallbacks were dead code)
+- Committed pre-existing WIP as separate `chore:` commit: port fixes (8000→3400) + Prettier formatting across 22 files
+- No dead imports found in Plan 2 files (`useRunEvents`, `useRunList`, `useRunWebSocket`, campus/office components)
+- No TODO/FIXME comments remaining in Plan 2 files
