@@ -126,6 +126,17 @@ When `sessionId` goes null, the character element must stay visible during the 3
 ### arrive: batched `setVisibleSessionId` + `setCharClass` in single microtask
 React 18 batches updates within the same queueMicrotask callback. The character element mounts with `char-arrive` class already set — CSS animations fire on DOM insertion with `animation-fill-mode: both`, so the element starts at the `from` state and animates forward.
 
+## Task 13 implementation notes (Plan 2)
+
+### "nook" removed from ViewTransition domOnlyViews
+NookDrillDown contains OfficeGame (PixiJS). The `domOnlyViews` list controls which outgoing views get duplicated as a snapshot during transition-out animation. Leaving "nook" in the list would create two PixiJS canvases during transition. Removed it — nook view has no outgoing animation (incoming view animates in, nook disappears immediately). Acceptable for MVP.
+
+### Session switching in page.tsx useEffect
+`useWebSocketEvents({ sessionId })` drives what session OfficeGame shows. When entering nook view, a `useEffect` watching `[view, activeNookSessionId, sessionId, setSessionId]` calls `agentMachineService.reset()` + `resetForSessionSwitch()` + `setSessionId(activeNookSessionId)`. The guard `activeNookSessionId !== sessionId` prevents re-triggering. Avoids duplicating `handleSessionSelect` logic by importing `agentMachineService` directly into page.tsx.
+
+### Role/model/task metadata derivation in NookSidebar
+Role: same index-based convention as RunOfficeView (memberSessionIds[0]=Designer, etc.). Model: `run.modelConfig[role.toLowerCase()]` with `_model` suffix fallback — matches Ralph workflow variable naming pattern. Task: `run.planTasks.find(t => t.assignedSessionId === activeNookSessionId)` — null if no task assigned to this session yet.
+
 ## Observations
 
 - The existing `useWebSocketEvents` hook is 500+ lines and tightly coupled

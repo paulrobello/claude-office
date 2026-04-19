@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  type ReactNode,
+} from "react";
 import { useNavigationStore } from "@/stores/navigationStore";
 import type { ViewMode } from "@/types/navigation";
 
@@ -16,7 +22,7 @@ interface ViewTransitionProps {
   campusView: ReactNode;
   /** Run office Level 2 — DOM only, safe to duplicate */
   runOfficeView?: ReactNode;
-  /** Nook drill-down Level 3 — DOM only for now, safe to duplicate */
+  /** Nook drill-down Level 3 — contains PixiJS, not duplicated on transition out */
   nookView?: ReactNode;
 }
 
@@ -81,7 +87,8 @@ export function ViewTransition({
   const isZoomIn = transitionDirection === "zoom-in";
 
   // DOM-only views can be safely duplicated during outgoing animation
-  const domOnlyViews: ViewMode[] = ["building", "campus", "run-office", "nook"];
+  // "nook" is excluded — it contains PixiJS (OfficeGame) which must not be duplicated
+  const domOnlyViews: ViewMode[] = ["building", "campus", "run-office"];
   const showOutgoingSnapshot =
     phase === "animating" &&
     outgoingView !== null &&
@@ -89,11 +96,16 @@ export function ViewTransition({
 
   const outgoingContent = (() => {
     switch (outgoingView) {
-      case "building": return buildingView;
-      case "campus": return campusView;
-      case "run-office": return runOfficeView ?? null;
-      case "nook": return nookView ?? null;
-      default: return null;
+      case "building":
+        return buildingView;
+      case "campus":
+        return campusView;
+      case "run-office":
+        return runOfficeView ?? null;
+      case "nook":
+        return nookView ?? null;
+      default:
+        return null;
     }
   })();
 
@@ -152,7 +164,11 @@ export function ViewTransition({
           className="flex-grow flex gap-2 overflow-hidden min-h-0"
           style={incomingStyle}
         >
-          {runOfficeView ?? <div className="p-8 text-slate-400 font-mono">TODO: RunOfficeView (T9)</div>}
+          {runOfficeView ?? (
+            <div className="p-8 text-slate-400 font-mono">
+              TODO: RunOfficeView (T9)
+            </div>
+          )}
         </div>
       )}
 
@@ -162,7 +178,11 @@ export function ViewTransition({
           className="flex-grow flex gap-2 overflow-hidden min-h-0"
           style={incomingStyle}
         >
-          {nookView ?? <div className="p-8 text-slate-400 font-mono">TODO: NookDrillDown (T13)</div>}
+          {nookView ?? (
+            <div className="p-8 text-slate-400 font-mono">
+              TODO: NookDrillDown (T13)
+            </div>
+          )}
         </div>
       )}
 

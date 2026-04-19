@@ -262,9 +262,11 @@ Session: completed cleanly. `nook-animations.css` new file with `char-arrive` (s
 
 ## Phase 4: Nook Drill-Down (Tasks 13–14)
 
-### 🔧 Task 13: NookDrillDown wrapper
+### ✅ Task 13: NookDrillDown wrapper
 
-**Files:** `frontend/src/components/views/NookDrillDown.tsx` (new), `frontend/src/components/office/NookSidebar.tsx` (new)
+Session: completed cleanly. NookDrillDown dynamically imports OfficeGame (ssr:false, same pattern as mobile branch in page.tsx). Removed "nook" from `domOnlyViews` in ViewTransition — OfficeGame (PixiJS) must not be duplicated during outgoing transition animation. Session switching wired in page.tsx via useEffect that watches `view` + `activeNookSessionId`: calls `agentMachineService.reset()` + `resetForSessionSwitch()` + `setSessionId(activeNookSessionId)` when entering nook view. NookSidebar derives role from memberSessionIds index (same convention as RunOfficeView T9); model from `run.modelConfig[role.toLowerCase()]` or `..._model` suffix fallback; task from `planTasks.find(t => t.assignedSessionId === activeNookSessionId)`. Frontend TSC + lint + tests pass clean. Backend pyright failures pre-existing.
+
+**Files:** `frontend/src/components/views/NookDrillDown.tsx` (new), `frontend/src/components/office/NookSidebar.tsx` (new), `frontend/src/components/navigation/ViewTransition.tsx`, `frontend/src/app/page.tsx`
 
 Wrap existing OfficeGame with session context. When user clicks an active
 nook in RunOfficeView, transition to NookDrillDown which:

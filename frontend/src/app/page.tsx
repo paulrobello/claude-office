@@ -41,7 +41,9 @@ import { BuildingView } from "@/components/views/BuildingView";
 import { FloorView } from "@/components/views/FloorView";
 import { CampusView } from "@/components/views/CampusView";
 import { RunOfficeView } from "@/components/views/RunOfficeView";
+import { NookDrillDown } from "@/components/views/NookDrillDown";
 import { useRunList } from "@/hooks/useRunList";
+import { agentMachineService } from "@/machines/agentMachineService";
 import { TourOverlay } from "@/components/tour/TourOverlay";
 import { useTourStore } from "@/stores/tourStore";
 import { CommandBar } from "@/components/command/CommandBar";
@@ -145,6 +147,7 @@ export default function V2TestPage(): React.ReactNode {
   useFloorConfig();
   useRunList();
   const view = useNavigationStore((s) => s.view);
+  const activeNookSessionId = useNavigationStore((s) => s.activeNookSessionId);
 
   // ------------------------------------------------------------------
   // Zoom navigation (scroll/pinch between views)
@@ -184,6 +187,19 @@ export default function V2TestPage(): React.ReactNode {
   useEffect(() => {
     startAttentionEngine();
   }, []);
+
+  // Switch the active session when entering a nook drill-down
+  useEffect(() => {
+    if (
+      view !== "nook" ||
+      !activeNookSessionId ||
+      activeNookSessionId === sessionId
+    )
+      return;
+    agentMachineService.reset();
+    useGameStore.getState().resetForSessionSwitch();
+    setSessionId(activeNookSessionId);
+  }, [view, activeNookSessionId, sessionId, setSessionId]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -481,6 +497,7 @@ export default function V2TestPage(): React.ReactNode {
             view={view}
             campusView={<CampusView sessions={sessions} />}
             runOfficeView={<RunOfficeView />}
+            nookView={<NookDrillDown />}
             buildingView={<BuildingView />}
             floorView={
               <FloorView
