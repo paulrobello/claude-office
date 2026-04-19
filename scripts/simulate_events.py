@@ -1,25 +1,21 @@
 #!/usr/bin/env python3
 """Simulation entry point for the Claude Office Visualizer.
 
-Runs one of five pre-built scenarios against the backend API:
+Runs one of six pre-built scenarios against the backend API:
 
-  quick       All visual elements, no compaction (~45 s)
-  basic       Simple agent spawn/complete (~60 s)
-  complex     Multi-agent workflow with context compaction (~5-10 min) [default]
-  edge_cases  Error handling, permissions, orphan cleanup (~2 min)
-  teams       Agent Teams: lead + 3 teammates + subagents + kanban (~4 min)
+  run_lifecycle  Full Ralph run lifecycle on campus view (~90 s) [default]
+  quick          All visual elements, no compaction (~45 s)
+  basic          Simple agent spawn/complete (~60 s)
+  complex        Multi-agent workflow with context compaction (~5-10 min)
+  edge_cases     Error handling, permissions, orphan cleanup (~2 min)
+  teams          Agent Teams: lead + 3 teammates + subagents + kanban (~4 min)
 
 Usage::
 
     python scripts/simulate_events.py
-    python scripts/simulate_events.py complex
-    python scripts/simulate_events.py basic
-    python scripts/simulate_events.py edge_cases
-
-    # Custom session ID
+    python scripts/simulate_events.py run_lifecycle
+    python scripts/simulate_events.py quick
     python scripts/simulate_events.py complex --session my_session_42
-
-    # Suppress progress output
     python scripts/simulate_events.py basic --quiet
 """
 
@@ -35,9 +31,11 @@ from scripts.scenarios.basic import run as run_basic
 from scripts.scenarios.complex import run as run_complex
 from scripts.scenarios.edge_cases import run as run_edge_cases
 from scripts.scenarios.quick import run as run_quick
+from scripts.scenarios.run_lifecycle import run as run_run_lifecycle
 from scripts.scenarios.teams import run as run_teams
 
 SCENARIOS: dict[str, object] = {
+    "run_lifecycle": run_run_lifecycle,
     "quick": run_quick,
     "basic": run_basic,
     "complex": run_complex,
@@ -45,7 +43,7 @@ SCENARIOS: dict[str, object] = {
     "teams": run_teams,
 }
 
-DEFAULT_SCENARIO = "complex"
+DEFAULT_SCENARIO = "run_lifecycle"
 DEFAULT_SESSION_ID = "sim_session_123"
 
 

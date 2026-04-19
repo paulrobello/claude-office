@@ -351,7 +351,7 @@ message handler to recognize run-related event types.
 
 ---
 
-### 🔧 Task 17: Simulation script integration
+### ✅ Task 17: Simulation script integration
 
 **Files:** `frontend/src/components/layout/HeaderControls.tsx` (minimal change)
 
