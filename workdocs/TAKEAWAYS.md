@@ -116,3 +116,18 @@ The `both` fill mode means the element starts in the `from` state (scale 0, opac
   reuses unchanged.
 - The navigation store's `ViewMode` type lives in `types/navigation.ts` —
   extending it there keeps the type system clean.
+
+## Task 8 implementation notes (Plan 2)
+
+### Pre-existing WIP lint errors fixed as part of Task 8
+Checkall blocked on 5 ESLint errors across pre-existing WIP files:
+- `RunOfficeCard.tsx`: `setPinging(true)` synchronous setState in effect → wrapped with `queueMicrotask`
+- `CommandBar.tsx`: `Date.now()` during render + two synchronous setState in effects → `now` state + queueMicrotask wrappers
+- `PointerRing.tsx` + `SpotlightDim.tsx`: `updatePosition()` synchronous setState in effect → `queueMicrotask`
+- `useZoomNavigation.ts`: unused `SNAP_OUT_THRESHOLD` → prefixed `_`; `zoomRef.current = zoom` during render → moved to `useEffect`
+- `RoomView.tsx`: `@ts-nocheck` on dead code not imported anywhere → deleted
+
+These files contained pre-existing WIP code that was included in their respective commits. The lint fixes were the only Task 8 additions; the underlying WIP feature code was already present.
+
+### ViewTransition campus/run-office/nook placeholders
+`run-office` and `nook` view modes render TODO placeholders. Tasks 9 (RunOfficeView) and 13 (NookDrillDown) will supply the real components as optional props — no ViewTransition changes needed then since the interface already accepts them.

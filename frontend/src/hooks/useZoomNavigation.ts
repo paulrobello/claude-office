@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigationStore } from "@/stores/navigationStore";
 
 const SNAP_THRESHOLD = 2.5;
-const SNAP_OUT_THRESHOLD = 0.4;
+const _SNAP_OUT_THRESHOLD = 0.4;
 const ZOOM_SPEED = 0.008;
 const SNAP_COOLDOWN_MS = 500;
 
@@ -23,13 +23,23 @@ interface ZoomState {
  *
  * In Floor view, this hook is inactive — react-zoom-pan-pinch handles zoom.
  */
-export function useZoomNavigation(containerRef: React.RefObject<HTMLDivElement | null>): ZoomState {
+export function useZoomNavigation(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+): ZoomState {
   const view = useNavigationStore((s) => s.view);
   const isTransitioning = useNavigationStore((s) => s.isTransitioning);
-  const [zoom, setZoom] = useState<ZoomState>({ scale: 1, originX: 0, originY: 0 });
+  const [zoom, setZoom] = useState<ZoomState>({
+    scale: 1,
+    originX: 0,
+    originY: 0,
+  });
   const zoomRef = useRef(zoom);
-  zoomRef.current = zoom;
   const lastSnapTime = useRef(0);
+
+  // Keep ref in sync with latest zoom after each render
+  useEffect(() => {
+    zoomRef.current = zoom;
+  });
 
   const handleWheel = useCallback(
     (e: WheelEvent) => {
@@ -74,7 +84,7 @@ export function useZoomNavigation(containerRef: React.RefObject<HTMLDivElement |
 
   // Reset zoom when view changes
   useEffect(() => {
-    setZoom({ scale: 1, originX: 0, originY: 0 });
+    queueMicrotask(() => setZoom({ scale: 1, originX: 0, originY: 0 }));
   }, [view]);
 
   // Attach wheel listener with { passive: false } to allow preventDefault

@@ -7,7 +7,10 @@ interface SpotlightDimProps {
   wide: boolean;
 }
 
-export function SpotlightDim({ targetTourId, wide }: SpotlightDimProps): ReactNode {
+export function SpotlightDim({
+  targetTourId,
+  wide,
+}: SpotlightDimProps): ReactNode {
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   const updatePosition = useCallback(() => {
@@ -24,7 +27,7 @@ export function SpotlightDim({ targetTourId, wide }: SpotlightDimProps): ReactNo
   }, [targetTourId, wide]);
 
   useEffect(() => {
-    updatePosition();
+    queueMicrotask(() => updatePosition());
     window.addEventListener("resize", updatePosition);
     window.addEventListener("scroll", updatePosition, true);
     const interval = setInterval(updatePosition, 500);
@@ -65,13 +68,25 @@ export function SpotlightDim({ targetTourId, wide }: SpotlightDimProps): ReactNo
   return (
     <>
       {/* Top */}
-      <div className={dimStyle} style={{ top: 0, left: 0, right: 0, height: y }} />
+      <div
+        className={dimStyle}
+        style={{ top: 0, left: 0, right: 0, height: y }}
+      />
       {/* Bottom */}
-      <div className={dimStyle} style={{ top: y + h, left: 0, right: 0, bottom: 0 }} />
+      <div
+        className={dimStyle}
+        style={{ top: y + h, left: 0, right: 0, bottom: 0 }}
+      />
       {/* Left */}
-      <div className={dimStyle} style={{ top: y, left: 0, width: x, height: h }} />
+      <div
+        className={dimStyle}
+        style={{ top: y, left: 0, width: x, height: h }}
+      />
       {/* Right */}
-      <div className={dimStyle} style={{ top: y, left: x + w, right: 0, height: h }} />
+      <div
+        className={dimStyle}
+        style={{ top: y, left: x + w, right: 0, height: h }}
+      />
     </>
   );
 }

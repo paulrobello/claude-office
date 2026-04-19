@@ -76,7 +76,8 @@ export function RunOfficeCard({ run }: RunOfficeCardProps): React.ReactNode {
   useEffect(() => {
     if (prevPhaseRef.current !== run.phase) {
       prevPhaseRef.current = run.phase;
-      setPinging(true);
+      // Defer to avoid synchronous setState in effect (react-hooks/set-state-in-effect)
+      queueMicrotask(() => setPinging(true));
     }
   }, [run.phase]);
 

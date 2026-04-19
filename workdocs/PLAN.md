@@ -156,7 +156,7 @@ Session: completed cleanly. `frontend/src/styles/campus-animations.css` new file
 
 ---
 
-### 🔧 Task 8: Wire CampusView into page.tsx + ViewTransition
+### ✅ Task 8: Wire CampusView into page.tsx + ViewTransition
 
 **Files:** `frontend/src/app/page.tsx`, `frontend/src/components/navigation/ViewTransition.tsx`
 
@@ -171,6 +171,8 @@ Add `useRunList()` call in page.tsx to bootstrap run data.
 - `make checkall` passes.
 
 **Dependencies:** Tasks 4, 5, 6, 7.
+
+Session: completed cleanly. Default view flipped to "campus" in navigationStore. ViewTransition extended to handle campus/run-office/nook (all DOM-only, safe to duplicate; run-office and nook render TODO placeholders). useRunList() wired in page.tsx; campusView prop added. Fixed pre-existing WIP lint errors across RunOfficeCard, CommandBar, PointerRing, SpotlightDim, useZoomNavigation; deleted dead RoomView.tsx. Frontend checkall passes; backend pyright pre-existing failures unchanged.
 
 ---
 

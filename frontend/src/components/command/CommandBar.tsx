@@ -1,8 +1,18 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  type ReactNode,
+} from "react";
 import { Command } from "lucide-react";
-import { useAttentionStore, type AttentionEntry, type AttentionCategory } from "@/stores/attentionStore";
+import {
+  useAttentionStore,
+  type AttentionEntry,
+  type AttentionCategory,
+} from "@/stores/attentionStore";
 import { useNavigationStore } from "@/stores/navigationStore";
 import { useGameStore } from "@/stores/gameStore";
 
@@ -10,11 +20,30 @@ import { useGameStore } from "@/stores/gameStore";
 // HELPERS
 // ============================================================================
 
-const CATEGORY_CONFIG: Record<AttentionCategory, { dot: string; label: string; badge: string }> = {
-  blocked: { dot: "bg-rose-500", label: "BLOCKED", badge: "bg-rose-500/20 text-rose-400 border-rose-500/40" },
-  waiting: { dot: "bg-amber-500", label: "WAITING", badge: "bg-amber-500/20 text-amber-400 border-amber-500/40" },
-  completed: { dot: "bg-emerald-500", label: "COMPLETED", badge: "bg-emerald-500/20 text-emerald-400 border-emerald-500/40" },
-  idle: { dot: "bg-slate-500", label: "IDLE", badge: "bg-slate-500/20 text-slate-400 border-slate-500/40" },
+const CATEGORY_CONFIG: Record<
+  AttentionCategory,
+  { dot: string; label: string; badge: string }
+> = {
+  blocked: {
+    dot: "bg-rose-500",
+    label: "BLOCKED",
+    badge: "bg-rose-500/20 text-rose-400 border-rose-500/40",
+  },
+  waiting: {
+    dot: "bg-amber-500",
+    label: "WAITING",
+    badge: "bg-amber-500/20 text-amber-400 border-amber-500/40",
+  },
+  completed: {
+    dot: "bg-emerald-500",
+    label: "COMPLETED",
+    badge: "bg-emerald-500/20 text-emerald-400 border-emerald-500/40",
+  },
+  idle: {
+    dot: "bg-slate-500",
+    label: "IDLE",
+    badge: "bg-slate-500/20 text-slate-400 border-slate-500/40",
+  },
 };
 
 function fuzzyMatch(query: string, text: string): boolean {
@@ -41,6 +70,12 @@ function AgentRow({
   onClick: () => void;
 }): ReactNode {
   const cfg = CATEGORY_CONFIG[entry.category];
+  // Snapshot current time as state so Date.now is not called directly during render
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <button
@@ -50,7 +85,9 @@ function AgentRow({
       }`}
     >
       {/* Urgency dot */}
-      <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${cfg.dot}`} />
+      <div
+        className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${cfg.dot}`}
+      />
 
       {/* Content */}
       <div className="flex-1 min-w-0">
@@ -86,7 +123,7 @@ function AgentRow({
         className={`flex-shrink-0 px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${cfg.badge}`}
       >
         {entry.category === "idle"
-          ? `IDLE ${Math.round((Date.now() - entry.lastActivityAt) / 60_000)}m`
+          ? `IDLE ${Math.round((now - entry.lastActivityAt) / 60_000)}m`
           : cfg.label}
       </span>
     </button>
@@ -121,8 +158,10 @@ export function CommandBar({ isOpen, onClose }: CommandBarProps): ReactNode {
   // Reset state when opening
   useEffect(() => {
     if (isOpen) {
-      setQuery("");
-      setSelectedIndex(0);
+      queueMicrotask(() => {
+        setQuery("");
+        setSelectedIndex(0);
+      });
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
@@ -130,7 +169,7 @@ export function CommandBar({ isOpen, onClose }: CommandBarProps): ReactNode {
   // Clamp selection when list changes
   useEffect(() => {
     if (selectedIndex >= filtered.length) {
-      setSelectedIndex(Math.max(0, filtered.length - 1));
+      queueMicrotask(() => setSelectedIndex(Math.max(0, filtered.length - 1)));
     }
   }, [filtered.length, selectedIndex]);
 

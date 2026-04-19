@@ -7,7 +7,10 @@ interface PointerRingProps {
   label: string | null;
 }
 
-export function PointerRing({ targetTourId, label }: PointerRingProps): ReactNode {
+export function PointerRing({
+  targetTourId,
+  label,
+}: PointerRingProps): ReactNode {
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   const updatePosition = useCallback(() => {
@@ -24,7 +27,7 @@ export function PointerRing({ targetTourId, label }: PointerRingProps): ReactNod
   }, [targetTourId]);
 
   useEffect(() => {
-    updatePosition();
+    queueMicrotask(() => updatePosition());
     window.addEventListener("resize", updatePosition);
     window.addEventListener("scroll", updatePosition, true);
     const interval = setInterval(updatePosition, 500);
