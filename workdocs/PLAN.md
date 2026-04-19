@@ -286,7 +286,9 @@ nook in RunOfficeView, transition to NookDrillDown which:
 
 ---
 
-### 🔧 Task 14: Hot-desk drill-down
+### ✅ Task 14: Hot-desk drill-down
+
+Session: completed cleanly. All three success criteria were already satisfied by code from Tasks 6 and 13: HotDeskBooth already called `goToNook(null, session.id)`; NookDrillDown.handleBack() already routes to `goToCampus()` when activeRunId is null; NookSidebar renders "—" for null role/task/model/elapsed. No code changes were required — verification pass only. Frontend TSC + 35 tests pass. Backend pyright pre-existing.
 
 **Files:** `frontend/src/components/campus/HotDeskArea.tsx`
 

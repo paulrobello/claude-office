@@ -137,6 +137,16 @@ NookDrillDown contains OfficeGame (PixiJS). The `domOnlyViews` list controls whi
 ### Role/model/task metadata derivation in NookSidebar
 Role: same index-based convention as RunOfficeView (memberSessionIds[0]=Designer, etc.). Model: `run.modelConfig[role.toLowerCase()]` with `_model` suffix fallback — matches Ralph workflow variable naming pattern. Task: `run.planTasks.find(t => t.assignedSessionId === activeNookSessionId)` — null if no task assigned to this session yet.
 
+## Task 14 implementation notes (Plan 2)
+
+### Already fully implemented by Tasks 6 and 13
+All three success criteria were satisfied before any T14 code was written:
+- `HotDeskBooth` in T6 already called `goToNook(null, session.id)`.
+- `NookDrillDown.handleBack()` in T13 already checks `if (activeRunId)` and falls back to `goToCampus()`.
+- `NookSidebar` in T13 already renders "—" for all null fields (role, task, model, elapsed).
+
+Task 14 was a verification pass, not an implementation session.
+
 ## Observations
 
 - The existing `useWebSocketEvents` hook is 500+ lines and tightly coupled
