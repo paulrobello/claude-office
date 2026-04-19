@@ -178,7 +178,7 @@ Session: completed cleanly. Default view flipped to "campus" in navigationStore.
 
 ## Phase 3: Run Office View (Tasks 9–12)
 
-### 🔧 Task 9: RunOfficeView component (static layout)
+### ✅ Task 9: RunOfficeView component (static layout)
 
 **Files:** `frontend/src/components/views/RunOfficeView.tsx` (new), `frontend/src/components/office/OrchestratorStation.tsx` (new), `frontend/src/components/office/RoleNook.tsx` (new)
 
@@ -189,13 +189,15 @@ Inactive nooks dim. Active nook has role character indicator + session
 metadata tooltip.
 
 **Success criteria:**
-- Renders correctly with a fixture Run (3 active roles, 1 inactive).
-- Inactive nooks have dim styling.
-- Active nooks show role name + character indicator.
-- Back button calls `goToCampus()`.
-- TypeScript compiles cleanly.
+- Renders correctly with a fixture Run (3 active roles, 1 inactive). ✅
+- Inactive nooks have dim styling. ✅
+- Active nooks show role name + character indicator. ✅
+- Back button calls `goToCampus()`. ✅
+- TypeScript compiles cleanly. ✅
 
 **Dependencies:** Tasks 2, 5.
+
+Session: completed cleanly. Index-based role assignment (memberSessionIds[0]=Designer, [1]=Coder, [2]=Verifier, [3]=Reviewer) since Run type carries only a flat ID list. 3x3 CSS grid with nooks in corners and OrchestratorStation at center. Active nooks show emoji character + truncated session ID tooltip; inactive nooks dim to 45% opacity. RunOfficeView wired into page.tsx via runOfficeView prop (ViewTransition already accepted this optional prop from T8). Frontend TSC + lint + 35 tests pass. Root make checkall fails only on pre-existing backend pyright errors (unchanged).
 
 ---
 

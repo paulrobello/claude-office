@@ -104,6 +104,17 @@ The `both` fill mode means the element starts in the `from` state (scale 0, opac
 ### Styles directory created (was absent)
 `frontend/src/styles/` did not exist. Created it with `campus-animations.css`. Task 8 (page.tsx wiring) and later tasks can add more CSS files here.
 
+## Task 9 implementation notes (Plan 2)
+
+### Index-based role-to-session mapping
+`Run.memberSessionIds` is a flat array with no per-role metadata. Used index-based assignment: [0]=Designer, [1]=Coder, [2]=Verifier, [3]=Reviewer. A run with 3 active members has Designer/Coder/Verifier occupied and Reviewer dim. Task 12 (animations) and future role-aware filtering can refine this once session role data is accessible at this level.
+
+### ViewTransition already had the runOfficeView slot (T8)
+T8 added `runOfficeView?: ReactNode` to ViewTransition and rendered a TODO placeholder. T9 only needed to: (a) create the component and (b) pass `runOfficeView={<RunOfficeView />}` in page.tsx. No ViewTransition changes required.
+
+### CSS grid approach for nook layout
+Used `gridTemplateColumns: "1fr auto 1fr"` and `gridTemplateRows: "1fr auto 1fr"` with explicit `gridRow`/`gridColumn` on each cell. Nooks fill the 4 outer corners (rows 1/3, cols 1/3); OrchestratorStation sits at center (row 2, col 2). Empty `<div>` spacers fill the 4 edge positions so the grid doesn't collapse.
+
 ## Observations
 
 - The existing `useWebSocketEvents` hook is 500+ lines and tightly coupled

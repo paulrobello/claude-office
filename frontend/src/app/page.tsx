@@ -40,12 +40,16 @@ import { ViewTransition } from "@/components/navigation/ViewTransition";
 import { BuildingView } from "@/components/views/BuildingView";
 import { FloorView } from "@/components/views/FloorView";
 import { CampusView } from "@/components/views/CampusView";
+import { RunOfficeView } from "@/components/views/RunOfficeView";
 import { useRunList } from "@/hooks/useRunList";
 import { TourOverlay } from "@/components/tour/TourOverlay";
 import { useTourStore } from "@/stores/tourStore";
 import { CommandBar } from "@/components/command/CommandBar";
 import { AttentionToasts } from "@/components/command/AttentionToasts";
-import { useAttentionStore, startAttentionEngine } from "@/stores/attentionStore";
+import {
+  useAttentionStore,
+  startAttentionEngine,
+} from "@/stores/attentionStore";
 
 // ============================================================================
 // DYNAMIC IMPORT (mobile branch only — desktop uses FloorView)
@@ -157,7 +161,7 @@ export default function V2TestPage(): React.ReactNode {
   // One-time initialization effects
   // ------------------------------------------------------------------
   useEffect(() => {
-    fetch("http://localhost:8000/api/v1/status")
+    fetch("http://localhost:3400/api/v1/status")
       .then((res) => res.json())
       .then((data: { aiSummaryEnabled: boolean }) =>
         setAiSummaryEnabled(data.aiSummaryEnabled),
@@ -227,9 +231,12 @@ export default function V2TestPage(): React.ReactNode {
     await handleDeleteSession(pending);
   };
 
-  const handleRenameSession = async (sessionId: string, displayName: string) => {
+  const handleRenameSession = async (
+    sessionId: string,
+    displayName: string,
+  ) => {
     try {
-      await fetch(`http://localhost:8000/api/v1/sessions/${sessionId}`, {
+      await fetch(`http://localhost:3400/api/v1/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ displayName }),
@@ -473,6 +480,7 @@ export default function V2TestPage(): React.ReactNode {
           <ViewTransition
             view={view}
             campusView={<CampusView sessions={sessions} />}
+            runOfficeView={<RunOfficeView />}
             buildingView={<BuildingView />}
             floorView={
               <FloorView
