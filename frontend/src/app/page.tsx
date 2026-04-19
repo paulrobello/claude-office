@@ -43,6 +43,7 @@ import { CampusView } from "@/components/views/CampusView";
 import { RunOfficeView } from "@/components/views/RunOfficeView";
 import { NookDrillDown } from "@/components/views/NookDrillDown";
 import { useRunList } from "@/hooks/useRunList";
+import { useRunEvents } from "@/hooks/useRunEvents";
 import { agentMachineService } from "@/machines/agentMachineService";
 import { TourOverlay } from "@/components/tour/TourOverlay";
 import { useTourStore } from "@/stores/tourStore";
@@ -146,6 +147,7 @@ export default function V2TestPage(): React.ReactNode {
   // ------------------------------------------------------------------
   useFloorConfig();
   useRunList();
+  useRunEvents();
   const view = useNavigationStore((s) => s.view);
   const activeNookSessionId = useNavigationStore((s) => s.activeNookSessionId);
 

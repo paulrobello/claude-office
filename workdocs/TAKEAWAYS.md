@@ -174,3 +174,24 @@ These files contained pre-existing WIP code that was included in their respectiv
 
 ### ViewTransition campus/run-office/nook placeholders
 `run-office` and `nook` view modes render TODO placeholders. Tasks 9 (RunOfficeView) and 13 (NookDrillDown) will supply the real components as optional props — no ViewTransition changes needed then since the interface already accepts them.
+
+## Task 16 implementation notes (Plan 2)
+
+### Separate WS connections from useRunList (by design)
+`useRunList` connects to `_run:<runId>` and handles `run_state` messages. `useRunEvents` opens separate connections to the same channels and handles `event` messages only. Two WS connections per run is acceptable; clean separation of concerns without cross-hook coupling.
+
+### Store subscription drives connection lifecycle
+`useRunEvents` subscribes to `useRunStore` (not REST). As `useRunList` adds runs via REST poll, the store subscription fires and `connectRun(runId)` is called. `connectRun` guards with a `wsMap.has` check — idempotent, no duplicate connections.
+
+### Backend event detail does not carry run-specific fields
+`event_dict.detail` in the backend only maps generic fields (toolName, message, etc.). Run-specific fields (`to_phase`, `outcome`, `run_id`) are NOT in the event message. Strategy:
+- `run_phase_change` → `refetchRuns()` immediately (avoids waiting 5 s for REST poll)
+- `run_end` → optimistic outcome="completed"; REST poll corrects if different
+- `role_session_joined` → `event.agentId` used as joining session ID (forward-compat for when backend emits this event)
+- `run_start` → `refetchRuns()` if run not in store; re-set if already known
+
+### ROLE_SESSION_JOINED never emitted by backend (yet)
+The event type is defined in the Python enum and tested, but no backend handler dispatches it. `useRunEvents` handles it anyway for forward-compatibility — the `agentId` field will carry the joining session ID when the backend eventually emits it.
+
+### Generated EventType missing run event types
+`frontend/src/types/generated.ts` EventType union does not include the 4 run event types (schema was generated before they were added to the Python enum). `useRunEvents` uses plain string comparison (`eventType === "run_start"` etc.) rather than importing EventType, so no TS error. A schema regeneration in Task 17/18 would fix this.

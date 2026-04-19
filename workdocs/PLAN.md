@@ -327,9 +327,11 @@ Session: completed cleanly. Breadcrumb now handles 4 branches: campus (static la
 
 ---
 
-### 🔧 Task 16: Event-driven animation triggers
+### ✅ Task 16: Event-driven animation triggers
 
-**Files:** `frontend/src/hooks/useRunEvents.ts` (new)
+Session: completed cleanly. `useRunEvents` subscribes to `_run:<runId>` per run via store subscription (runs discovered by `useRunList`). Separate WS connections from `useRunList` — handles `event` messages; `useRunList` handles `run_state`. `run_phase_change` triggers immediate `refetchRuns()` for updated phase. `run_end` sets outcome optimistically. `role_session_joined` uses `agentId` as joining session (forward-compat; backend doesn't emit this event yet). Wired into `page.tsx` alongside `useRunList()`. Frontend TSC + lint + tests pass clean. Backend pyright pre-existing failures unchanged.
+
+**Files:** `frontend/src/hooks/useRunEvents.ts` (new), `frontend/src/app/page.tsx`
 
 Hook that listens for synthetic events (`run_start`, `run_phase_change`,
 `run_end`, `role_session_joined`) on the global WebSocket feed and
@@ -339,11 +341,11 @@ Integrates with the existing `useWebSocketEvents` pattern — extends the
 message handler to recognize run-related event types.
 
 **Success criteria:**
-- `run_start` event creates a new Run in store (triggers office-appear).
-- `run_phase_change` updates Run.phase (triggers tint transition).
-- `run_end` updates Run.outcome (triggers office dim).
-- `role_session_joined` adds session to run's member list (triggers arrive).
-- TypeScript compiles cleanly.
+- `run_start` event creates a new Run in store (triggers office-appear). ✅
+- `run_phase_change` updates Run.phase (triggers tint transition). ✅
+- `run_end` updates Run.outcome (triggers office dim). ✅
+- `role_session_joined` adds session to run's member list (triggers arrive). ✅
+- TypeScript compiles cleanly. ✅
 
 **Dependencies:** Tasks 2, 3, 7, 11, 12.
 
