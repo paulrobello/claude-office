@@ -1,5 +1,5 @@
-/** View modes for the two-tier navigation */
-export type ViewMode = "building" | "floor";
+/** View modes — legacy 2-tier (building/floor) preserved; 3-tier campus added */
+export type ViewMode = "building" | "floor" | "campus" | "run-office" | "nook";
 
 /** Room configuration from backend */
 export interface RoomConfig {

@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import type { ViewMode, BuildingConfig, FloorConfig, TransitionDirection } from "@/types/navigation";
+import type {
+  ViewMode,
+  BuildingConfig,
+  FloorConfig,
+  TransitionDirection,
+} from "@/types/navigation";
 
 interface NavigationState {
   /** Current view mode */
@@ -16,6 +21,10 @@ interface NavigationState {
   transitionDirection: TransitionDirection;
   /** Whether a transition animation is in progress */
   isTransitioning: boolean;
+  /** Active run ID (set when viewing run-office or nook) */
+  activeRunId: string | null;
+  /** Active nook session ID (set when viewing nook) */
+  activeNookSessionId: string | null;
   /** Set transition origin for the next navigation */
   setTransitionOrigin: (origin: { x: number; y: number } | null) => void;
   /** Mark transition as complete */
@@ -40,6 +49,12 @@ interface NavigationState {
   goToBuilding: () => void;
   /** Navigate to a specific floor */
   goToFloor: (floorId: string) => void;
+  /** Navigate to campus view (Level 1) */
+  goToCampus: () => void;
+  /** Navigate to a run office (Level 2) */
+  goToRunOffice: (runId: string) => void;
+  /** Navigate to a nook drill-down (Level 3); runId is null for hot-desk */
+  goToNook: (runId: string | null, sessionId: string) => void;
   /** Set building config from API */
   setBuildingConfig: (config: BuildingConfig) => void;
   /** Set loading state */
@@ -56,9 +71,15 @@ export const useNavigationStore = create<NavigationState>((set, get) => ({
   transitionOrigin: null,
   transitionDirection: null,
   isTransitioning: false,
+  activeRunId: null,
+  activeNookSessionId: null,
   setTransitionOrigin: (origin) => set({ transitionOrigin: origin }),
   completeTransition: () =>
-    set({ isTransitioning: false, transitionDirection: null, transitionOrigin: null }),
+    set({
+      isTransitioning: false,
+      transitionDirection: null,
+      transitionOrigin: null,
+    }),
   allSessions: [],
   setAllSessions: (sessions) => set({ allSessions: sessions }),
 
@@ -74,6 +95,33 @@ export const useNavigationStore = create<NavigationState>((set, get) => ({
     set({
       view: "floor",
       floorId,
+      transitionDirection: "zoom-in",
+      isTransitioning: true,
+    }),
+
+  goToCampus: () =>
+    set({
+      view: "campus",
+      activeRunId: null,
+      activeNookSessionId: null,
+      transitionDirection: "zoom-out",
+      isTransitioning: true,
+    }),
+
+  goToRunOffice: (runId) =>
+    set({
+      view: "run-office",
+      activeRunId: runId,
+      activeNookSessionId: null,
+      transitionDirection: "zoom-in",
+      isTransitioning: true,
+    }),
+
+  goToNook: (runId, sessionId) =>
+    set({
+      view: "nook",
+      activeRunId: runId,
+      activeNookSessionId: sessionId,
       transitionDirection: "zoom-in",
       isTransitioning: true,
     }),

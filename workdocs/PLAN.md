@@ -92,7 +92,7 @@ Hook that fetches `GET /api/v1/runs` on mount + every 5s poll. Populates
 
 ## Phase 2: Campus View (Tasks 5–8)
 
-### 🔧 Task 5: Navigation store extension
+### ✅ Task 5: Navigation store extension
 
 **Files:** `frontend/src/stores/navigationStore.ts`, `frontend/src/types/navigation.ts`
 
@@ -108,6 +108,8 @@ Set default view to `"campus"` instead of `"building"`.
 - TypeScript compiles cleanly.
 
 **Dependencies:** None.
+
+Session: completed cleanly. Extended `ViewMode` in `types/navigation.ts` to include `"campus" | "run-office" | "nook"` alongside legacy modes. Added `activeRunId` and `activeNookSessionId` to store state. Added `goToCampus()`, `goToRunOffice(runId)`, `goToNook(runId, sessionId)` actions. Default view stays `"building"` (Task 8 does the flip). 10 new tests in `navigationStore.test.ts`, all pass. TSC and lint clean.
 
 ---
 
