@@ -92,7 +92,7 @@ Hook that fetches `GET /api/v1/runs` on mount + every 5s poll. Populates
 
 ## Phase 2: Campus View (Tasks 5–8)
 
-### ⬜ Task 5: Navigation store extension
+### 🔧 Task 5: Navigation store extension
 
 **Files:** `frontend/src/stores/navigationStore.ts`, `frontend/src/types/navigation.ts`
 
