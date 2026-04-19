@@ -39,6 +39,8 @@ import { Breadcrumb } from "@/components/navigation/Breadcrumb";
 import { ViewTransition } from "@/components/navigation/ViewTransition";
 import { BuildingView } from "@/components/views/BuildingView";
 import { FloorView } from "@/components/views/FloorView";
+import { CampusView } from "@/components/views/CampusView";
+import { useRunList } from "@/hooks/useRunList";
 import { TourOverlay } from "@/components/tour/TourOverlay";
 import { useTourStore } from "@/stores/tourStore";
 import { CommandBar } from "@/components/command/CommandBar";
@@ -137,6 +139,7 @@ export default function V2TestPage(): React.ReactNode {
   // Floor configuration + navigation
   // ------------------------------------------------------------------
   useFloorConfig();
+  useRunList();
   const view = useNavigationStore((s) => s.view);
 
   // ------------------------------------------------------------------
@@ -469,6 +472,7 @@ export default function V2TestPage(): React.ReactNode {
         >
           <ViewTransition
             view={view}
+            campusView={<CampusView sessions={sessions} />}
             buildingView={<BuildingView />}
             floorView={
               <FloorView

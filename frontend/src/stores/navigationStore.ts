@@ -64,7 +64,7 @@ interface NavigationState {
 }
 
 export const useNavigationStore = create<NavigationState>((set, get) => ({
-  view: "building",
+  view: "campus",
   floorId: null,
   buildingConfig: null,
   isLoading: true,

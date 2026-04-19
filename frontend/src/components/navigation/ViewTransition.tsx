@@ -12,23 +12,32 @@ interface ViewTransitionProps {
   buildingView: ReactNode;
   /** Content with PixiJS — always mounted once, never duplicated */
   floorView: ReactNode;
+  /** Campus Level 1 — DOM only, safe to duplicate */
+  campusView: ReactNode;
+  /** Run office Level 2 — DOM only, safe to duplicate */
+  runOfficeView?: ReactNode;
+  /** Nook drill-down Level 3 — DOM only for now, safe to duplicate */
+  nookView?: ReactNode;
 }
 
 /**
  * Animated view switcher that avoids duplicating PixiJS components.
  *
- * BuildingView is lightweight (DOM only) and CAN be duplicated during the
- * outgoing animation. FloorView contains PixiJS and must only exist once —
- * it's always mounted and toggled via CSS display.
+ * DOM-only views (building, campus, run-office, nook) CAN be duplicated
+ * during outgoing animation. FloorView contains PixiJS and must only exist
+ * once — always mounted and toggled via CSS display.
  *
- * Zoom-in:  BuildingView scales up 1→3x + fades out,
- *           FloorView wrapper fades in from scale 0.3→1x.
+ * Zoom-in:  outgoing view scales up 1→3x + fades out,
+ *           incoming view fades in from scale 0.3→1x.
  * Zoom-out: reverse.
  */
 export function ViewTransition({
   view,
   buildingView,
   floorView,
+  campusView,
+  runOfficeView,
+  nookView,
 }: ViewTransitionProps): ReactNode {
   const transitionOrigin = useNavigationStore((s) => s.transitionOrigin);
   const transitionDirection = useNavigationStore((s) => s.transitionDirection);
@@ -71,11 +80,24 @@ export function ViewTransition({
 
   const isZoomIn = transitionDirection === "zoom-in";
 
-  // Outgoing BuildingView snapshot (only during zoom-in, when leaving building)
-  const showOutgoingBuilding =
-    phase === "animating" && outgoingView === "building";
+  // DOM-only views can be safely duplicated during outgoing animation
+  const domOnlyViews: ViewMode[] = ["building", "campus", "run-office", "nook"];
+  const showOutgoingSnapshot =
+    phase === "animating" &&
+    outgoingView !== null &&
+    domOnlyViews.includes(outgoingView);
 
-  // Outgoing style for the BuildingView copy that scales away
+  const outgoingContent = (() => {
+    switch (outgoingView) {
+      case "building": return buildingView;
+      case "campus": return campusView;
+      case "run-office": return runOfficeView ?? null;
+      case "nook": return nookView ?? null;
+      default: return null;
+    }
+  })();
+
+  // Outgoing style for the DOM-only copy that scales away
   const outgoingStyle: React.CSSProperties = {
     transformOrigin: originStyle,
     transform: isZoomIn ? "scale(3)" : "scale(0.3)",
@@ -96,35 +118,65 @@ export function ViewTransition({
 
   const incomingOrigin = phase === "animating" ? originStyle : undefined;
 
+  const incomingStyle: React.CSSProperties | undefined = incomingAnimation
+    ? {
+        animation: incomingAnimation,
+        transformOrigin: incomingOrigin,
+        position: "relative",
+        zIndex: 2,
+      }
+    : undefined;
+
   return (
     <div className="relative flex-grow flex overflow-hidden min-h-0">
-      {/* Outgoing BuildingView copy (safe to duplicate — no PixiJS) */}
-      {showOutgoingBuilding && (
+      {/* Outgoing DOM-only view snapshot (safe to duplicate) */}
+      {showOutgoingSnapshot && outgoingContent && (
         <div style={outgoingStyle} className="flex gap-2">
-          {buildingView}
+          {outgoingContent}
         </div>
       )}
 
-      {/* BuildingView: conditionally rendered */}
+      {/* CampusView: conditionally rendered (DOM only) */}
+      {view === "campus" && (
+        <div
+          className="flex-grow flex gap-2 overflow-hidden min-h-0"
+          style={incomingStyle}
+        >
+          {campusView}
+        </div>
+      )}
+
+      {/* RunOfficeView: conditionally rendered (DOM only) */}
+      {view === "run-office" && (
+        <div
+          className="flex-grow flex gap-2 overflow-hidden min-h-0"
+          style={incomingStyle}
+        >
+          {runOfficeView ?? <div className="p-8 text-slate-400 font-mono">TODO: RunOfficeView (T9)</div>}
+        </div>
+      )}
+
+      {/* NookView: conditionally rendered (DOM only for now) */}
+      {view === "nook" && (
+        <div
+          className="flex-grow flex gap-2 overflow-hidden min-h-0"
+          style={incomingStyle}
+        >
+          {nookView ?? <div className="p-8 text-slate-400 font-mono">TODO: NookDrillDown (T13)</div>}
+        </div>
+      )}
+
+      {/* BuildingView: conditionally rendered (DOM only) */}
       {view === "building" && (
         <div
           className="flex-grow flex gap-2 overflow-hidden min-h-0"
-          style={
-            incomingAnimation
-              ? {
-                  animation: incomingAnimation,
-                  transformOrigin: incomingOrigin,
-                  position: "relative",
-                  zIndex: 2,
-                }
-              : undefined
-          }
+          style={incomingStyle}
         >
           {buildingView}
         </div>
       )}
 
-      {/* FloorView: always mounted, toggled via CSS — never duplicated */}
+      {/* FloorView: always mounted, toggled via CSS — never duplicated (PixiJS) */}
       <div
         className={
           view === "floor"
@@ -150,8 +202,6 @@ export function ViewTransition({
         <div
           style={{
             ...outgoingStyle,
-            /* FloorView is still visible in its slot — this is just a
-               dimming overlay that fades to match the transition feel */
             background: "var(--background, #0a0a0a)",
           }}
         />
