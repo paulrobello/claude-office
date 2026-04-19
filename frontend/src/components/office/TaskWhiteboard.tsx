@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import "@/styles/task-animations.css";
 import type { PlanTask, PlanTaskStatus } from "@/types/run";
 
 interface TaskWhiteboardProps {
@@ -27,10 +29,17 @@ const COLUMN_HEADER_COLORS: Record<PlanTaskStatus, string> = {
   done: "#10b981",
 };
 
-function StickyCard({ task }: { task: PlanTask }) {
+function StickyCard({
+  task,
+  isSliding,
+}: {
+  task: PlanTask;
+  isSliding: boolean;
+}) {
   const colors = STATUS_COLORS[task.status];
   return (
     <div
+      className={isSliding ? "sticky-slide-in" : undefined}
       style={{
         background: colors.bg,
         border: `1px solid ${colors.border}`,
@@ -39,12 +48,28 @@ function StickyCard({ task }: { task: PlanTask }) {
         boxShadow: "1px 2px 4px rgba(0,0,0,0.12)",
       }}
     >
-      <p
-        className="text-xs font-mono leading-snug"
-        style={{ color: colors.text, wordBreak: "break-word" }}
-      >
-        {task.title}
-      </p>
+      <div className="flex items-center gap-1">
+        {task.status === "done" && (
+          <span
+            className={isSliding ? "checkmark-appear" : undefined}
+            style={{
+              color: colors.text,
+              fontSize: "10px",
+              fontWeight: 700,
+              lineHeight: 1,
+              flexShrink: 0,
+            }}
+          >
+            ✓
+          </span>
+        )}
+        <p
+          className="text-xs font-mono leading-snug"
+          style={{ color: colors.text, wordBreak: "break-word" }}
+        >
+          {task.title}
+        </p>
+      </div>
       {task.assignedSessionId && (
         <p
           className="text-xs font-mono mt-1"
@@ -58,6 +83,34 @@ function StickyCard({ task }: { task: PlanTask }) {
 }
 
 export function TaskWhiteboard({ tasks }: TaskWhiteboardProps) {
+  const prevStatusRef = useRef<Map<string, PlanTaskStatus>>(new Map());
+  const [slidingTasks, setSlidingTasks] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const newSliding = new Set<string>();
+    tasks.forEach((task) => {
+      const prev = prevStatusRef.current.get(task.id);
+      if (prev !== undefined && prev !== task.status) {
+        newSliding.add(task.id);
+      }
+      prevStatusRef.current.set(task.id, task.status);
+    });
+
+    if (newSliding.size === 0) return;
+
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setSlidingTasks(newSliding);
+    });
+    const timer = setTimeout(() => {
+      if (active) setSlidingTasks(new Set());
+    }, 450);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [tasks]);
+
   const byStatus = (status: PlanTaskStatus) =>
     tasks.filter((t) => t.status === status);
 
@@ -144,7 +197,11 @@ export function TaskWhiteboard({ tasks }: TaskWhiteboardProps) {
                   }}
                 >
                   {col.map((task) => (
-                    <StickyCard key={task.id} task={task} />
+                    <StickyCard
+                      key={task.id}
+                      task={task}
+                      isSliding={slidingTasks.has(task.id)}
+                    />
                   ))}
                 </div>
               )}

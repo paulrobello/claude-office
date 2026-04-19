@@ -220,7 +220,7 @@ Session: completed cleanly. Pure DOM/CSS three-column whiteboard. StickyCard col
 
 ---
 
-### 🔧 Task 11: TaskWhiteboard animations (sticky slides)
+### ✅ Task 11: TaskWhiteboard animations (sticky slides)
 
 **Files:** `frontend/src/components/office/TaskWhiteboard.tsx`, `frontend/src/styles/task-animations.css` (new)
 
@@ -236,6 +236,8 @@ status to detect transitions.
 - No layout thrashing during animation.
 
 **Dependencies:** Task 10.
+
+Session: completed cleanly. `task-animations.css` new file with `sticky-slide-in` (translateX -24px→0 + opacity, 400ms ease-out) and `checkmark-appear` (scale 0→1, 100ms). `useRef<Map<string, PlanTaskStatus>>` tracks previous status per task; `useState<Set<string>>` holds currently-animating task IDs. `useEffect` on `tasks` prop detects status changes, queues animation class via `queueMicrotask` (avoids `react-hooks/set-state-in-effect` lint rule), clears after 450ms. Checkmark (✓) renders on all `done` tasks; `checkmark-appear` class fires only on the transition render. Frontend checkall exits 0.
 
 ---
 

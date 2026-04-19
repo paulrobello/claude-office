@@ -1,0 +1,32 @@
+/* GPU-composited only: transform, opacity */
+
+@keyframes sticky-slide-in {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes checkmark-appear {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.sticky-slide-in {
+  animation: sticky-slide-in 400ms ease-out both;
+}
+
+.checkmark-appear {
+  animation: checkmark-appear 100ms ease-out both;
+  display: inline-block;
+}
