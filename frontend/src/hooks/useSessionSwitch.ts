@@ -56,7 +56,7 @@ export function useSessionSwitch({
 
     try {
       showStatus(`Deleting session ${id.slice(0, 8)}...`, "info");
-      const res = await fetch(`http://localhost:8000/api/v1/sessions/${id}`, {
+      const res = await fetch(`http://localhost:3400/api/v1/sessions/${id}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -80,7 +80,7 @@ export function useSessionSwitch({
   const handleClearDB = async (): Promise<void> => {
     try {
       showStatus("Clearing database...", "info");
-      const res = await fetch("http://localhost:8000/api/v1/sessions", {
+      const res = await fetch("http://localhost:3400/api/v1/sessions", {
         method: "DELETE",
       });
       if (res.ok) {
@@ -102,7 +102,7 @@ export function useSessionSwitch({
     try {
       showStatus("Triggering simulation...", "info");
       const res = await fetch(
-        "http://localhost:8000/api/v1/sessions/simulate",
+        "http://localhost:3400/api/v1/sessions/simulate",
         { method: "POST" },
       );
       if (res.ok) {

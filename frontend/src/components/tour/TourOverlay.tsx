@@ -81,7 +81,8 @@ export function TourOverlay(): ReactNode {
     if (step.view !== currentView && step.advanceOn.kind !== "navigation") {
       const store = useNavigationStore.getState();
       if (step.view === "building") store.goToBuilding();
-      else if (step.view === "floor" && store.floorId) store.goToFloor(store.floorId);
+      else if (step.view === "floor" && store.floorId)
+        store.goToFloor(store.floorId);
     }
   }, [step]);
 
@@ -89,9 +90,17 @@ export function TourOverlay(): ReactNode {
 
   return (
     <>
-      <SpotlightDim targetTourId={step.targetTourId} wide={step.wideSpotlight} />
+      <SpotlightDim
+        targetTourId={step.targetTourId}
+        wide={step.wideSpotlight}
+      />
       <PointerRing targetTourId={step.targetTourId} label={step.pointerLabel} />
-      <NarratorBar step={step} stepIndex={stepIndex} totalSteps={steps.length} onSkip={skipTour} />
+      <NarratorBar
+        step={step}
+        stepIndex={stepIndex}
+        totalSteps={steps.length}
+        onSkip={skipTour}
+      />
     </>
   );
 }

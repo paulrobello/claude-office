@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useNavigationStore } from "@/stores/navigationStore";
 
-const API_URL = "http://localhost:8000/api/v1";
+const API_URL = "http://localhost:3400/api/v1";
 
 /**
  * Fetches building configuration and session summaries from the backend.
@@ -16,7 +16,9 @@ export function useFloorConfig(): void {
     fetch(`${API_URL}/floors`)
       .then((res) => res.json())
       .then((data) => setBuildingConfig(data))
-      .catch(() => setBuildingConfig({ building_name: "Building", floors: [] }));
+      .catch(() =>
+        setBuildingConfig({ building_name: "Building", floors: [] }),
+      );
   }, [setBuildingConfig, setLoading]);
 
   // Periodically fetch session summaries for room/floor activity

@@ -5,7 +5,7 @@ import { agentMachineService } from "@/machines/agentMachineService";
 import { useGameStore } from "@/stores/gameStore";
 import type { Session } from "@/hooks/useSessions";
 
-const API_BASE = "http://localhost:8000/api/v1";
+const API_BASE = "http://localhost:3400/api/v1";
 
 interface UseFloorSessionsResult {
   /** Sessions for the current floor */
@@ -22,7 +22,9 @@ interface UseFloorSessionsResult {
  * Manages sessions scoped to a specific floor.
  * Auto-selects the latest active session when the floor changes.
  */
-export function useFloorSessions(floorId: string | null): UseFloorSessionsResult {
+export function useFloorSessions(
+  floorId: string | null,
+): UseFloorSessionsResult {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [sessionId, setSessionId] = useState("");

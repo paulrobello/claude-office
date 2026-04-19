@@ -1,10 +1,6 @@
 export type RunPhase = "A" | "B" | "C" | "D" | "done";
 
-export type RunOutcome =
-  | "in_progress"
-  | "completed"
-  | "stuck"
-  | "abandoned";
+export type RunOutcome = "in_progress" | "completed" | "stuck" | "abandoned";
 
 export type PlanTaskStatus = "todo" | "in_progress" | "done";
 

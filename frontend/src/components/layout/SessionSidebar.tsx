@@ -95,7 +95,10 @@ export function SessionSidebar({
       className={`relative flex flex-col gap-1.5 flex-shrink-0 overflow-hidden ${
         isDragging ? "select-none" : "transition-all duration-300"
       }`}
-      style={{ width: isCollapsed ? 40 : sidebarWidth, maxHeight: "calc(100vh - 60px)" }}
+      style={{
+        width: isCollapsed ? 40 : sidebarWidth,
+        maxHeight: "calc(100vh - 60px)",
+      }}
     >
       {/* Collapse Toggle */}
       <button
@@ -178,7 +181,11 @@ export function SessionSidebar({
                               value={editName}
                               onChange={(e) => setEditName(e.target.value)}
                               onBlur={() => {
-                                if (editName.trim() && editName !== (session.displayName || session.projectName)) {
+                                if (
+                                  editName.trim() &&
+                                  editName !==
+                                    (session.displayName || session.projectName)
+                                ) {
                                   onRenameSession(session.id, editName.trim());
                                 }
                                 setEditingId(null);
@@ -200,12 +207,18 @@ export function SessionSidebar({
                               }`}
                               onDoubleClick={() => {
                                 setEditingId(session.id);
-                                setEditName(session.displayName || session.projectName || "");
+                                setEditName(
+                                  session.displayName ||
+                                    session.projectName ||
+                                    "",
+                                );
                                 setTimeout(() => editRef.current?.select(), 50);
                               }}
                               title="Double-click to rename"
                             >
-                              {session.displayName || session.projectName || "Unknown Project"}
+                              {session.displayName ||
+                                session.projectName ||
+                                "Unknown Project"}
                             </span>
                           )}
                           <button

@@ -39,7 +39,9 @@ export const useRunStore = create<RunState>((set) => ({
 export const selectRuns = (state: RunState) => state.runs;
 
 export const selectActiveRun = (state: RunState): Run | null =>
-  state.activeRunId != null ? (state.runs.get(state.activeRunId) ?? null) : null;
+  state.activeRunId != null
+    ? (state.runs.get(state.activeRunId) ?? null)
+    : null;
 
 export const selectHotDeskSessions = <T extends { runId?: string | null }>(
   sessions: T[],

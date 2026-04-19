@@ -424,8 +424,8 @@ export function useWebSocketEvents({
     }
 
     const wsUrl = roomId
-      ? `ws://localhost:8000/ws/room/${roomId}`
-      : `ws://localhost:8000/ws/${sessionId}`;
+      ? `ws://localhost:3400/ws/room/${roomId}`
+      : `ws://localhost:3400/ws/${sessionId}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 

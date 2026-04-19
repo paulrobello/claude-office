@@ -27,7 +27,7 @@ interface PreferencesState {
 // CONSTANTS
 // ============================================================================
 
-const API_BASE = "http://localhost:8000/api/v1/preferences";
+const API_BASE = "http://localhost:3400/api/v1/preferences";
 
 const DEFAULT_CLOCK_TYPE: ClockType = "analog";
 const DEFAULT_CLOCK_FORMAT: ClockFormat = "12h";

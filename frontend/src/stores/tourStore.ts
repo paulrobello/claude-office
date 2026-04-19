@@ -132,8 +132,7 @@ export const useTourStore = create<TourState>((set, get) => ({
   steps: TOUR_STEPS,
   hasSeenTour: false,
 
-  startTour: () =>
-    set({ isActive: true, currentStepIndex: 0 }),
+  startTour: () => set({ isActive: true, currentStepIndex: 0 }),
 
   advanceStep: () => {
     const { currentStepIndex, steps } = get();

@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { useAttentionStore, type AttentionCategory } from "@/stores/attentionStore";
+import {
+  useAttentionStore,
+  type AttentionCategory,
+} from "@/stores/attentionStore";
 
 const DOT_COLOR: Record<AttentionCategory, string> = {
   blocked: "bg-rose-500",
@@ -14,7 +17,9 @@ interface AttentionToastsProps {
   onOpenCommandBar: (agentId?: string) => void;
 }
 
-export function AttentionToasts({ onOpenCommandBar }: AttentionToastsProps): ReactNode {
+export function AttentionToasts({
+  onOpenCommandBar,
+}: AttentionToastsProps): ReactNode {
   const pendingToasts = useAttentionStore((s) => s.pendingToasts);
   const dismissToast = useAttentionStore((s) => s.dismissToast);
 
@@ -40,7 +45,9 @@ export function AttentionToasts({ onOpenCommandBar }: AttentionToastsProps): Rea
           }}
           className="flex items-center gap-2.5 px-4 py-2.5 bg-slate-900/95 border border-slate-700 rounded-lg shadow-2xl backdrop-blur-sm animate-slide-up hover:bg-slate-800 transition-colors max-w-xs"
         >
-          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${DOT_COLOR[toast.category]}`} />
+          <div
+            className={`w-2 h-2 rounded-full flex-shrink-0 ${DOT_COLOR[toast.category]}`}
+          />
           <div className="min-w-0 text-left">
             <div className="text-white text-xs font-mono font-bold truncate">
               {toast.agentName}

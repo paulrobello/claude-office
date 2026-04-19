@@ -12,9 +12,15 @@
 }
 
 @keyframes phase-ping {
-  0%   { transform: scale(1); }
-  40%  { transform: scale(1.04); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .office-appear {
@@ -22,7 +28,9 @@
 }
 
 .office-phase-transition {
-  transition: border-color 600ms ease, opacity 300ms ease;
+  transition:
+    border-color 600ms ease,
+    opacity 300ms ease;
 }
 
 .office-phase-ping {

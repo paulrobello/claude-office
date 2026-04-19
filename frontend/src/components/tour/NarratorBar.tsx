@@ -10,7 +10,12 @@ interface NarratorBarProps {
   onSkip: () => void;
 }
 
-export function NarratorBar({ step, stepIndex, totalSteps, onSkip }: NarratorBarProps): ReactNode {
+export function NarratorBar({
+  step,
+  stepIndex,
+  totalSteps,
+  onSkip,
+}: NarratorBarProps): ReactNode {
   const progress = ((stepIndex + 1) / totalSteps) * 100;
 
   return (

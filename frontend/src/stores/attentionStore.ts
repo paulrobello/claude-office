@@ -44,11 +44,22 @@ interface AttentionState {
 // SCORING
 // ============================================================================
 
-const BLOCKED_KEYWORDS = ["error", "permission", "denied", "failed", "failure", "crash", "exception"];
+const BLOCKED_KEYWORDS = [
+  "error",
+  "permission",
+  "denied",
+  "failed",
+  "failure",
+  "crash",
+  "exception",
+];
 const WAITING_STATES: BackendAgentState[] = ["waiting", "waiting_permission"];
 const COMPLETED_STATES: BackendAgentState[] = ["completed", "reporting_done"];
 
-function categorizeAgent(agent: AgentAnimationState, now: number): { category: AttentionCategory; score: number } {
+function categorizeAgent(
+  agent: AgentAnimationState,
+  now: number,
+): { category: AttentionCategory; score: number } {
   const state = agent.backendState;
   const bubbleText = agent.bubble.content?.text?.toLowerCase() ?? "";
 
@@ -98,7 +109,10 @@ function buildTimeline(agent: AgentAnimationState): TimelineAction[] {
 
   if (agent.bubble.content) {
     const icon = agent.bubble.content.icon ?? "💬";
-    timeline.push({ icon, label: agent.bubble.content.text?.slice(0, 20) ?? "" });
+    timeline.push({
+      icon,
+      label: agent.bubble.content.text?.slice(0, 20) ?? "",
+    });
   }
 
   return timeline.slice(-4);
@@ -176,7 +190,10 @@ function recomputeAttention(): void {
     lastToastTime.set(entry.agentId, now);
     newToasts.push(entry);
 
-    if (entry.category === "blocked" && useAttentionStore.getState().soundEnabled) {
+    if (
+      entry.category === "blocked" &&
+      useAttentionStore.getState().soundEnabled
+    ) {
       try {
         const audio = new Audio("/sounds/ping.mp3");
         audio.volume = 0.3;

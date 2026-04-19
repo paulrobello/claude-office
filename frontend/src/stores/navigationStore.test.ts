@@ -18,7 +18,10 @@ describe("useNavigationStore — campus navigation actions", () => {
   });
 
   it("goToCampus sets view=campus and clears run/nook IDs", () => {
-    useNavigationStore.setState({ activeRunId: "ral-abc", activeNookSessionId: "s-123" });
+    useNavigationStore.setState({
+      activeRunId: "ral-abc",
+      activeNookSessionId: "s-123",
+    });
     useNavigationStore.getState().goToCampus();
     const state = useNavigationStore.getState();
     expect(state.view).toBe("campus");

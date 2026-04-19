@@ -5,7 +5,7 @@ import { agentMachineService } from "@/machines/agentMachineService";
 import { useGameStore } from "@/stores/gameStore";
 import type { Session } from "@/hooks/useSessions";
 
-const API_BASE = "http://localhost:8000/api/v1";
+const API_BASE = "http://localhost:3400/api/v1";
 
 interface UseRoomSessionsResult {
   /** Sessions for the current room */

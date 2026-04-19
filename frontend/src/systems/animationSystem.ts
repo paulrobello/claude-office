@@ -394,8 +394,8 @@ class AnimationSystem {
         "walking_to_desk",
         "walking_to_elevator",
       ]);
-      const hasInteractingAgent = Array.from(store.agents.values()).some(
-        (a) => BOSS_INTERACTION_PHASES.has(a.phase),
+      const hasInteractingAgent = Array.from(store.agents.values()).some((a) =>
+        BOSS_INTERACTION_PHASES.has(a.phase),
       );
       if (!hasInteractingAgent) {
         if (this.bossLockedSince === null) {

@@ -28,11 +28,16 @@ body {
 }
 
 @keyframes tour-ring-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.6), 0 0 20px 4px rgba(249, 115, 22, 0.2);
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px rgba(249, 115, 22, 0.6),
+      0 0 20px 4px rgba(249, 115, 22, 0.2);
   }
   50% {
-    box-shadow: 0 0 0 5px rgba(249, 115, 22, 0.4), 0 0 30px 8px rgba(249, 115, 22, 0.3);
+    box-shadow:
+      0 0 0 5px rgba(249, 115, 22, 0.4),
+      0 0 30px 8px rgba(249, 115, 22, 0.3);
   }
 }
 

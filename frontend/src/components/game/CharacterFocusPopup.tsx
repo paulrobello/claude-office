@@ -11,7 +11,13 @@
 
 "use client";
 
-import { useRef, useState, useEffect, useCallback, type ReactNode } from "react";
+import {
+  useRef,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from "react";
 import { Terminal } from "lucide-react";
 import { useGameStore } from "@/stores/gameStore";
 
@@ -47,13 +53,11 @@ export function CharacterFocusPopup(): ReactNode {
       setBusy(true);
       try {
         await fetch(
-          `http://localhost:8000/api/v1/sessions/${focusedCharacter.sessionId}/focus`,
+          `http://localhost:3400/api/v1/sessions/${focusedCharacter.sessionId}/focus`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(
-              withMessage && message ? { message } : {},
-            ),
+            body: JSON.stringify(withMessage && message ? { message } : {}),
           },
         );
       } finally {
@@ -67,8 +71,7 @@ export function CharacterFocusPopup(): ReactNode {
   if (!focusedCharacter) return null;
 
   const displayName =
-    focusedCharacter.name ??
-    (focusedCharacter.isBoss ? "Boss" : "Agent");
+    focusedCharacter.name ?? (focusedCharacter.isBoss ? "Boss" : "Agent");
 
   return (
     <>

@@ -19,7 +19,14 @@ import {
   Sprite,
   Application as PixiApplication,
 } from "pixi.js";
-import { useMemo, useEffect, useRef, useCallback, useState, type ReactNode } from "react";
+import {
+  useMemo,
+  useEffect,
+  useRef,
+  useCallback,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   TransformWrapper,
   TransformComponent,
@@ -48,7 +55,11 @@ import { CharacterFocusPopup } from "./CharacterFocusPopup";
 import { useAnimationSystem } from "@/systems/animationSystem";
 import { useCompactionAnimation } from "@/systems/compactionAnimation";
 import { useOfficeTextures } from "@/hooks/useOfficeTextures";
-import { CANVAS_WIDTH, CANVAS_HEIGHT, BACKGROUND_COLOR } from "@/constants/canvas";
+import {
+  CANVAS_WIDTH,
+  CANVAS_HEIGHT,
+  BACKGROUND_COLOR,
+} from "@/constants/canvas";
 import {
   EMPLOYEE_OF_MONTH_POSITION,
   CITY_WINDOW_POSITION,
@@ -220,7 +231,10 @@ export function OfficeGame(): ReactNode {
 
       const bossCX = boss.position.x;
       const bossCY = boss.position.y - 40;
-      if (Math.abs(canvasX - bossCX) < HIT_W && Math.abs(canvasY - bossCY) < HIT_H) {
+      if (
+        Math.abs(canvasX - bossCX) < HIT_W &&
+        Math.abs(canvasY - bossCY) < HIT_H
+      ) {
         return "boss";
       }
 
