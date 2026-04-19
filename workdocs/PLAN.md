@@ -201,7 +201,7 @@ Session: completed cleanly. Index-based role assignment (memberSessionIds[0]=Des
 
 ---
 
-### ⬜ Task 10: TaskWhiteboard component (sticky columns)
+### 🔧 Task 10: TaskWhiteboard component (sticky columns)
 
 **Files:** `frontend/src/components/office/TaskWhiteboard.tsx` (new)
 
