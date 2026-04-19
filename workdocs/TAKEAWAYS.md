@@ -115,6 +115,17 @@ T8 added `runOfficeView?: ReactNode` to ViewTransition and rendered a TODO place
 ### CSS grid approach for nook layout
 Used `gridTemplateColumns: "1fr auto 1fr"` and `gridTemplateRows: "1fr auto 1fr"` with explicit `gridRow`/`gridColumn` on each cell. Nooks fill the 4 outer corners (rows 1/3, cols 1/3); OrchestratorStation sits at center (row 2, col 2). Empty `<div>` spacers fill the 4 edge positions so the grid doesn't collapse.
 
+## Task 12 implementation notes (Plan 2)
+
+### `visibleSessionId` ref bridges the leave animation gap
+When `sessionId` goes null, the character element must stay visible during the 300ms fade-out. `visibleSessionId` state stays set until a 320ms timeout fires. The `queueMicrotask` pattern (used in T11) batches the `setCharClass` call out of the useEffect synchronous body to satisfy `react-hooks/set-state-in-effect`.
+
+### Nook background uses CSS transitions on opacity + border-color
+`opacity 400ms ease` is GPU-composited. `border-color 400ms ease` is not, but was already used in campus-animations (T7). The lit/dim transition uses `isLit = sessionId !== null` (not `hasChar`) so background state tracks the actual session, not the animation-extended visible state.
+
+### arrive: batched `setVisibleSessionId` + `setCharClass` in single microtask
+React 18 batches updates within the same queueMicrotask callback. The character element mounts with `char-arrive` class already set — CSS animations fire on DOM insertion with `animation-fill-mode: both`, so the element starts at the `from` state and animates forward.
+
 ## Observations
 
 - The existing `useWebSocketEvents` hook is 500+ lines and tightly coupled

@@ -1,0 +1,31 @@
+/* GPU-composited only: transform, opacity */
+
+@keyframes char-arrive {
+  from {
+    transform: scale(0.5) translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes char-leave {
+  from {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.5) translateY(8px);
+    opacity: 0;
+  }
+}
+
+.char-arrive {
+  animation: char-arrive 500ms ease-out both;
+}
+
+.char-leave {
+  animation: char-leave 300ms ease-in both;
+}

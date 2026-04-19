@@ -241,7 +241,9 @@ Session: completed cleanly. `task-animations.css` new file with `sticky-slide-in
 
 ---
 
-### 🔧 Task 12: Role character animations (arrive/leave)
+### ✅ Task 12: Role character animations (arrive/leave)
+
+Session: completed cleanly. `nook-animations.css` new file with `char-arrive` (scale 0.5+opacity 0 → scale 1+opacity 1, 500ms ease-out) and `char-leave` (reverse, 300ms ease-in). `useRef(prevSessionId)` detects null→string (arrive) and string→null (leave). `useState(visibleSessionId)` persists displayed character through 320ms leave fade-out before hiding. `queueMicrotask` batches state updates to satisfy `react-hooks/set-state-in-effect`. Nook background opacity/border-color transitions (400ms ease) on `isLit` via inline style transition. Frontend checkall exits 0.
 
 **Files:** `frontend/src/components/office/RoleNook.tsx`, `frontend/src/styles/nook-animations.css` (new)
 
