@@ -286,7 +286,7 @@ nook in RunOfficeView, transition to NookDrillDown which:
 
 ---
 
-### ⬜ Task 14: Hot-desk drill-down
+### 🔧 Task 14: Hot-desk drill-down
 
 **Files:** `frontend/src/components/campus/HotDeskArea.tsx`
 
