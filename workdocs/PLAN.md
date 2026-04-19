@@ -220,7 +220,7 @@ Session: completed cleanly. Pure DOM/CSS three-column whiteboard. StickyCard col
 
 ---
 
-### ⬜ Task 11: TaskWhiteboard animations (sticky slides)
+### 🔧 Task 11: TaskWhiteboard animations (sticky slides)
 
 **Files:** `frontend/src/components/office/TaskWhiteboard.tsx`, `frontend/src/styles/task-animations.css` (new)
 
