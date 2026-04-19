@@ -373,7 +373,7 @@ appears → phase changes → tasks progress → run_end → office dims.
 
 ---
 
-### ⬜ Task 18: Final integration test + cleanup
+### 🔧 Task 18: Final integration test + cleanup
 
 **Files:** Multiple (cleanup pass)
 
