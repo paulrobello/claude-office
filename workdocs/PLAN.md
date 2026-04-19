@@ -48,7 +48,7 @@ types for `Run`, `PlanTask`, `RunStats`. Export selectors:
 
 ---
 
-### ⬜ Task 3: Run WebSocket hook (`useRunWebSocket`)
+### 🔧 Task 3: Run WebSocket hook (`useRunWebSocket`)
 
 **Files:** `frontend/src/hooks/useRunWebSocket.ts` (new)
 
