@@ -327,7 +327,7 @@ Session: completed cleanly. Breadcrumb now handles 4 branches: campus (static la
 
 ---
 
-### ⬜ Task 16: Event-driven animation triggers
+### 🔧 Task 16: Event-driven animation triggers
 
 **Files:** `frontend/src/hooks/useRunEvents.ts` (new)
 
