@@ -113,7 +113,7 @@ Session: completed cleanly. Extended `ViewMode` in `types/navigation.ts` to incl
 
 ---
 
-### ⬜ Task 6: CampusView component (static layout)
+### 🔧 Task 6: CampusView component (static layout)
 
 **Files:** `frontend/src/components/views/CampusView.tsx` (new), `frontend/src/components/campus/RunOfficeCard.tsx` (new), `frontend/src/components/campus/HotDeskArea.tsx` (new), `frontend/src/components/campus/CampusSidebar.tsx` (new)
 
