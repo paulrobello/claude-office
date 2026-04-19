@@ -71,6 +71,17 @@ No vitest config existed. The existing `runStore.test.ts` only uses `import type
 ### @testing-library/react not available
 Not installed. Wrote a minimal `renderHook` helper using React 19's `act` + `react-dom/client` directly.
 
+## Task 4 implementation notes (Plan 2)
+
+### WS managed manually via Map<runId, WsEntry> ref
+`useRunWebSocket` can't be reused per-run from `useRunList` (hooks can't be called inside loops). Used option (b): `Map<runId, WsEntry>` ref with inline reconnect logic mirroring `useRunWebSocket`. Each entry tracks `ws`, `active` flag, `reconnectTimeout`, and `backoffMs`.
+
+### Disconnect-on-ended-outcome in ws.onmessage
+When a `run_state` message arrives with `outcome !== "in_progress"`, the handler deactivates the entry and closes the WS immediately — avoids a separate effect or poll cycle to detect run end.
+
+### Empty useEffect deps is intentional
+The effect runs once on mount. All state is in refs (`wsMapRef`) or accessed via `useRunStore.getState()` (store getter, not reactive). No external values need tracking.
+
 ## Observations
 
 - The existing `useWebSocketEvents` hook is 500+ lines and tightly coupled

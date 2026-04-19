@@ -70,19 +70,21 @@ Session: completed cleanly. Hook uses `active` flag (not connectionId ref) to pr
 
 ---
 
-### 🔧 Task 4: Run list hook (`useRunList`)
+### ✅ Task 4: Run list hook (`useRunList`)
 
-**Files:** `frontend/src/hooks/useRunList.ts` (new)
+Session: completed cleanly. Manages a `Map<runId, WsEntry>` ref directly (option b) — hooks can't be called in a loop so `useRunWebSocket` can't be reused per-run from a hook. Disconnect-on-ended-outcome wired in `ws.onmessage`. 8 tests, all pass. Pre-existing lint errors in WIP files unchanged. Frontend typecheck clean.
+
+**Files:** `frontend/src/hooks/useRunList.ts` (new), `frontend/src/hooks/useRunList.test.ts` (new)
 
 Hook that fetches `GET /api/v1/runs` on mount + every 5s poll. Populates
 `useRunStore`. Manages WebSocket subscriptions for each discovered run
 (calls `useRunWebSocket` per run or manages connections manually).
 
 **Success criteria:**
-- On mount, fetches runs and populates store.
-- New runs discovered on poll get WebSocket subscriptions.
-- Ended runs (outcome != in_progress) get cleaned up from subscriptions.
-- TypeScript compiles cleanly.
+- On mount, fetches runs and populates store. ✅
+- New runs discovered on poll get WebSocket subscriptions. ✅
+- Ended runs (outcome != in_progress) get cleaned up from subscriptions. ✅
+- TypeScript compiles cleanly. ✅
 
 **Dependencies:** Tasks 1, 2, 3.
 
