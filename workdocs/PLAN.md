@@ -262,7 +262,7 @@ Session: completed cleanly. `nook-animations.css` new file with `char-arrive` (s
 
 ## Phase 4: Nook Drill-Down (Tasks 13–14)
 
-### ⬜ Task 13: NookDrillDown wrapper
+### 🔧 Task 13: NookDrillDown wrapper
 
 **Files:** `frontend/src/components/views/NookDrillDown.tsx` (new), `frontend/src/components/office/NookSidebar.tsx` (new)
 
