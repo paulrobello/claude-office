@@ -60,6 +60,17 @@ teardown which disposes the in-memory SQLite DB, breaking subsequent tests. Used
 tests (RUN_ID_RE validation + mock WebSocket endpoint tests) instead, matching the
 pattern in `test_websocket_room.py`.
 
+## Task 3 implementation notes (Plan 2)
+
+### `active` flag vs connectionId ref for stale reconnect prevention
+`useWebSocketEvents.ts` uses a `connectionIdRef` + `currentSessionIdRef.current = sessionId` write during render to prevent stale reconnects. The new react-hooks/refs rule (v7) flags writes to refs during render. Used a local `let active = true` closure flag instead — cleaner, no render-time ref mutations, no exhaustive-deps warnings.
+
+### `vitest.config.ts` was missing
+No vitest config existed. The existing `runStore.test.ts` only uses `import type { Run }` from `@/types/run` (type-only, not resolved at runtime) so the missing config was invisible. Adding value imports from `@/stores/runStore` in the hook test exposed the gap. Created `vitest.config.ts` with `resolve.alias` for `@/`.
+
+### @testing-library/react not available
+Not installed. Wrote a minimal `renderHook` helper using React 19's `act` + `react-dom/client` directly.
+
 ## Observations
 
 - The existing `useWebSocketEvents` hook is 500+ lines and tightly coupled

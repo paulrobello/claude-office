@@ -48,7 +48,7 @@ types for `Run`, `PlanTask`, `RunStats`. Export selectors:
 
 ---
 
-### 🔧 Task 3: Run WebSocket hook (`useRunWebSocket`)
+### ✅ Task 3: Run WebSocket hook (`useRunWebSocket`)
 
 **Files:** `frontend/src/hooks/useRunWebSocket.ts` (new)
 
@@ -56,11 +56,15 @@ Hook that connects to `ws://localhost:3400/ws/_run:<runId>`, parses
 `run_state` messages, and dispatches `setRun()` on `useRunStore`.
 Handles reconnection (2s backoff), cleanup on unmount/runId change.
 
+Session: completed cleanly. Hook uses `active` flag (not connectionId ref) to prevent stale reconnects — cleaner than existing hook pattern and satisfies react-hooks/refs lint rule. Created `vitest.config.ts` with `@/` alias (missing, caused test resolution failure). Tests at `frontend/src/hooks/useRunWebSocket.test.ts` (7 tests, all pass). Pre-existing lint errors in WIP files unchanged. Frontend typecheck clean.
+
+**Files:** `frontend/src/hooks/useRunWebSocket.ts` (new), `frontend/src/hooks/useRunWebSocket.test.ts` (new), `frontend/vitest.config.ts` (new)
+
 **Success criteria:**
-- Hook connects when given a valid runId.
-- Dispatches setRun on incoming `run_state` message.
-- Disconnects cleanly on unmount.
-- TypeScript compiles cleanly.
+- Hook connects when given a valid runId. ✅
+- Dispatches setRun on incoming `run_state` message. ✅
+- Disconnects cleanly on unmount. ✅
+- TypeScript compiles cleanly. ✅
 
 **Dependencies:** Task 2.
 
