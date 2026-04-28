@@ -1,685 +1,504 @@
 # Documentation Style Guide
 
-This guide establishes standards and best practices for creating and maintaining documentation in the Par Terminal Emulator project. It ensures consistency, clarity, and professionalism across all technical documentation.
+A generic style guide for writing clear, maintainable technical documentation. Use it as a baseline for project READMEs, guides, references, runbooks, architecture notes, and API documentation.
 
 ## Table of Contents
+
 - [Quick Reference](#quick-reference)
+- [Core Principles](#core-principles)
+- [Document Types](#document-types)
 - [Document Structure](#document-structure)
 - [Writing Style](#writing-style)
-- [Diagram Standards](#diagram-standards)
-- [Color Scheme](#color-scheme)
-- [Code Examples](#code-examples)
+- [Formatting Standards](#formatting-standards)
+- [Code and Command Examples](#code-and-command-examples)
+- [Diagrams and Visuals](#diagrams-and-visuals)
 - [API Documentation](#api-documentation)
 - [File Organization](#file-organization)
 - [Maintenance](#maintenance)
 - [Review Checklist](#review-checklist)
+- [Templates](#templates)
 
 ## Quick Reference
 
 ### Essential Rules
-- **Never use ASCII art** - Always use Mermaid diagrams
-- **Always include a TOC** for documents > 500 words
-- **Use dark backgrounds** with white text in diagrams
-- **Specify language** in all code blocks
-- **Test all examples** before documenting
-- **Update cross-references** when modifying content
-- **Never use line numbers** in file references - They're brittle and hard to maintain
-- **Do not store package versions** in documentation - Version numbers are brittle and difficult to maintain
+
+- Write for the reader's task, not the author's implementation details
+- Start every document with a clear H1 title and a short summary
+- Include a table of contents for long documents or documents with many sections
+- Use active voice, direct language, and consistent terminology
+- Specify a language for every fenced code block
+- Prefer copy-paste-friendly commands without shell prompts
+- Test examples before publishing when practical
+- Use Mermaid for architecture, flow, sequence, state, and relationship diagrams
+- Use text trees for directory structures and terminal-style blocks for transcripts
+- Avoid line numbers in durable file references unless tied to a specific commit or ephemeral review
+- Avoid duplicating dependency versions already defined in package manifests
+- Update related links, examples, and references when changing documentation
+
+### Prefer This
+
+````markdown
+The `createClient()` function reads configuration from `config.yaml`.
+
+```bash
+example-cli validate config.yaml
+```
+````
+
+### Avoid This
+
+````markdown
+The functionality located at `src/client.ts:184` should be utilized by users.
+
+```bash
+$ example-cli validate config.yaml
+```
+````
+
+Use shell prompts only for interactive transcripts, not for commands intended to be copied.
+
+## Core Principles
+
+| Principle | Guidance |
+| --- | --- |
+| **Clarity** | Say exactly what the reader needs to know or do |
+| **Accuracy** | Keep examples, links, and behavior aligned with the current implementation |
+| **Scannability** | Use headings, lists, tables, and examples to support quick reading |
+| **Maintainability** | Avoid brittle details such as line numbers, duplicated versions, and stale screenshots |
+| **Consistency** | Use the same names, terms, capitalization, and structure across related docs |
+| **Accessibility** | Do not rely on color alone; provide labels, descriptions, and readable contrast |
+
+## Document Types
+
+Different documents need different structures. Do not force every document into the same template.
+
+| Type | Purpose | Recommended Sections |
+| --- | --- | --- |
+| **README** | Orient new users and contributors | Purpose, install/setup, quick usage, development, links |
+| **Quickstart** | Help users succeed quickly | Prerequisites, steps, verification, next steps |
+| **How-to guide** | Complete a specific task | Goal, prerequisites, steps, troubleshooting, verification |
+| **Reference** | Provide complete facts/options | Scope, concepts, options/API, examples, related docs |
+| **Architecture note** | Explain design and tradeoffs | Context, goals, components, data/control flow, tradeoffs, risks |
+| **Runbook** | Operate or recover a system | Symptoms, impact, diagnosis, remediation, rollback, escalation |
+| **Troubleshooting** | Resolve known issues | Symptoms, likely causes, fixes, verification |
+| **Migration guide** | Move between versions or systems | Audience, breaking changes, preparation, steps, rollback, validation |
+| **Changelog/release notes** | Record released changes | Version/date, added/changed/fixed/removed, migration notes |
 
 ## Document Structure
 
-### Required Elements
+### Required Baseline
 
-Every documentation file MUST include:
+Every durable documentation file should include:
 
-1. **Title (H1)**: Clear, descriptive title that immediately identifies the document's purpose
-2. **Brief Description**: 1-2 sentence summary immediately after the title
-3. **Table of Contents**: Required for documents > 500 words or > 3 main sections
-4. **Overview Section**: Context and scope of the document
-5. **Main Content**: Logical sections with proper hierarchy
-6. **Related Documentation**: Links to relevant resources at the end
+1. **Title (H1):** One clear document title
+2. **Summary:** One or two sentences explaining scope and audience
+3. **Main content:** Sections organized by reader workflow
+4. **Related links:** Relevant follow-up docs when useful
 
-### Document Template
+Longer documents should also include:
 
-```markdown
-# Document Title
+- **Table of contents:** For documents over roughly 500 words or with more than three major sections
+- **Prerequisites:** For procedural docs that assume tools, access, or background knowledge
+- **Verification:** For setup, operations, and troubleshooting docs
+- **Troubleshooting:** For workflows with common failure modes
 
-Brief description of what this document covers and its intended audience.
+### Heading Hierarchy
 
-## Table of Contents
-- [Overview](#overview)
-- [Prerequisites](#prerequisites)
-- [Main Topic](#main-topic)
-  - [Subtopic 1](#subtopic-1)
-  - [Subtopic 2](#subtopic-2)
-- [Examples](#examples)
-- [Troubleshooting](#troubleshooting)
-- [Related Documentation](#related-documentation)
+| Level | Use | Example |
+| --- | --- | --- |
+| H1 | Document title only | `# Deployment Guide` |
+| H2 | Major sections | `## Configure the Service` |
+| H3 | Subsections | `### Environment Variables` |
+| H4 | Small divisions inside complex sections | `#### Retry Behavior` |
+| H5+ | Avoid when possible | Prefer lists or split the section |
 
-## Overview
-
-Detailed introduction providing context, scope, and objectives...
-
-## Prerequisites
-
-What the reader needs to know or have before proceeding...
-
-[Main content sections...]
-
-## Related Documentation
-
-- [Relevant Doc 1](link1.md) - Brief description
-- [Relevant Doc 2](link2.md) - Brief description
-```
-
-### Section Hierarchy
-
-| Level | Usage | Markdown | Example |
-|-------|-------|----------|---------|
-| H1 | Document title only | `#` | `# API Documentation` |
-| H2 | Main sections | `##` | `## Authentication` |
-| H3 | Subsections | `###` | `### OAuth Flow` |
-| H4 | Minor divisions | `####` | `#### Error Codes` |
-| H5+ | Avoid if possible | `#####` | Use lists instead |
-
-### Information Architecture Flow
+### Recommended Information Flow
 
 ```mermaid
 graph TD
-    Title[Document Title - H1]
-    Overview[Overview - H2]
-    Main[Main Content - H2]
-    Sub1[Subsection 1 - H3]
-    Sub2[Subsection 2 - H3]
-    Details[Details - H4]
-    Examples[Examples - H2]
-    Trouble[Troubleshooting - H2]
-    Related[Related Docs - H2]
+    Title[Title]
+    Summary[Summary]
+    Context[Context or Overview]
+    Prereq[Prerequisites]
+    Body[Main Content]
+    Examples[Examples]
+    Verify[Verification]
+    Trouble[Troubleshooting]
+    Related[Related Documentation]
 
-    Title --> Overview
-    Overview --> Main
-    Main --> Sub1
-    Main --> Sub2
-    Sub1 --> Details
-    Main --> Examples
-    Examples --> Trouble
+    Title --> Summary
+    Summary --> Context
+    Context --> Prereq
+    Prereq --> Body
+    Body --> Examples
+    Examples --> Verify
+    Verify --> Trouble
     Trouble --> Related
 
-    style Title fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
-    style Overview fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
-    style Main fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
-    style Sub1 fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
-    style Sub2 fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
-    style Details fill:#37474f,stroke:#78909c,stroke-width:1px,color:#ffffff
-    style Examples fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
-    style Trouble fill:#ff6f00,stroke:#ffa726,stroke-width:2px,color:#ffffff
-    style Related fill:#880e4f,stroke:#c2185b,stroke-width:2px,color:#ffffff
+    class Title primary
+    class Summary,Context info
+    class Prereq warning
+    class Body,Examples active
+    class Verify success
+    class Trouble error
+    class Related neutral
+
+    classDef primary fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
+    classDef active fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
+    classDef success fill:#2e7d32,stroke:#66bb6a,stroke-width:2px,color:#ffffff
+    classDef error fill:#b71c1c,stroke:#f44336,stroke-width:2px,color:#ffffff
+    classDef warning fill:#ff6f00,stroke:#ffa726,stroke-width:2px,color:#ffffff
+    classDef info fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
+    classDef neutral fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
 ```
 
-## Diagram Standards
+## Writing Style
 
-### Always Use Mermaid
+### Voice and Tone
 
-**NEVER use ASCII art diagrams.** Always use Mermaid for:
+- **Direct:** Tell readers what to do and what happens next
+- **Professional:** Be precise without sounding bureaucratic
+- **Approachable:** Explain unfamiliar concepts before using shorthand
+- **Inclusive:** Avoid assumptions about the reader's background, location, or tooling
+- **Current:** Use present tense for current behavior
+
+### Style Rules
+
+| Do | Avoid |
+| --- | --- |
+| “Run the command to validate the configuration.” | “The command should be executed in order to validate the configuration.” |
+| “The API returns JSON.” | “JSON is returned by the API.” |
+| “Set `timeoutSeconds` to `30`.” | “Set an appropriate timeout value.” |
+| “Use `repository`, not `repo`, in this file.” | Mixing “repository”, “repo”, and “project” for the same concept |
+
+### Terminology
+
+- Define acronyms on first use: “Application Programming Interface (API)”
+- Prefer one canonical term for each concept
+- Use product, command, and package names exactly as they appear in the project
+- Avoid jokes, idioms, or culture-specific phrases in technical instructions
+
+### Procedural Writing
+
+For step-by-step instructions:
+
+1. Start each step with an action verb
+2. Include only one primary action per step
+3. Explain why when the reason affects user choice or safety
+4. Show expected output or success criteria when useful
+5. End with verification
+
+## Formatting Standards
+
+### Inline Formatting
+
+| Element | Format | Example |
+| --- | --- | --- |
+| File paths | Backticks | `src/config.ts` |
+| Commands | Backticks or fenced blocks | `example-cli init` |
+| Function/class names | Backticks | `createClient()` |
+| Environment variables | Backticks | `API_KEY` |
+| UI labels | Bold or quoted consistently | **Save** |
+| Emphasis | Bold sparingly | **Important:** |
+
+### File References
+
+Avoid line numbers in durable documentation because they become stale after edits.
+
+Good:
+
+- “See `src/client.ts` for the client implementation.”
+- “The `createClient()` function validates the options object.”
+- “The deployment workflow lives in `.github/workflows/deploy.yml`.”
+
+Avoid:
+
+- “See `src/client.ts:184`.”
+- “Update lines 20-45 in `config.ts`.”
+- “The bug is fixed at `/Users/example/project/src/client.ts:184`.”
+
+Line numbers are acceptable in temporary debugging notes, issue comments, or review comments tied to a specific commit SHA.
+
+### Version References
+
+Avoid duplicating dependency or package versions in general documentation. Version numbers drift and should usually live in package manifests, lockfiles, release notes, or generated API references.
+
+Good:
+
+- “See the project manifest for dependency versions.”
+- “Requires the runtime version specified by the project configuration.”
+- “Use the version documented in the package manifest.”
+
+Acceptable places for versions:
+
+- Changelogs and release notes
+- Migration guides
+- Compatibility matrices
+- Security advisories
+- Troubleshooting notes for version-specific bugs
+- Package manifests and lockfiles
+
+### Callouts
+
+Use blockquotes for important contextual notes. Keep them short.
+
+> **Note:** Additional context that helps understanding.
+
+> **Tip:** A helpful shortcut or best practice.
+
+> **Warning:** A risk that can cause data loss, downtime, or confusing behavior.
+
+> **Security:** Information related to secrets, permissions, data exposure, or trust boundaries.
+
+> **Deprecated:** A feature or approach that should no longer be used.
+
+## Code and Command Examples
+
+### Code Blocks
+
+Always specify a language for fenced code blocks.
+
+````markdown
+```ts
+export interface ClientOptions {
+  endpoint: string;
+  timeoutSeconds?: number;
+}
+```
+````
+
+Use comments to explain why code is written a certain way, not to restate obvious operations.
+
+```ts
+const cacheTtlSeconds = 300; // Balances freshness with upstream rate limits.
+```
+
+### Commands
+
+Use copy-paste-friendly commands without a prompt when the reader should run them directly.
+
+```bash
+example-cli validate config.yaml
+example-cli deploy --dry-run
+```
+
+Use prompts only for transcripts or interactive sessions.
+
+```text
+$ example-cli status
+Service: healthy
+Queue: empty
+```
+
+### Expected Output
+
+Include output when it helps readers confirm success. Keep long output abbreviated.
+
+```bash
+example-cli test
+```
+
+```text
+✓ Configuration loaded
+✓ Connection established
+✓ Checks passed
+```
+
+### Secrets and Credentials
+
+- Never include real API keys, tokens, passwords, private keys, or connection strings
+- Use placeholders such as `<API_KEY>` or `example-token`
+- Make clear where secrets should be stored
+- Warn when a workflow crosses a trust boundary, such as browser-to-server credentials
+
+### Error Examples
+
+Show the symptom, cause, fix, and verification.
+
+````markdown
+#### Error: `Permission denied`
+
+**Symptom:** The command exits with `Permission denied`.
+
+**Likely cause:** The current user cannot read the configuration file.
+
+**Fix:** Update file ownership or run the command with the correct user.
+
+```bash
+example-cli validate config.yaml
+```
+
+**Verify:** The command exits successfully and prints `Configuration valid`.
+````
+
+## Diagrams and Visuals
+
+### When to Use Mermaid
+
+Use Mermaid for:
+
 - Architecture diagrams
 - Flow charts
 - Sequence diagrams
 - State diagrams
 - Entity relationship diagrams
+- Dependency diagrams
 
-### Mermaid Diagram Template
+Use text blocks for:
 
-```markdown
-```mermaid
-graph TD
-    Component1[Component Name]
-    Component2[Another Component]
+- Directory trees
+- Terminal transcripts
+- Simple before/after file layouts
 
-    Component1 --> Component2
+### Mermaid Style
 
-    style Component1 fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
-    style Component2 fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
-```
-
-## Color Scheme
-
-### High-Contrast Colors for Dark Mode Compatibility
-
-All diagrams MUST use dark backgrounds with white text (`color:#ffffff`) for maximum contrast and readability in both light and dark modes.
-
-### Component Color Mapping
-
-| Component Type | Fill Color | Stroke Color | Stroke Width | Text Color | Usage |
-|---------------|------------|--------------|--------------|------------|--------|
-| **Primary/Main** | `#e65100` | `#ff9800` | 3px | `#ffffff` | Main components, load balancers, orchestrators |
-| **Active/Healthy** | `#1b5e20` | `#4caf50` | 2px | `#ffffff` | Active backends, healthy services |
-| **Success State** | `#2e7d32` | `#66bb6a` | 2px | `#ffffff` | Successful operations, active components |
-| **Failed/Unhealthy** | `#b71c1c` | `#f44336` | 2px | `#ffffff` | Failed components, error states |
-| **Error/Alert** | `#d32f2f` | `#ef5350` | 2px | `#ffffff` | Errors, crashed services |
-| **Data Storage** | `#0d47a1` | `#2196f3` | 2px | `#ffffff` | Redis, cache layers |
-| **Database** | `#1a237e` | `#3f51b5` | 2px | `#ffffff` | PostgreSQL, persistent storage |
-| **Client/External** | `#4a148c` | `#9c27b0` | 2px | `#ffffff` | CLI, TUI, API clients |
-| **Special/Events** | `#880e4f` | `#c2185b` | 2px | `#ffffff` | WebSocket, special protocols |
-| **Neutral/Info** | `#37474f` | `#78909c` | 2px | `#ffffff` | Stopped services, info boxes |
-| **Warning** | `#ff6f00` | `#ffa726` | 2px | `#ffffff` | Decision points, warnings |
-
-### Example Color Application
+Prefer `classDef` styles over repeated per-node `style` declarations.
 
 ```mermaid
 graph TD
-    LB[Load Balancer]
-    Backend[Active Backend]
-    Failed[Failed Backend]
-    Redis[Redis Cache]
-    PG[PostgreSQL]
-    Client[CLI Client]
+    Client[Client]
+    API[API]
+    DB[(Database)]
 
-    style LB fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
-    style Backend fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
-    style Failed fill:#b71c1c,stroke:#f44336,stroke-width:2px,color:#ffffff
-    style Redis fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
-    style PG fill:#1a237e,stroke:#3f51b5,stroke-width:2px,color:#ffffff
-    style Client fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
+    Client --> API
+    API --> DB
+
+    class Client external
+    class API primary
+    class DB database
+
+    classDef primary fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
+    classDef database fill:#1a237e,stroke:#3f51b5,stroke-width:2px,color:#ffffff
+    classDef external fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
 ```
 
-## Writing Style
-
-### Core Principles
-
-| Principle | Do | Don't |
-|-----------|-----|-------|
-| **Clarity** | "Click the Submit button" | "The submission interface should be utilized" |
-| **Conciseness** | "Install dependencies: `npm install`" | "To install the required dependencies, run the npm install command" |
-| **Active Voice** | "The API returns JSON data" | "JSON data is returned by the API" |
-| **Specificity** | "Set timeout to 30 seconds" | "Set an appropriate timeout value" |
-| **Consistency** | Use the same terms throughout | Mix "endpoint", "route", and "path" |
-
-### Voice and Tone
-
-- **Professional but approachable**: Technical accuracy without unnecessary jargon
-- **Direct and actionable**: Focus on what the reader needs to do
-- **Inclusive language**: Use "you" for instructions, avoid assumptions about expertise
-- **Present tense**: Describe current behavior ("The system uses..." not "The system will use...")
-
-### Formatting Standards
-
-| Element | Format | Example | Usage |
-|---------|--------|---------|-------|
-| **Bold** | `**text**` | **Important:** | Key concepts, warnings, emphasis |
-| *Italics* | `*text*` | *Note:* | Subtle emphasis, first use of terms |
-| `Code` | `` `text` `` | `npm run dev` | Commands, file names, variables |
-| ~~Strike~~ | `~~text~~` | ~~Deprecated~~ | Outdated information |
-| > Quote | `> text` | > Best practice | Callouts, tips, notes |
-
-### Text Elements
-
-#### Commands and Code
-- File paths: `/Users/bob/Repos/my-project/`
-- Commands: `docker-compose up -d`
-- Functions: `processEvent()`
-- Classes: `WebSocketProvider`
-- Variables: `DASHBOARD_SERVER_URL`
-- Ports: `port 8080`
-
-#### File References
-
-**IMPORTANT**: When referencing files in documentation, **DO NOT include line numbers**. Line numbers are brittle and difficult to maintain as code changes.
-
-**Good examples:**
-- "The `Terminal` class in `src/terminal.rs`"
-- "See the implementation in `src/python_bindings/terminal.rs`"
-- "The `export_text()` method in `Terminal`"
-
-**Bad examples:**
-- ❌ "See `src/terminal.rs:816`" - line numbers change with code edits
-- ❌ "Located at `/Users/probello/Repos/par-term-emu-rust/Cargo.toml:3`" - overly specific and fragile
-- ❌ "The fix is in `terminal.rs` lines 100-150" - ranges become outdated quickly
-
-**Exception**: Line numbers may be included in:
-- Temporary debugging notes (marked clearly as temporary)
-- Issue reports with specific commit SHA references
-- Code review comments (ephemeral by nature)
-
-#### Package Versions
-
-**IMPORTANT**: Do not store package version numbers in documentation. Versions are brittle and difficult to maintain as dependencies are updated.
-
-**Good examples:**
-- "Requires Python 3.12+" - minimum version requirement only
-- "Uses Textual framework for the TUI"
-- "Built with par-term-emu-core-rust (Rust backend)"
-- "Dependencies managed via pyproject.toml"
-
-**Bad examples:**
-- ❌ "Textual 6.6.0+" - specific version that will become outdated
-- ❌ "PyYAML 6.0.3 for configuration" - unnecessarily specific
-- ❌ "par-term-emu-core-rust 0.4.0 or later" - maintenance burden
-
-**Why avoid version numbers:**
-- Dependencies update frequently
-- Documentation becomes stale and misleading
-- Creates maintenance burden across all docs
-- Version requirements are already defined in package manifests (pyproject.toml, requirements.txt, etc.)
-- Users should reference the canonical source (package files) for version info
-
-**Where versions ARE appropriate:**
-- Release notes and changelogs
-- Migration guides (e.g., "Upgrading from v1.x to v2.x")
-- Troubleshooting specific version-related bugs
-- Package manifest files (pyproject.toml, requirements.txt)
-
-**Best practice**: Reference the package manifest location instead:
-- "See `pyproject.toml` for current dependency versions"
-- "Minimum Python version specified in `pyproject.toml`"
-
-#### Callout Boxes
-
-Use blockquotes with emoji indicators for different types of information:
-
-> **📝 Note:** Additional context or information
-
-> **⚠️ Warning:** Important caution about potential issues
-
-> **✅ Tip:** Helpful suggestion or best practice
-
-> **🚫 Deprecated:** Feature or method no longer recommended
-
-> **🔒 Security:** Security-related information
-
-### Lists and Sequences
-
-#### Unordered Lists (Features, Options)
-- Use for non-sequential items
-- Keep items parallel in structure
-- Start with capital letters
-- End without punctuation (unless full sentences)
-
-#### Ordered Lists (Instructions, Steps)
-1. Use for sequential procedures
-2. Write as complete sentences
-3. Include expected outcomes where helpful
-4. Number all steps (don't mix with bullets)
-
-#### Nested Lists
-- Main item
-  - Sub-item with 2-space indent
-    - Further nesting with 4-space indent
-  - Another sub-item
-- Next main item
-
-### Acronyms and Terminology
-
-| First Use | Subsequent Uses |
-|-----------|-----------------|
-| Application Programming Interface (API) | API |
-| WebSocket (WS) | WS or WebSocket |
-| Personally Identifiable Information (PII) | PII |
-| Real-Time (RT) | RT or real-time |
-
-### Writing Patterns
-
-#### Describing Features
-```markdown
-## Feature Name
-
-**Purpose:** One-line description of what it does
-
-**When to use:** Specific scenarios where this feature applies
-
-**How it works:**
-1. Step-by-step explanation
-2. Of the feature's operation
-3. With clear outcomes
-
-**Example:** Practical demonstration
-```
-
-#### Documenting Procedures
-```markdown
-### How to [Task Name]
-
-**Prerequisites:**
-- Required software installed
-- Necessary permissions
-- Configuration completed
-
-**Steps:**
-1. **Start the service**
-   ```bash
-   command to execute
-   ```
-   Expected output or result
-
-2. **Configure settings**
-   Description of what to configure and why
-
-3. **Verify operation**
-   How to confirm success
-```
-
-## Code Examples
-
-### Code Block Guidelines
-
-#### Language Specification
-Always specify the language for proper syntax highlighting:
-
-````markdown
-```python
-# Python with type hints
-async def process_event(event: dict[str, Any]) -> EventResponse:
-    """Process incoming event and return response."""
-    return EventResponse(status="success", data=event)
-```
-
-```typescript
-// TypeScript with interfaces
-interface EventData {
-  id: string;
-  timestamp: Date;
-  payload: Record<string, unknown>;
-}
-```
-
-```bash
-#!/bin/bash
-# Shell script with error handling
-set -euo pipefail
-docker-compose up -d || exit 1
-```
-
-#### Code Annotations
-
-Use comments to explain complex logic:
-
-```python
-# Good: Explains why, not what
-cache_ttl = 300  # 5 minutes - balances freshness with API rate limits
-
-# Avoid: Obvious comments
-x = x + 1  # Increment x
-```
-
-### Command-Line Examples
-
-#### Basic Format
-```bash
-# Description of what the command does
-$ command --with-options
-
-# Expected output (if relevant)
-Output line 1
-Output line 2
-```
-
-#### Interactive Sessions
-```bash
-# Start interactive session
-$ python
->>> import sys
->>> sys.version
-'3.12.0 (main, Oct  2 2024, 00:00:00) [GCC 11.2.0]'
->>> exit()
-
-# Return to shell
-$
-```
-
-#### Multi-Step Procedures
-```bash
-# Step 1: Clone the repository
-$ git clone https://github.com/user/repo.git
-Cloning into 'repo'...
-
-# Step 2: Install dependencies
-$ cd repo
-$ npm install
-added 150 packages in 3.5s
-
-# Step 3: Run tests
-$ npm test
-✓ All tests passed (42 passing)
-```
-
-### Configuration Examples
-
-#### YAML with Comments
-```yaml
-# Service configuration
-services:
-  dashboard:
-    image: dashboard:latest
-    ports:
-      - "8080:8080"  # External:Internal port mapping
-    environment:
-      DEBUG: "false"  # Set to "true" for verbose logging
-      DATABASE_URL: ${DATABASE_URL}  # From .env file
-    volumes:
-      - ./data:/app/data:rw  # Persistent storage
-```
-
-#### JSON with Schema
-```json
-{
-  "$schema": "https://example.com/schema/v1",
-  "name": "example-config",
-  "version": "1.0.0",
-  "settings": {
-    "timeout": 30,
-    "retries": 3
-  }
-}
-```
-
-### Error Examples
-
-Always show both error cases and solutions:
-
-```python
-# Common error
-try:
-    result = risky_operation()
-except SpecificError as e:
-    # Bad: Silent failure
-    pass
-
-# Better approach
-try:
-    result = risky_operation()
-except SpecificError as e:
-    logger.error(f"Operation failed: {e}")
-    # Provide fallback or re-raise with context
-    raise OperationError(f"Could not complete task: {e}") from e
-```
+### Diagram Color Palette
+
+Use high-contrast colors and clear labels. Do not rely on color alone to convey meaning.
+
+| Semantic Role | Fill | Stroke | Use |
+| --- | --- | --- | --- |
+| Primary | `#e65100` | `#ff9800` | Main service or orchestration point |
+| Active/Healthy | `#1b5e20` | `#4caf50` | Healthy components or active paths |
+| Success | `#2e7d32` | `#66bb6a` | Successful states or completed operations |
+| Error/Failed | `#b71c1c` | `#f44336` | Failures or unavailable components |
+| Warning | `#ff6f00` | `#ffa726` | Risk, decision, or caution points |
+| Data/Storage | `#0d47a1` | `#2196f3` | Caches, queues, or data services |
+| Database | `#1a237e` | `#3f51b5` | Persistent storage |
+| External/Client | `#4a148c` | `#9c27b0` | Users, clients, external systems |
+| Neutral/Info | `#37474f` | `#78909c` | Notes, inactive components, or metadata |
+
+### Accessibility
+
+- Label states and arrows clearly
+- Add a short explanation before or after complex diagrams
+- Provide alt text or captions for images
+- Avoid tiny text in screenshots
+- Prefer diagrams that remain readable in light and dark themes
 
 ## API Documentation
 
-### Endpoint Documentation Template
+### Endpoint Template
 
-```markdown
-### Endpoint Name
+````markdown
+### Create Resource
 
-**Purpose:** Brief description of what the endpoint does
+Creates a resource and returns the created representation.
 
-**Method:** `GET` | `POST` | `PUT` | `DELETE` | `PATCH`
+**Method:** `POST`
+**Path:** `/api/resources`
+**Authentication:** Required
 
-**Path:** `/api/v1/resource/{id}`
+#### Request Headers
 
-**Authentication:** Required | Optional | None
-
-#### Request
-
-**Headers:**
 | Header | Required | Description |
-|--------|----------|-------------|
-| Authorization | Yes | Bearer token |
-| Content-Type | Yes | application/json |
+| --- | --- | --- |
+| `Authorization` | Yes | Bearer token |
+| `Content-Type` | Yes | `application/json` |
 
-**Path Parameters:**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| id | string | Yes | Resource identifier |
+#### Request Body
 
-**Query Parameters:**
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| limit | integer | 10 | Maximum results |
-| offset | integer | 0 | Pagination offset |
-
-**Request Body:**
 ```json
 {
-  "field1": "value",
-  "field2": 123
+  "name": "example",
+  "enabled": true
 }
 ```
 
-#### Response
+#### Success Response
 
-**Success Response (200 OK):**
+**Status:** `201 Created`
+
 ```json
 {
-  "status": "success",
-  "data": {
-    "id": "abc123",
-    "field1": "value"
-  }
+  "id": "resource_123",
+  "name": "example",
+  "enabled": true
 }
 ```
 
-**Error Response (400 Bad Request):**
-```json
-{
-  "status": "error",
-  "message": "Invalid input",
-  "errors": [
-    {
-      "field": "field1",
-      "message": "Field is required"
-    }
-  ]
-}
-```
+#### Error Responses
 
-#### Examples
+| Status | Cause | Response |
+| --- | --- | --- |
+| `400 Bad Request` | Invalid input | Validation error details |
+| `401 Unauthorized` | Missing or invalid credentials | Authentication error |
+| `409 Conflict` | Resource already exists | Conflict error |
 
-**cURL:**
+#### Example
+
 ```bash
-curl -X POST https://api.example.com/v1/resource \
-  -H "Authorization: Bearer token123" \
+curl -X POST https://api.example.com/resources \
+  -H "Authorization: Bearer <TOKEN>" \
   -H "Content-Type: application/json" \
-  -d '{"field1": "value"}'
+  -d '{"name":"example","enabled":true}'
 ```
+````
 
-**Python:**
-```python
-import requests
+### API Reference Guidelines
 
-response = requests.post(
-    "https://api.example.com/v1/resource",
-    headers={"Authorization": "Bearer token123"},
-    json={"field1": "value"}
-)
-```
-
-### API Flow Diagrams
-
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant A as API
-    participant D as Database
-    participant Q as Queue
-
-    C->>A: POST /api/events
-    A->>A: Validate request
-    A->>D: Store event
-    A->>Q: Queue for processing
-    A-->>C: 202 Accepted
-    Q->>D: Process async
-```
+- Document authentication and authorization requirements
+- List path, query, header, and body parameters separately
+- Include data types, required status, defaults, and constraints
+- Show success and common error responses
+- Include idempotency, pagination, rate limit, and retry behavior when relevant
+- Keep examples safe: no real credentials or production identifiers
 
 ## File Organization
 
-### Directory Structure
+### Common Documentation Layout
 
-```
+```text
 docs/
-├── README.md                    # Documentation index
-├── DOCUMENTATION_STYLE_GUIDE.md # This guide
-├── architecture/                # System design documents
-│   ├── SYSTEM_OVERVIEW.md
-│   ├── DATABASE_SCHEMA.md
-│   └── API_ARCHITECTURE.md
-├── guides/                      # How-to and tutorials
-│   ├── QUICKSTART.md
-│   ├── DEPLOYMENT_GUIDE.md
-│   └── TROUBLESHOOTING.md
-├── api/                        # API documentation
-│   ├── REST_API.md
-│   ├── WEBSOCKET_API.md
-│   └── examples/
-└── diagrams/                   # Standalone diagram sources
-    └── system-flow.mmd
+├── README.md
+├── DOCUMENTATION_STYLE_GUIDE.md
+├── architecture/
+│   └── system-overview.md
+├── guides/
+│   └── deployment.md
+├── reference/
+│   └── configuration.md
+├── runbooks/
+│   └── service-recovery.md
+└── troubleshooting/
+    └── common-errors.md
 ```
 
-### File Naming Conventions
+Directory trees are allowed even though they use text characters; they are not a substitute for architecture or flow diagrams.
 
-File name should be uppercase with lowercase extension.
+### Naming Conventions
 
-| Type | Pattern | Example | Description |
-|------|---------|---------|-------------|
-| **Guides** | `*_GUIDE.md` | `DEPLOYMENT_GUIDE.md` | Step-by-step instructions |
-| **Architecture** | `*_ARCHITECTURE.md` | `SYSTEM_ARCHITECTURE.md` | Design documents |
-| **API Docs** | `*_API.md` | `REST_API.md` | API references |
-| **Reference** | `*_REFERENCE.md` | `CONFIG_REFERENCE.md` | Configuration/settings |
-| **Troubleshooting** | `TROUBLESHOOTING_*.md` | `TROUBLESHOOTING_DOCKER.md` | Problem-solving |
+Choose one naming convention per project and use it consistently.
 
-### Standard Files
+Common options:
 
-#### Root Level Documentation
-- `README.md` - Project overview and entry point
-- `CHANGELOG.md` - Version history and releases
-- `CONTRIBUTING.md` - Contribution guidelines
-- `LICENSE.md` - License information
-- `SECURITY.md` - Security policies and reporting
+| Convention | Example | Notes |
+| --- | --- | --- |
+| Lowercase kebab-case | `deployment-guide.md` | Good for web docs and static site generators |
+| Upper snake case | `DEPLOYMENT_GUIDE.md` | Common in repo-root docs |
+| Conventional root names | `README.md`, `CONTRIBUTING.md` | Use established ecosystem names |
 
-#### Project-Specific
-- `CLAUDE.md` - AI assistant instructions (if using Claude)
-- `QUICKSTART.md` - Getting started quickly
-- `ARCHITECTURE.md` - High-level system design
-- `API_DOCUMENTATION.md` - Complete API reference
-- `TROUBLESHOOTING.md` - Common issues and solutions
-
-### Documentation Hierarchy
-
-```mermaid
-graph TD
-    README[README.md - Entry Point]
-    QS[QUICKSTART.md]
-    ARCH[ARCHITECTURE.md]
-    API[API_DOCUMENTATION.md]
-    GUIDE[Guides/]
-    TROUBLE[TROUBLESHOOTING.md]
-    REF[References/]
-
-    README --> QS
-    README --> ARCH
-    README --> API
-    README --> GUIDE
-    README --> TROUBLE
-    ARCH --> REF
-    API --> REF
-    GUIDE --> TROUBLE
-
-    style README fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
-    style QS fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
-    style ARCH fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
-    style API fill:#1a237e,stroke:#3f51b5,stroke-width:2px,color:#ffffff
-    style GUIDE fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
-    style TROUBLE fill:#ff6f00,stroke:#ffa726,stroke-width:2px,color:#ffffff
-    style REF fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
-```
+Avoid renaming existing documentation solely for style unless the project is already doing a documentation reorganization.
 
 ## Maintenance
 
@@ -687,401 +506,248 @@ graph TD
 
 ```mermaid
 graph LR
-    Create[Create/Update]
-    Review[Peer Review]
+    Draft[Draft or Update]
+    Review[Review]
     Test[Test Examples]
     Publish[Publish]
-    Monitor[Monitor]
-    Update[Update]
+    Monitor[Monitor for Drift]
+    Revise[Revise]
 
-    Create --> Review
+    Draft --> Review
     Review --> Test
     Test --> Publish
     Publish --> Monitor
-    Monitor --> Update
-    Update --> Review
+    Monitor --> Revise
+    Revise --> Review
 
-    style Create fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
-    style Review fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
-    style Test fill:#ff6f00,stroke:#ffa726,stroke-width:2px,color:#ffffff
-    style Publish fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
-    style Monitor fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
-    style Update fill:#880e4f,stroke:#c2185b,stroke-width:2px,color:#ffffff
+    class Draft active
+    class Review info
+    class Test warning
+    class Publish primary
+    class Monitor neutral
+    class Revise active
+
+    classDef primary fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
+    classDef active fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
+    classDef warning fill:#ff6f00,stroke:#ffa726,stroke-width:2px,color:#ffffff
+    classDef info fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
+    classDef neutral fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
 ```
 
-### Version Management
+### Update Checklist
 
-#### Version Annotations
-```markdown
-<!-- Added in v1.0.0 -->
-**New Feature:** WebSocket auto-reconnection
+When changing documentation:
 
-<!-- Changed in v1.2.0 -->
-**Updated:** Connection timeout increased to 30s (was 10s)
+1. Check whether linked docs also need updates
+2. Update internal anchors if headings changed
+3. Verify examples still match the implementation
+4. Remove stale screenshots, diagrams, and references
+5. Run available documentation checks
+6. Add release notes or changelog entries when the change affects users
 
-<!-- Deprecated in v2.0.0 -->
-> **⚠️ DEPRECATED:** Use `newMethod()` instead. Will be removed in v3.0.0.
+### Recommended Automated Checks
 
-<!-- Removed in v3.0.0 -->
-~~Old feature documentation removed~~
-```
+Use whichever tools fit the project:
 
-#### Breaking Changes
-```markdown
-> **🚨 Breaking Change in v2.0.0**
->
-> The API endpoint structure has changed:
-> - Old: `/api/resource`
-> - New: `/api/v2/resources`
->
-> Migration guide: [See MIGRATION_V2.md](MIGRATION_V2.md)
-```
-
-### Cross-Reference Management
-
-#### Update Checklist
-When modifying documentation:
-
-1. **Identify Dependencies**
-   - List all documents that reference the current one
-   - Note sections that might be affected
-
-2. **Update Links**
-   - Fix broken internal links
-   - Update anchor links if headings changed
-   - Verify external links still work
-
-3. **Synchronize Examples**
-   - Ensure code examples match current implementation
-   - Update configuration samples
-   - Test command-line examples
-
-4. **Version Consistency**
-   - Update version numbers where referenced
-   - Add changelog entries
-   - Mark deprecated features
-
-### Documentation Testing
-
-#### Automated Checks
-- Link validation (internal and external)
-- Markdown linting (proper syntax)
-- Code block syntax validation
-- Mermaid diagram rendering
-
-#### Manual Verification
-- Technical accuracy review
-- Example functionality testing
-- Screenshot currency (if applicable)
-- Flow diagram accuracy
+- Markdown linting
+- Link validation
+- Spell checking or terminology checks
+- Code block extraction and testing
+- Mermaid rendering validation
+- API reference generation or schema validation
 
 ## Review Checklist
 
-### Pre-Commit Checklist
+### Structure
 
-#### Structure & Format
-- [ ] **Title**: Clear, descriptive H1 heading
-- [ ] **Description**: Brief summary after title
-- [ ] **TOC**: Present for documents > 500 words
-- [ ] **Sections**: Logical hierarchy (H2 → H3 → H4)
-- [ ] **Headings**: Descriptive and action-oriented
+- [ ] One H1 title
+- [ ] Clear summary near the top
+- [ ] Table of contents when useful
+- [ ] Headings follow a logical hierarchy
+- [ ] Related links are present when helpful
 
-#### Content Quality
-- [ ] **Clarity**: Simple, direct language
-- [ ] **Completeness**: All necessary information included
-- [ ] **Accuracy**: Technical details verified
-- [ ] **Consistency**: Terminology matches project standards
-- [ ] **Examples**: Practical and tested
+### Content
 
-#### Visual Elements
-- [ ] **Diagrams**: Mermaid (not ASCII art)
-- [ ] **Colors**: High contrast with white text
-- [ ] **Tables**: Properly formatted with headers
-- [ ] **Images**: Alt text provided (if any)
-- [ ] **Code blocks**: Language specified
+- [ ] The intended audience is clear
+- [ ] The document answers the reader's likely task or question
+- [ ] Terms are defined and used consistently
+- [ ] Assumptions and prerequisites are explicit
+- [ ] Safety, security, and rollback notes are included where relevant
 
-#### Code & Commands
-- [ ] **Syntax**: Proper highlighting language set
-- [ ] **Testing**: All examples executed successfully
-- [ ] **Output**: Expected results documented
-- [ ] **Errors**: Common errors and solutions included
-- [ ] **Versions**: Compatible with current project version
+### Examples
 
-#### Links & References
-- [ ] **Internal links**: All working and accurate
-- [ ] **External links**: Verified and accessible
-- [ ] **Cross-references**: Updated in related docs
-- [ ] **Related docs**: Section included at end
-- [ ] **API refs**: Match current implementation
+- [ ] Code blocks specify languages
+- [ ] Commands are copy-paste friendly unless shown as transcripts
+- [ ] Examples use placeholders instead of real secrets
+- [ ] Expected output or verification is included when useful
+- [ ] Examples have been tested or clearly marked as illustrative
 
-#### Metadata & Maintenance
-- [ ] **File name**: Follows naming conventions
-- [ ] **Location**: In appropriate directory
-- [ ] **Version info**: Included where relevant
-- [ ] **Deprecations**: Clearly marked
-- [ ] **Changelog**: Entry added (if applicable)
+### Links and Maintenance
 
-### Review Process
+- [ ] Internal links and anchors work
+- [ ] External links are still valid
+- [ ] File references avoid brittle line numbers
+- [ ] Version references are necessary and maintainable
+- [ ] Related docs and changelogs are updated when needed
 
-```mermaid
-stateDiagram-v2
-    [*] --> Draft: Create/Update
-    Draft --> Review: Submit PR
-    Review --> Revise: Changes Requested
-    Revise --> Review: Re-submit
-    Review --> Approved: LGTM
-    Approved --> Merged: Merge PR
-    Merged --> Published: Deploy
-    Published --> [*]
+### Visuals
 
-    note right of Review
-        - Technical accuracy
-        - Style compliance
-        - Example testing
-    end note
+- [ ] Mermaid is used for diagrams where appropriate
+- [ ] Directory trees are formatted as `text`
+- [ ] Diagrams include clear labels and do not rely on color alone
+- [ ] Images have alt text or nearby descriptions
 
-    note right of Approved
-        - All checks passed
-        - Examples verified
-        - Links validated
-    end note
-```
+## Templates
 
-### Quality Metrics
+### General Guide Template
 
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| **Readability** | Grade 8-10 | Flesch-Kincaid score |
-| **Completeness** | 100% | All sections populated |
-| **Accuracy** | 100% | Technical review passed |
-| **Link Health** | 100% | No broken links |
-| **Example Success** | 100% | All examples run |
-| **Update Frequency** | < 6 months | Last modification date |
+````markdown
+# Guide Title
 
-## Example Templates
-
-### Complete Feature Documentation
-
-```markdown
-# Feature Name
-
-One-line description of the feature's purpose and value.
+One or two sentences describing what this guide helps the reader accomplish.
 
 ## Table of Contents
+
 - [Overview](#overview)
-- [Architecture](#architecture)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [API Reference](#api-reference)
+- [Prerequisites](#prerequisites)
+- [Steps](#steps)
+- [Verify](#verify)
 - [Troubleshooting](#troubleshooting)
-- [Performance](#performance)
-- [Security](#security)
 - [Related Documentation](#related-documentation)
 
 ## Overview
 
-**Purpose:** What problem does this solve?
+Explain the goal, scope, and expected outcome.
 
-**Key Features:**
-- Feature 1: Brief description
-- Feature 2: Brief description
-- Feature 3: Brief description
+## Prerequisites
 
-**Requirements:**
-- System requirement 1
-- System requirement 2
+- Required access
+- Required tools
+- Required configuration
 
-## Architecture
+## Steps
 
-### System Design
+1. **Do the first action**
 
-```mermaid
-graph TB
-    subgraph "Feature Components"
-        A[Input Handler]
-        B[Processing Engine]
-        C[Output Manager]
-    end
+   ```bash
+   example-cli prepare
+   ```
 
-    subgraph "External Systems"
-        D[Database]
-        E[Cache]
-        F[Message Queue]
-    end
+2. **Do the second action**
 
-    A --> B
-    B --> C
-    B --> D
-    B --> E
-    C --> F
+   ```bash
+   example-cli apply
+   ```
 
-    style A fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
-    style B fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
-    style C fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
-    style D fill:#1a237e,stroke:#3f51b5,stroke-width:2px,color:#ffffff
-    style E fill:#880e4f,stroke:#c2185b,stroke-width:2px,color:#ffffff
-    style F fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
-```
-
-### Data Flow
-
-Description of how data moves through the system...
-
-## Installation
-
-### Prerequisites
+## Verify
 
 ```bash
-# Check required versions
-$ node --version
-v20.17.0
-$ npm --version
-10.0.0
+example-cli status
 ```
 
-### Setup Steps
-
-1. **Install dependencies**
-   ```bash
-   npm install feature-package
-   ```
-
-2. **Configure environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your settings
-   ```
-
-3. **Initialize feature**
-   ```bash
-   npm run feature:init
-   ```
-
-## Configuration
-
-### Basic Configuration
-
-```yaml
-feature:
-  enabled: true
-  mode: production
-  options:
-    timeout: 30
-    retries: 3
-```
-
-### Advanced Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `cache.enabled` | boolean | true | Enable caching |
-| `cache.ttl` | integer | 3600 | Cache TTL in seconds |
-| `log.level` | string | "info" | Logging level |
-
-## Usage
-
-### Basic Example
-
-```javascript
-import { Feature } from 'feature-package';
-
-const feature = new Feature({
-  apiKey: 'your-api-key'
-});
-
-const result = await feature.process(data);
-```
-
-### Advanced Usage
-
-```javascript
-// With error handling and options
-try {
-  const result = await feature.process(data, {
-    timeout: 5000,
-    retryOnFailure: true
-  });
-  console.log('Success:', result);
-} catch (error) {
-  console.error('Failed:', error.message);
-}
-```
-
-## API Reference
-
-See [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for complete reference.
+Expected result: the command reports a healthy status.
 
 ## Troubleshooting
 
-### Common Issues
+### Problem: Brief symptom
 
-#### Issue: Connection timeout
-**Symptom:** Error: ETIMEDOUT
-**Solution:** Increase timeout in configuration
-```yaml
-feature:
-  options:
-    timeout: 60  # Increase from default 30
-```
+**Cause:** Likely cause.
 
-#### Issue: Authentication failed
-**Symptom:** 401 Unauthorized
-**Solution:** Verify API key is correct and has required permissions
+**Fix:** Corrective action.
 
-## Performance
-
-### Benchmarks
-
-| Operation | Average Time | Throughput |
-|-----------|--------------|------------|
-| Process small | 50ms | 20 req/s |
-| Process large | 200ms | 5 req/s |
-| Batch process | 1000ms | 100 items/s |
-
-### Optimization Tips
-
-- Enable caching for repeated queries
-- Use batch operations for multiple items
-- Implement connection pooling
-
-## Security
-
-### Best Practices
-
-- Store sensitive configuration in environment variables
-- Rotate API keys regularly
-- Enable rate limiting
-- Use HTTPS for all connections
-
-### Security Headers
-
-```javascript
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"]
-    }
-  }
-}));
-```
+**Verify:** How to confirm the fix worked.
 
 ## Related Documentation
 
-- [System Architecture](ARCHITECTURE.md) - Overall system design
-- [API Documentation](API_DOCUMENTATION.md) - Complete API reference
-- [Deployment Guide](DEPLOYMENT_GUIDE.md) - Production deployment
-- [Troubleshooting Guide](TROUBLESHOOTING.md) - Extended troubleshooting
+- [Related topic](related-topic.md) - Why it is useful
+````
 
-## Summary
+### Architecture Note Template
 
-This style guide ensures consistency and quality across all project documentation. Following these guidelines will result in documentation that is:
+````markdown
+# Architecture: System or Feature Name
 
-- **Clear and concise** - Easy to understand and navigate
-- **Visually enhanced** - Effective use of diagrams and formatting
-- **Technically accurate** - Verified examples and information
-- **Well-maintained** - Regular updates and cross-reference management
-- **Professional** - Consistent style and presentation
+Brief summary of the design and why it exists.
 
-Remember: Good documentation is an investment in your project's success and your team's productivity.
+## Context
+
+What problem this design addresses and what constraints shaped it.
+
+## Goals
+
+- Goal one
+- Goal two
+
+## Non-Goals
+
+- Explicitly out-of-scope item
+
+## Components
+
+```mermaid
+graph TD
+    Client[Client]
+    Service[Service]
+    Store[(Store)]
+
+    Client --> Service
+    Service --> Store
+```
+
+## Data Flow
+
+Describe how data or control moves through the system.
+
+## Tradeoffs
+
+| Choice | Benefit | Cost |
+| --- | --- | --- |
+| Selected approach | Why it helps | What it makes harder |
+
+## Operational Notes
+
+Monitoring, deployment, rollback, and failure-mode considerations.
+
+## Related Documentation
+
+- [Related guide](related-guide.md)
+````
+
+### Troubleshooting Template
+
+````markdown
+# Troubleshooting: Problem Area
+
+Use this guide to diagnose and resolve common problems with the system or workflow.
+
+## Symptom: Brief Description
+
+**Impact:** What the user or system experiences.
+
+**Likely causes:**
+
+- Cause one
+- Cause two
+
+**Diagnosis:**
+
+```bash
+example-cli diagnose
+```
+
+**Fix:**
+
+```bash
+example-cli repair
+```
+
+**Verify:**
+
+```bash
+example-cli status
+```
+
+Expected result: the status is healthy.
+
+**Escalate if:** Conditions that require additional help.
+````
