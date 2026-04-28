@@ -102,3 +102,7 @@ PRD.md
 
 # --- Paid/Licensed Assets ---
 frontend/public/sprites/paid/
+.pi/extensions/discord-relay/state.json
+.superpowers
+docs/superpowers
+.cc2cc-session-id

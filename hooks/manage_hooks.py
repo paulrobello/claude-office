@@ -158,10 +158,7 @@ def uninstall_hooks(_hook_cmd: str, dry_run: bool = False) -> None:
 
     changes_made = False
 
-    for hook_type in HOOK_TYPES:
-        if hook_type not in hooks_config:
-            continue
-
+    for hook_type in list(hooks_config.keys()):
         current_list = hooks_config[hook_type]
         original_len = len(current_list)
 
