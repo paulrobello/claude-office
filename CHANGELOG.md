@@ -2,6 +2,62 @@
 
 All notable changes to Claude Office Visualizer are documented here.
 
+## [Unreleased]
+
+### Security
+
+- **Localhost-only middleware**: All API endpoints now reject non-loopback connections (SEC-001)
+- **CORS origins**: Replaced wildcard `["*"]` with configured localhost origins list (SEC-002)
+- **WebSocket validation**: Added Origin header validation and session ID regex check on all WebSocket endpoints (SEC-003, SEC-009)
+- **Clipboard write limits**: Added 10MB hard limit and 1MB soft limit on clipboard content (SEC-004)
+- **Error message sanitization**: API routes no longer leak internal exception details to clients (SEC-005)
+- **XXE protection**: Replaced `xml.etree.ElementTree` with `defusedxml` in hooks event parsing (SEC-006)
+- **Configurable paths**: Removed hardcoded user-specific paths from hooks config (SEC-007)
+- **Rate limiting**: Added sliding-window rate limiter on event ingestion (300 req/60s, configurable) (SEC-008)
+- **Token redaction**: Debug logger now redacts OAuth tokens, API keys, and secrets (SEC-010)
+- **Path traversal protection**: Static file serving validates requested paths stay within STATIC_DIR (SEC-011)
+- **Static serving gate**: Static file serving now requires `SERVE_STATIC=1` env var (SEC-012)
+
+### Changed
+
+- **StateMachine refactor**: Replaced 230-line if/elif chain with dispatch table, extracted `TokenTracker` module (ARC-001)
+- **Single state mutation**: Centralized state mutations in `transition()` dispatch table, removed redundant handler mutations (ARC-002)
+- **Dependency injection**: Added `get_*()`/`override_*()` DI providers for event processor and WebSocket manager (ARC-003)
+- **Dependency consolidation**: Removed duplicate deps from root pyproject.toml (ARC-004)
+- **Sprite-debug deduplication**: Deleted 12 duplicate files (~3000 lines) from `app/sprite-debug/` (ARC-005)
+- **Migration cleanup**: Removed unused `alembic` and `asyncpg` deps, documented intentional SQLite approach (ARC-006)
+- **WebSocket URL**: Made configurable via `NEXT_PUBLIC_WS_URL` env var (ARC-009)
+- **Platform abstraction**: Clipboard and terminal commands now platform-aware (macOS/Linux/Windows) (ARC-010)
+
+### Fixed
+
+- **N+1 query**: Session listing now uses single GROUP BY query instead of per-session COUNT (QA-002)
+- **Silent exceptions**: Added logging to all catch blocks in TokenTracker (QA-005)
+- **Console.log cleanup**: Removed 12 debug console.log statements from production frontend code (QA-003)
+- **Broadcast duplication**: Extracted generic `_broadcast_to_connections()` helper in WebSocket manager (QA-007)
+- **Async subprocess**: Converted `subprocess.run()` to `asyncio.create_subprocess_exec()` in focus endpoint (QA-011)
+- **Transition atomicity**: Added try/except with logging in dispatch table invocation (QA-013)
+- **Broadcast debounce**: Skip WebSocket broadcast when todos haven't changed (QA-015)
+- **Magic numbers**: JSONL read sizes are now named constants in TokenTracker (QA-012)
+- **Cyclomatic complexity**: transition() method reduced from 230 lines to 15 lines via dispatch table (QA-006)
+
+### Added
+
+- **CONTRIBUTING.md**: Development setup, code style, PR process, and code of conduct (DOC-003)
+- **OpenCode plugin README**: Installation, configuration, event mapping, and development docs (DOC-004)
+- **GitHub templates**: Bug report, feature request issue templates, and PR template (DOC-012)
+- **Docstrings**: 26 Google-style docstrings added to public backend methods (DOC-005)
+
+### Documentation
+
+- **Multi-floor/Agent Teams**: Added comprehensive section to ARCHITECTURE.md (DOC-001)
+- **API endpoint docs**: Added all missing endpoints to backend README (DOC-002)
+- **Configuration reference**: Added env var table to ARCHITECTURE.md (DOC-006)
+- **Frontend README**: Added missing stores, machines, hooks, and i18n documentation (DOC-011)
+- **Version sync**: Updated stale VERSION field in config.py to 0.14.0 (DOC-007)
+- **README cleanup**: Trimmed What's New section to reference CHANGELOG (DOC-010)
+- **Emoji removal**: Cleaned emoji violations from QUICKSTART.md and frontend README (DOC-009)
+
 ## [0.14.0] - 2026-04-11
 
 ### Added
