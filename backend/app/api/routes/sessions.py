@@ -269,6 +269,43 @@ class FocusRequest(BaseModel):
 
     message: str | None = None
 
+    model_config = {"str_max_length": 100_000}
+
+
+def _validate_clipboard_message(message: str | None) -> str | None:
+    """Validate and truncate clipboard message to a safe maximum length.
+
+    Args:
+        message: The raw clipboard text from the request body.
+
+    Returns:
+        The validated message, truncated to 1 MB if necessary.
+
+    Raises:
+        HTTPException: If the message exceeds a hard maximum of 10 MB.
+    """
+    if message is None:
+        return None
+
+    hard_max = 10 * 1024 * 1024  # 10 MB
+    soft_max = 1024 * 1024  # 1 MB
+
+    if len(message) > hard_max:
+        raise HTTPException(
+            status_code=413,
+            detail="Clipboard message too large (max 10 MB)",
+        )
+
+    if len(message) > soft_max:
+        logger.warning(
+            "Clipboard message truncated from %d to %d bytes",
+            len(message),
+            soft_max,
+        )
+        return message[:soft_max]
+
+    return message
+
 
 @router.post("/{session_id}/focus")
 async def focus_session(
@@ -325,7 +362,8 @@ async def focus_session(
                     continue
 
         # Optionally copy message to clipboard (non-blocking async subprocess)
-        if body and body.message:
+        clipboard_message = _validate_clipboard_message(body.message if body else None)
+        if clipboard_message:
             clipboard_cmd: list[str] = []
             if sys.platform == "darwin":
                 clipboard_cmd = ["pbcopy"]
@@ -342,7 +380,7 @@ async def focus_session(
                         stdout=asyncio.subprocess.DEVNULL,
                         stderr=asyncio.subprocess.DEVNULL,
                     )
-                    await proc.communicate(input=body.message.encode("utf-8"))
+                    await proc.communicate(input=clipboard_message.encode("utf-8"))
                 except FileNotFoundError:
                     logger.warning("Clipboard command not found: %s", clipboard_cmd[0])
 

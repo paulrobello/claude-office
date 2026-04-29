@@ -74,6 +74,14 @@ def temp_dir() -> Iterator[Path]:
         yield Path(tmpdir)
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter() -> None:  # pyright: ignore[reportUnusedFunction]
+    """Reset the event ingestion rate limiter before each test."""
+    from app.api.routes.events import reset_rate_limiter
+
+    reset_rate_limiter()
+
+
 @pytest.fixture
 def sample_jsonl_content() -> str:
     """Sample JSONL content for testing transcript parsing."""

@@ -46,7 +46,7 @@ Before starting, ensure you have:
 | Claude Code | Latest | `claude --version` |
 | tmux | Any | `tmux -V` |
 
-> **📝 Note:** tmux is optional but recommended for the best development experience. Bun can be used as an alternative to Node.js/npm.
+> **Note:** tmux is optional but recommended for the best development experience. Bun can be used as an alternative to Node.js/npm.
 
 ### Installing uv (if needed)
 
@@ -87,7 +87,7 @@ claude setup-token
 echo "CLAUDE_CODE_OAUTH_TOKEN=your-token-here" > backend/.env
 ```
 
-> **📝 Note:** Without this token, the visualizer works fully but displays raw agent IDs instead of generated names, and tool names instead of task summaries. The frontend displays AI status in the top right corner so you can verify if it's properly configured.
+> **Note:** Without this token, the visualizer works fully but displays raw agent IDs instead of generated names, and tool names instead of task summaries. The frontend displays AI status in the top right corner so you can verify if it's properly configured.
 
 ### Step 4: Verify Hooks Installation
 
@@ -244,7 +244,7 @@ lsof -ti:3000 | xargs kill -9
 2. Restart Claude Code after hook installation
 3. Check hook logs: `make hooks-logs`
 
-> **⚠️ Warning:** After installing hooks, you must restart Claude Code for them to take effect.
+> **Warning:** After installing hooks, you must restart Claude Code for them to take effect.
 
 ### Backend Crashes or Won't Start
 
@@ -257,7 +257,7 @@ rm backend/visualizer.db
 # Restart the backend - database will be recreated with current schema
 ```
 
-> **📝 Note:** This will clear all stored session history. The database is automatically recreated on startup with the correct schema.
+> **Note:** This will clear all stored session history. The database is automatically recreated on startup with the correct schema.
 
 ## Related Documentation
 

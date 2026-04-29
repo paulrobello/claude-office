@@ -36,7 +36,7 @@ async def get_all_preferences(
         return {pref.key: pref.value for pref in preferences}
     except Exception as e:
         logger.exception("Error fetching preferences: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail="Failed to fetch preferences") from e
 
 
 @router.get("/{key}")
@@ -50,7 +50,7 @@ async def get_preference(
         return {"key": key, "value": pref.value if pref else None}
     except Exception as e:
         logger.exception("Error fetching preference %s: %s", key, e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail="Failed to fetch preference") from e
 
 
 @router.put("/{key}")
@@ -85,7 +85,7 @@ async def set_preference(
     except Exception as e:
         await db.rollback()
         logger.exception("Error setting preference %s: %s", key, e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail="Failed to set preference") from e
 
 
 @router.delete("/{key}")
@@ -113,7 +113,7 @@ async def delete_preference(
     except Exception as e:
         await db.rollback()
         logger.exception("Error deleting preference %s: %s", key, e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail="Failed to delete preference") from e
 
 
 def _validate_building_config(value: str) -> None:

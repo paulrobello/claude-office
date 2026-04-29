@@ -1,5 +1,6 @@
 import importlib
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -24,6 +25,8 @@ from app.db.database import Base, get_engine
 from app.services.git_service import git_service
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
+
+_SERVE_STATIC = os.environ.get("SERVE_STATIC", "").lower() in ("1", "true", "yes")
 
 _LOCALHOST_HOSTS = frozenset({"127.0.0.1", "::1", "localhost", "testclient"})
 
@@ -146,6 +149,16 @@ async def get_status() -> dict[str, bool | str | None]:
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
+    from app.api.websocket import validate_session_id, validate_websocket_origin
+
+    if not validate_session_id(session_id):
+        await websocket.close(code=4000, reason="Invalid session ID format")
+        return
+
+    if not validate_websocket_origin(websocket):
+        await websocket.close(code=4003, reason="Origin not allowed")
+        return
+
     await manager.connect(websocket, session_id)
 
     current_state = await event_processor.get_current_state(session_id)
@@ -184,6 +197,16 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
 @app.websocket("/ws/room/{room_id}")
 async def websocket_room(websocket: WebSocket, room_id: str) -> None:
     """Room-level WebSocket: sends merged state for all sessions in a room."""
+    from app.api.websocket import validate_session_id, validate_websocket_origin
+
+    if not validate_session_id(room_id):
+        await websocket.close(code=4000, reason="Invalid room ID format")
+        return
+
+    if not validate_websocket_origin(websocket):
+        await websocket.close(code=4003, reason="Origin not allowed")
+        return
+
     from app.core.room_orchestrator import RoomOrchestrator
 
     await manager.connect_room(websocket, room_id)
@@ -209,18 +232,43 @@ async def websocket_room(websocket: WebSocket, room_id: str) -> None:
         await manager.disconnect_room(websocket, room_id)
 
 
-if STATIC_DIR.exists():
+def _safe_static_path(requested_path: str) -> Path | None:
+    """Resolve a static file path and verify it stays within STATIC_DIR.
+
+    Returns the resolved Path if safe, or None if the path escapes the
+    static directory (path traversal attempt).
+    """
+    # Resolve both to absolute, real paths to eliminate symlinks and '..'
+    resolved = (STATIC_DIR / requested_path).resolve()
+    static_root = STATIC_DIR.resolve()
+
+    # Ensure the resolved path is within the static directory
+    try:
+        resolved.relative_to(static_root)
+    except ValueError:
+        return None
+
+    return resolved
+
+
+if _SERVE_STATIC and STATIC_DIR.exists():
+    _static_dir_resolved = STATIC_DIR.resolve()
+
     app.mount("/_next", StaticFiles(directory=STATIC_DIR / "_next"), name="next_static")
 
     @app.get("/{path:path}")
     async def serve_frontend(path: str) -> FileResponse:
         """Serve static frontend files with SPA fallback routing."""
-        file_path = STATIC_DIR / path
+        # Reject path traversal attempts
+        file_path = _safe_static_path(path)
+        if file_path is None:
+            return FileResponse(STATIC_DIR / "index.html")
+
         if file_path.is_file():
             return FileResponse(file_path)
 
-        html_path = STATIC_DIR / f"{path}.html"
-        if html_path.is_file():
+        html_path = _safe_static_path(f"{path}.html")
+        if html_path is not None and html_path.is_file():
             return FileResponse(html_path)
 
         index_path = STATIC_DIR / "index.html"

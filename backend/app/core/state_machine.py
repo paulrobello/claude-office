@@ -200,6 +200,7 @@ def parse_todos_from_event(event: Event) -> list[TodoItem]:
 
 
 def _handle_session_start(sm: "StateMachine", event: Event) -> None:
+    """Handle SESSION_START: initialize office state for a new session."""
     sm.phase = OfficePhase.STARTING
     sm.boss_state = BossState.IDLE
     sm.whiteboard.reset()
@@ -207,6 +208,7 @@ def _handle_session_start(sm: "StateMachine", event: Event) -> None:
 
 
 def _handle_context_compaction(sm: "StateMachine", event: Event) -> None:
+    """Handle CONTEXT_COMPACTION: reset tool counter and record compaction."""
     sm.tool_uses_since_compaction = 0
     sm.whiteboard.record_compaction()
     sm.whiteboard.add_news_item(
@@ -216,6 +218,7 @@ def _handle_context_compaction(sm: "StateMachine", event: Event) -> None:
 
 
 def _handle_pre_tool_use(sm: "StateMachine", event: Event) -> None:
+    """Handle PRE_TOOL_USE: update boss/agent state and process TodoWrite events."""
     tool_name = event.data.tool_name if event.data else None
 
     if tool_name == "TodoWrite":
@@ -254,6 +257,7 @@ def _handle_pre_tool_use(sm: "StateMachine", event: Event) -> None:
 
 
 def _handle_user_prompt_submit(sm: "StateMachine", event: Event) -> None:
+    """Handle USER_PROMPT_SUBMIT: boss receives a new user prompt."""
     sm.boss_state = BossState.RECEIVING
     prompt_text = event.data.prompt if event.data else ""
     sm.print_report = False
@@ -268,6 +272,7 @@ def _handle_user_prompt_submit(sm: "StateMachine", event: Event) -> None:
 
 
 def _handle_permission_request(sm: "StateMachine", event: Event) -> None:
+    """Handle PERMISSION_REQUEST: set boss or agent to waiting state."""
     agent_id = (event.data.agent_id if event.data else None) or "main"
     tool_name = event.data.tool_name if event.data else "permission"
 
@@ -287,6 +292,7 @@ def _handle_permission_request(sm: "StateMachine", event: Event) -> None:
 
 
 def _handle_post_tool_use(sm: "StateMachine", event: Event) -> None:
+    """Handle POST_TOOL_USE: increment tool counter and reset agent state."""
     agent_id = (event.data.agent_id if event.data else None) or "main"
     if agent_id == "main":
         sm.boss_state = BossState.IDLE
@@ -298,6 +304,7 @@ def _handle_post_tool_use(sm: "StateMachine", event: Event) -> None:
 
 
 def _handle_subagent_start(sm: "StateMachine", event: Event) -> None:
+    """Handle SUBAGENT_START: create a new agent and add to arrival queue."""
     if event.data and event.data.agent_id and len(sm.agents) < sm.MAX_AGENTS:
         agent = sm.create_agent(event.data)
         sm.boss_state = BossState.DELEGATING
@@ -315,6 +322,7 @@ def _handle_subagent_start(sm: "StateMachine", event: Event) -> None:
 
 
 def _handle_subagent_stop(sm: "StateMachine", event: Event) -> None:
+    """Handle SUBAGENT_STOP: resolve agent, add to departure queue, credit tool uses."""
     if event.data:
         resolved = resolve_agent_for_stop(
             agents=sm.agents,
@@ -350,11 +358,13 @@ def _handle_subagent_stop(sm: "StateMachine", event: Event) -> None:
 
 
 def _handle_cleanup(sm: "StateMachine", event: Event) -> None:
+    """Handle CLEANUP: remove a departed agent from all state."""
     if event.data and event.data.agent_id:
         sm.remove_agent(event.data.agent_id)
 
 
 def _handle_stop(sm: "StateMachine", event: Event) -> None:
+    """Handle STOP: main agent completes work, show completion message."""
     sm.phase = OfficePhase.COMPLETING
     sm.boss_state = BossState.COMPLETING
 
@@ -374,12 +384,14 @@ def _handle_stop(sm: "StateMachine", event: Event) -> None:
 
 
 def _handle_session_end(sm: "StateMachine", event: Event) -> None:
+    """Handle SESSION_END: mark session as ended."""
     sm.phase = OfficePhase.ENDED
     sm.boss_state = BossState.IDLE
     sm.boss_current_task = None
 
 
 def _handle_background_task_notification(sm: "StateMachine", event: Event) -> None:
+    """Handle BACKGROUND_TASK_NOTIFICATION: update background task status on whiteboard."""
     if event.data:
         task_id = event.data.background_task_id or "unknown"
         status = event.data.background_task_status or "completed"
@@ -395,6 +407,7 @@ def _handle_background_task_notification(sm: "StateMachine", event: Event) -> No
 
 
 def _handle_task_created(sm: "StateMachine", event: Event) -> None:
+    """Handle TASK_CREATED: create a KanbanTask entry for Agent Teams."""
     task_id = event.data.task_id if event.data else None
     if not task_id:
         return
@@ -409,6 +422,7 @@ def _handle_task_created(sm: "StateMachine", event: Event) -> None:
 
 
 def _handle_task_completed(sm: "StateMachine", event: Event) -> None:
+    """Handle TASK_COMPLETED: mark a KanbanTask as completed for Agent Teams."""
     task_id = event.data.task_id if event.data else None
     if not task_id:
         return
@@ -426,6 +440,7 @@ def _handle_task_completed(sm: "StateMachine", event: Event) -> None:
 
 
 def _handle_teammate_idle(sm: "StateMachine", event: Event) -> None:
+    """Handle TEAMMATE_IDLE: set teammate boss state to idle."""
     sm.boss_state = BossState.IDLE
     sm.boss_bubble = None
 

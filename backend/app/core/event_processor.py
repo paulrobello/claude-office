@@ -158,6 +158,7 @@ class EventProcessor:
     """
 
     def __init__(self) -> None:
+        """Initialize the EventProcessor with empty session and orchestrator registries."""
         self.sessions: dict[str, StateMachine] = {}
         self.orchestrators: dict[str, RoomOrchestrator] = {}
         self._sessions_lock = asyncio.Lock()
@@ -290,7 +291,15 @@ class EventProcessor:
     # ------------------------------------------------------------------
 
     async def process_event(self, event: Event) -> None:
-        """Process an incoming event and update session state."""
+        """Process an incoming event and update session state.
+
+        Delegates to :meth:`_process_event_internal` for the actual routing.
+        Catches exceptions and broadcasts an error to connected clients so
+        the frontend can display the failure.
+
+        Args:
+            event: The incoming hook event to process.
+        """
         logger.info(
             f"Processing event: {event.event_type} "
             f"Session: {event.session_id} "
@@ -313,7 +322,20 @@ class EventProcessor:
     # ------------------------------------------------------------------
 
     async def _process_event_internal(self, event: Event) -> None:
-        """Persist, update state machine, build history entry, delegate to handlers."""
+        """Persist event, update state machine, build history, and delegate to handlers.
+
+        This is the core processing pipeline:
+        1. Resolve floor/room assignment from building config
+        2. Persist the event to the database
+        3. Restore or create the session StateMachine
+        4. Run ``sm.transition(event)`` via the dispatch table
+        5. Build a HistoryEntry and append to the session history
+        6. Delegate to typed handler functions for enrichment
+        7. Broadcast state updates to WebSocket clients
+
+        Args:
+            event: The incoming hook event.
+        """
         # Resolve floor/room assignment BEFORE persisting so the assignment
         # is written in the same DB session (avoids StaleDataError from a
         # separate _sync_room_to_db call).
@@ -511,7 +533,16 @@ class EventProcessor:
     async def _persist_synthetic_event(
         self, session_id: str, event_type: EventType, data: EventData | dict[str, Any] | None
     ) -> None:
-        """Save an intermediate lifecycle state to the DB for perfect replay."""
+        """Save an intermediate lifecycle event to the DB for replay fidelity.
+
+        Used to persist synthetic events like CLEANUP that are generated
+        during processing rather than received from hooks.
+
+        Args:
+            session_id: The session the event belongs to.
+            event_type: The type of event to persist.
+            data: Event payload (EventData, raw dict, or None).
+        """
         payload: dict[str, Any]
         if data is None:
             payload = {}
@@ -530,7 +561,14 @@ class EventProcessor:
             await db.commit()
 
     async def _restore_session(self, session_id: str) -> None:
-        """Reconstruct a StateMachine from DB events."""
+        """Reconstruct a StateMachine from persisted DB events.
+
+        Replays all events for the session through a fresh StateMachine,
+        rebuilding agent state, conversation history, and task lists.
+
+        Args:
+            session_id: The session to restore.
+        """
         async with AsyncSessionLocal() as db:
             result = await db.execute(
                 select(EventRecord)
@@ -774,7 +812,13 @@ class EventProcessor:
     # ------------------------------------------------------------------
 
     async def _update_agent_state(self, session_id: str, agent_id: str, state: AgentState) -> None:
-        """Update an agent's state and broadcast to clients."""
+        """Update an agent's state and broadcast the new state to clients.
+
+        Args:
+            session_id: The session containing the agent.
+            agent_id: The agent to update.
+            state: The new AgentState value.
+        """
         sm = self.sessions.get(session_id)
         if sm and agent_id in sm.agents:
             sm.agents[agent_id].state = state
@@ -788,7 +832,15 @@ class EventProcessor:
             await broadcast_state(session_id, sm)
 
     async def _start_beads_if_available(self, session_id: str) -> None:
-        """Start beads polling if the session's project has a .beads/ directory."""
+        """Start beads issue tracker polling if the project has a .beads/ directory.
+
+        Checks the session's project root for a ``.beads/`` directory and
+        initializes polling if found. Tracks which sessions have been checked
+        to avoid repeated filesystem lookups.
+
+        Args:
+            session_id: The session to check and potentially start polling for.
+        """
         if session_id in self._beads_sessions:
             return
         project_root = await self.get_project_root(session_id)
@@ -828,11 +880,31 @@ class EventProcessor:
     # ------------------------------------------------------------------
 
     def get_event_summary(self, event: Event) -> str:
-        """Public wrapper for generating event summaries."""
+        """Generate a human-readable summary for an event.
+
+        Public wrapper around :meth:`_get_event_summary` for use by
+        route handlers and other consumers outside the class.
+
+        Args:
+            event: The event to summarize.
+
+        Returns:
+            A one-line human-readable summary string.
+        """
         return self._get_event_summary(event)
 
     def _get_event_summary(self, event: Event) -> str:
-        """Generate a human-readable summary for the event log."""
+        """Generate a human-readable one-line summary for the event log.
+
+        Dispatches on ``event.event_type`` to produce a contextual summary
+        including tool names, agent IDs, task subjects, and truncated prompts.
+
+        Args:
+            event: The event to summarize.
+
+        Returns:
+            A human-readable summary string.
+        """
         if not event.data:
             return f"{event.event_type} event received"
 

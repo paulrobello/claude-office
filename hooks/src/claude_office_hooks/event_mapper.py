@@ -9,7 +9,7 @@ Output suppression is handled in main.py before this module is imported.
 
 import os
 import re
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from pathlib import Path
 from typing import Any, cast
 

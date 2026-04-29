@@ -9,11 +9,29 @@ because writing to either of those streams would break Claude Code integration.
 
 import datetime
 import json
+import re
 import traceback
 from pathlib import Path
 from typing import Any
 
 DEBUG_LOG_PATH = Path.home() / ".claude" / "claude-office-hooks.log"
+
+# Patterns for sensitive values that must be redacted from debug logs.
+_REDACT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    # OAuth / Bearer tokens in env vars or data fields
+    (re.compile(r"(oauth[_-]?token[\":\s]*[=\"]?\s*)([^\s\"',}]+)", re.IGNORECASE), r"\1[REDACTED]"),
+    (re.compile(r"(bearer\s+)([^\s]+)", re.IGNORECASE), r"\1[REDACTED]"),
+    (re.compile(r"(sk-[a-zA-Z0-9-]{10,})", re.IGNORECASE), r"[REDACTED]"),
+    # Generic token/password fields in JSON-like output
+    (re.compile(r"\"(token|password|secret|api[_-]?key)\"[\":\s]*\"([^\"]+)\"", re.IGNORECASE), r'"\1":"[REDACTED]"'),
+]
+
+
+def _redact(text: str) -> str:
+    """Redact known sensitive patterns from *text*."""
+    for pattern, replacement in _REDACT_PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text
 
 
 def get_iso_timestamp() -> str:
@@ -72,9 +90,9 @@ def debug_log(
             f.write(f"\n{'=' * 60}\n")
             f.write(f"[{get_iso_timestamp()}] Event: {event_type}\n")
             f.write("--- RAW INPUT FROM CLAUDE CODE ---\n")
-            f.write(json.dumps(raw_data, indent=2, default=str))
+            f.write(_redact(json.dumps(raw_data, indent=2, default=str)))
             f.write("\n--- MAPPED PAYLOAD TO BACKEND ---\n")
-            f.write(json.dumps(payload, indent=2, default=str))
+            f.write(_redact(json.dumps(payload, indent=2, default=str)))
             f.write(f"\n{'=' * 60}\n")
     except Exception:
         # Don't let logging break the hook

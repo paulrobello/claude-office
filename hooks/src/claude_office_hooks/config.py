@@ -4,13 +4,14 @@ IMPORTANT: This module must not produce any stdout/stderr output.
 Output suppression is handled in main.py before this module is imported.
 """
 
+import os
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # API endpoint and request constants
 # ---------------------------------------------------------------------------
 
-API_URL = "http://localhost:8000/api/v1/events"
+API_URL = os.environ.get("CLAUDE_OFFICE_API_URL", "http://localhost:8000/api/v1/events")
 TIMEOUT = 0.5  # Seconds — keep short so hooks never block Claude
 
 # ---------------------------------------------------------------------------
@@ -26,7 +27,9 @@ CONFIG_FILE = Path.home() / ".claude" / "claude-office-config.env"
 # Prefixes to strip from project names derived from transcript paths.
 # These path fragments appear because Claude names projects after the
 # filesystem path where the session was started (with slashes → dashes).
-STRIP_PREFIXES = ["-Users-probello-Repos-", "-Users-probello-"]
+# Default is empty -- configure via CLAUDE_OFFICE_STRIP_PREFIXES env var,
+# the --strip-prefixes CLI flag, or the config file.
+STRIP_PREFIXES: list[str] = []
 
 
 def load_config() -> dict[str, str]:

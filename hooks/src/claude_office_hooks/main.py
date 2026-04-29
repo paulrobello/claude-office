@@ -85,7 +85,7 @@ try:
             default=None,
             help=(
                 "Comma-separated list of prefixes to strip from project names. "
-                "Example: --strip-prefixes '-Users-probello-Repos-,-Users-probello-'"
+                "Example: --strip-prefixes '-Users-myuser-Repos-,-Users-myuser-'"
             ),
         )
         args = parser.parse_args()

@@ -9,7 +9,7 @@ _DEFAULT_DB_PATH = _BACKEND_DIR / "visualizer.db"
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Claude Office Visualizer"
-    VERSION: str = "0.1.0"
+    VERSION: str = "0.14.0"
     API_V1_STR: str = "/api/v1"
 
     BACKEND_CORS_ORIGINS: list[str] = [

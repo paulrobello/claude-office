@@ -98,7 +98,7 @@ bun run dev
 
 The application runs at [http://localhost:3000](http://localhost:3000).
 
-> **📝 Note:** The backend must be running at `localhost:8000` for WebSocket connectivity.
+> **Note:** The backend must be running at `localhost:8000` for WebSocket connectivity.
 
 ### Production Build
 
@@ -181,12 +181,18 @@ frontend/src/
 │       └── SettingsModal.tsx     # User preferences modal
 ├── stores/
 │   ├── gameStore.ts              # Unified Zustand store
-│   └── preferencesStore.ts       # User preferences store
+│   ├── preferencesStore.ts       # User preferences store
+│   ├── attentionStore.ts         # Session attention/follow state
+│   ├── navigationStore.ts        # Floor navigation state
+│   └── tourStore.ts              # Onboarding tour state
 ├── machines/
 │   ├── agentMachine.ts           # XState agent lifecycle (composition root)
 │   ├── agentMachineCommon.ts     # Shared actions, guards, delays
+│   ├── agentMachineService.ts    # Agent machine service functions
 │   ├── agentArrivalMachine.ts    # Arrival sub-machine states
-│   └── agentDepartureMachine.ts  # Departure sub-machine states
+│   ├── agentDepartureMachine.ts  # Departure sub-machine states
+│   ├── positionHelpers.ts        # Position calculation helpers
+│   └── queueManager.ts           # Queue management for arrival/departure
 ├── systems/
 │   ├── animationSystem.ts        # Single RAF loop
 │   ├── compactionAnimation.ts    # Boss stomp animation
@@ -201,11 +207,18 @@ frontend/src/
 │   ├── useWebSocketEvents.ts     # WebSocket message handler
 │   ├── useOfficeTextures.ts      # Texture loading hook
 │   ├── useSessions.ts            # Session list management
-│   └── useSessionSwitch.ts       # Session switching logic
+│   ├── useSessionSwitch.ts       # Session switching logic
+│   ├── useDragResize.ts          # Drag-to-resize sidebar panels
+│   └── useTranslation.ts         # i18n translation hook
 ├── constants/
 │   ├── canvas.ts                 # Canvas dimensions
 │   ├── positions.ts              # Coordinate constants
 │   └── quotes.ts                 # Loading screen quotes
+├── i18n/
+│   ├── index.ts                  # Locale type and translation loader
+│   ├── en.ts                     # English translations
+│   ├── es.ts                     # Spanish translations
+│   └── pt-BR.ts                  # Brazilian Portuguese translations
 └── types/
     ├── index.ts                  # TypeScript type definitions
     └── generated.ts              # Auto-generated types from backend
@@ -283,8 +296,23 @@ User preferences are stored in the backend and synced via `preferencesStore.ts`:
 | `clockType`             | `analog`, `digital` | `analog` | Wall clock display mode                  |
 | `clockFormat`           | `12h`, `24h`        | `12h`    | Digital clock time format                |
 | `autoFollowNewSessions` | `true`, `false`     | `true`   | Auto-follow new sessions in same project |
+| `language`              | `en`, `es`, `pt-BR` | `en`     | UI language                              |
 
 Click the wall clock to cycle through modes, or use the Settings modal to configure all preferences.
+
+### Additional Stores
+
+| Store      | File                 | Purpose                                                                               |
+| ---------- | -------------------- | ------------------------------------------------------------------------------------- |
+| Attention  | `attentionStore.ts`  | Tracks which session the user is currently following and manages auto-follow behavior |
+| Navigation | `navigationStore.ts` | Manages floor navigation state for multi-floor building views                         |
+| Tour       | `tourStore.ts`       | Controls the onboarding tour walkthrough state                                        |
+
+### Internationalization
+
+The frontend supports multiple languages via a lightweight i18n system in `frontend/src/i18n/`. English is the default and serves as the fallback for missing translation keys. The `useTranslation` hook provides a `t()` function with parameter interpolation and pluralization support.
+
+To add a language, create a new file (e.g., `fr.ts`) with all `TranslationKey` entries, register it in `index.ts`, and add the locale to the `Locale` type.
 
 ## Debug Tools
 
