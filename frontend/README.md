@@ -355,6 +355,6 @@ bun run lint --fix
 ## Related Documentation
 
 - [Project README](../README.md) - Project overview
-- [Architecture](../docs/ARCHITECTURE.md) - System design details
-- [Quick Start](../docs/QUICKSTART.md) - Getting started guide
+- [Architecture](../docs/architecture/ARCHITECTURE.md) - System design details
+- [Quick Start](../docs/guides/quickstart.md) - Getting started guide
 - [PRD](../PRD.md) - Full product requirements

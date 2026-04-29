@@ -72,7 +72,7 @@ For the full release history, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Quick Start
 
-For the fastest setup, see the [Quick Start Guide](docs/QUICKSTART.md).
+For the fastest setup, see the [Quick Start Guide](docs/guides/quickstart.md).
 
 ```bash
 git clone https://github.com/paulrobello/claude-office.git
@@ -233,7 +233,7 @@ The plugin maps OpenCode events to claude-office backend events:
 | `make docker-down` | Stop container |
 | `make docker-logs` | View container logs |
 
-See [Docker Guide](docs/DOCKER.md) for detailed configuration.
+See [Docker Guide](docs/guides/deployment.md) for detailed configuration.
 
 ### Accessing the Visualizer
 
@@ -308,11 +308,11 @@ Contributions are welcome! Please ensure that all pull requests:
 
 ## Related Documentation
 
-- [Quick Start Guide](docs/QUICKSTART.md) - Get running in under 5 minutes
-- [Architecture](docs/ARCHITECTURE.md) - System design, data flow, component details
-- [Whiteboard Modes](docs/WHITEBOARD.md) - 11 display modes with keyboard shortcuts
-- [Docker Guide](docs/DOCKER.md) - Docker deployment and configuration
-- [AI Summary](docs/AI_SUMMARY.md) - AI-powered summary service documentation
+- [Quick Start Guide](docs/guides/quickstart.md) - Get running in under 5 minutes
+- [Architecture](docs/architecture/ARCHITECTURE.md) - System design, data flow, component details
+- [Whiteboard Modes](docs/reference/whiteboard-modes.md) - 11 display modes with keyboard shortcuts
+- [Docker Guide](docs/guides/deployment.md) - Docker deployment and configuration
+- [AI Summary](docs/reference/ai-summary.md) - AI-powered summary service documentation
 - [Backend README](backend/README.md) - Backend-specific setup
 - [Frontend README](frontend/README.md) - Frontend-specific setup
 - [Hooks README](hooks/README.md) - Hook installation details

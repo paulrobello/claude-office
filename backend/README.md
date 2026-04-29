@@ -339,7 +339,7 @@ make typecheck  # Type check with pyright
 ## Related Documentation
 
 - [Project README](../README.md) - Project overview
-- [Architecture](../docs/ARCHITECTURE.md) - System design details
-- [Quick Start](../docs/QUICKSTART.md) - Getting started guide
-- [Docker Guide](../docs/DOCKER.md) - Container deployment
-- [AI Summary](../docs/AI_SUMMARY.md) - AI summary service documentation
+- [Architecture](../docs/architecture/ARCHITECTURE.md) - System design details
+- [Quick Start](../docs/guides/quickstart.md) - Getting started guide
+- [Docker Guide](../docs/guides/deployment.md) - Container deployment
+- [AI Summary](../docs/reference/ai-summary.md) - AI summary service documentation

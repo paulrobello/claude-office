@@ -149,7 +149,7 @@ claude-office/
 └── Makefile          # Project orchestration
 ```
 
-See [Architecture](docs/ARCHITECTURE.md) for detailed component documentation.
+See [Architecture](docs/architecture/ARCHITECTURE.md) for detailed component documentation.
 
 ## Branch Naming
 

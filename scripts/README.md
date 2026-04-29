@@ -270,6 +270,6 @@ Realistic task descriptions for marquee display (sample):
 ## Related Documentation
 
 - [Project README](../README.md) - Project overview
-- [Quick Start](../docs/QUICKSTART.md) - Getting started guide
+- [Quick Start](../docs/guides/quickstart.md) - Getting started guide
 - [Backend README](../backend/README.md) - Backend API details
 - [Frontend README](../frontend/README.md) - Frontend visualization
