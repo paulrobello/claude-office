@@ -4,13 +4,14 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from rich.logging import RichHandler
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.routes import events, floors, preferences, sessions
 from app.api.websocket import manager
@@ -21,6 +22,29 @@ from app.db.database import Base, get_engine
 from app.services.git_service import git_service
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
+
+_LOCALHOST_HOSTS = frozenset({"127.0.0.1", "::1", "localhost", "testclient"})
+
+
+class LocalhostOnlyMiddleware(BaseHTTPMiddleware):
+    """Reject HTTP requests from non-localhost origins.
+
+    This is a local-only development tool, not deployed to the public internet.
+    All API endpoints (including subprocess execution and clipboard writes)
+    are protected by restricting access to the loopback interface.
+
+    ``"testclient"`` is the sentinel host used by Starlette's test transport
+    and cannot appear on a real TCP connection, so it is safe to allow.
+    """
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        client_host = request.client.host if request.client else None
+        if client_host not in _LOCALHOST_HOSTS:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Access denied: localhost only"},
+            )
+        return await call_next(request)
 
 
 logging.basicConfig(
@@ -84,11 +108,13 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(LocalhostOnlyMiddleware)
 
 app.include_router(events.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(floors.router, prefix=f"{settings.API_V1_STR}")
