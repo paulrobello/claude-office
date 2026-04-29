@@ -724,14 +724,9 @@ export const useGameStore = create<GameStore>()(
           const shouldQueueForCompaction = isCompacting && !options?.immediate;
           const shouldQueue = shouldQueueForCompaction || bossBubble.content;
 
-          console.log(
-            `[Store] enqueueBubble boss: isCompacting=${isCompacting}, hasContent=${!!bossBubble.content}, shouldQueue=${shouldQueue}, queueLen=${bossBubble.queue.length}, text="${content.text?.slice(0, 30)}..."`,
-          );
-
           if (!shouldQueue) {
             // No current bubble and not compacting, display immediately
             // IMPORTANT: Preserve any existing queued bubbles (e.g., from compaction)
-            console.log(`[Store] Boss bubble DISPLAYED immediately`);
             return {
               boss: {
                 ...state.boss,
@@ -744,9 +739,6 @@ export const useGameStore = create<GameStore>()(
             };
           }
           // Queue it (compacting or already has a bubble displaying)
-          console.log(
-            `[Store] Boss bubble QUEUED (new queueLen=${bossBubble.queue.length + 1})`,
-          );
           return {
             boss: {
               ...state.boss,

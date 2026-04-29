@@ -108,6 +108,7 @@ class TokenTracker:
             return count
 
         except Exception:
+            logger.debug("Failed to count tool uses in %s", transcript_path, exc_info=True)
             return 0
 
     def extract_thinking_from_jsonl(
@@ -170,7 +171,7 @@ class TokenTracker:
                 return latest_thinking
 
         except Exception:
-            pass
+            logger.debug("Failed to extract thinking from %s", transcript_path, exc_info=True)
 
         return None
 
@@ -227,6 +228,6 @@ class TokenTracker:
                     continue
 
         except Exception:
-            pass
+            logger.debug("Failed to extract token usage from %s", transcript_path, exc_info=True)
 
         return None

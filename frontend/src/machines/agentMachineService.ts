@@ -105,7 +105,6 @@ class AgentMachineService {
     },
   ): void {
     if (this.agents.has(agentId)) {
-      console.warn(`[SERVICE] Agent ${agentId} already exists`);
       return;
     }
 
@@ -153,9 +152,6 @@ class AgentMachineService {
   triggerDeparture(agentId: string): void {
     const managed = this.agents.get(agentId);
     if (!managed) {
-      console.warn(
-        `[SERVICE] Cannot trigger departure for unknown agent ${agentId}`,
-      );
       return;
     }
     this.pendingDepartures.delete(agentId);
@@ -179,7 +175,6 @@ class AgentMachineService {
   sendEvent(agentId: string, event: AgentMachineEvent): void {
     const managed = this.agents.get(agentId);
     if (!managed) {
-      console.warn(`[SERVICE] Cannot send event to unknown agent ${agentId}`);
       return;
     }
     managed.actor.send(event);

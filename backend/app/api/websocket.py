@@ -1,11 +1,44 @@
 import asyncio
 import logging
+import re
 from typing import Any
 
 from fastapi import WebSocket
 from starlette.websockets import WebSocketState
 
 logger = logging.getLogger(__name__)
+
+# Valid session/room IDs: alphanumeric, dashes, underscores only
+_VALID_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{1,128}$")
+
+# Origins permitted for WebSocket connections (localhost only)
+_ALLOWED_WS_ORIGINS = frozenset(
+    {
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    }
+)
+
+
+def validate_websocket_origin(websocket: WebSocket) -> bool:
+    """Check the Origin header on a WebSocket handshake.
+
+    Returns True if the origin is allowed (localhost) or absent (non-browser
+    clients like the test suite may not send Origin).  Returns False for
+    disallowed origins.
+    """
+    origin = websocket.headers.get("origin")
+    if origin is None:
+        # Non-browser clients (curl, test suite) -- rely on localhost middleware
+        return True
+    return origin.rstrip("/") in _ALLOWED_WS_ORIGINS
+
+
+def validate_session_id(session_id: str) -> bool:
+    """Return True if *session_id* matches the expected format."""
+    return bool(_VALID_ID_PATTERN.match(session_id))
 
 
 class ConnectionManager:
@@ -15,6 +48,49 @@ class ConnectionManager:
         self.active_connections: dict[str, list[WebSocket]] = {}
         self.room_connections: dict[str, list[WebSocket]] = {}
         self._lock = asyncio.Lock()
+
+    # ------------------------------------------------------------------
+    # Generic broadcast helper
+    # ------------------------------------------------------------------
+
+    async def _broadcast_to_connections(
+        self,
+        message: dict[str, Any],
+        connections: list[WebSocket],
+        connection_map: dict[str, list[WebSocket]],
+        group_key: str,
+    ) -> None:
+        """Send a message to a list of WebSocket connections and prune failures.
+
+        Args:
+            message: JSON-serializable payload to send.
+            connections: Snapshot of connections to iterate.
+            connection_map: The master dict (``active_connections`` or
+                ``room_connections``) to prune dead sockets from.
+            group_key: The key within *connection_map* to clean up.
+        """
+        failed: list[WebSocket] = []
+        for connection in connections:
+            try:
+                if connection.client_state == WebSocketState.CONNECTED:
+                    await connection.send_json(message)
+            except Exception as e:
+                logger.warning("Failed to send to WebSocket (%s): %s", group_key, e)
+                failed.append(connection)
+
+        if failed:
+            async with self._lock:
+                group = connection_map.get(group_key)
+                if group:
+                    for conn in failed:
+                        if conn in group:
+                            group.remove(conn)
+                    if not group:
+                        del connection_map[group_key]
+
+    # ------------------------------------------------------------------
+    # Session-level operations
+    # ------------------------------------------------------------------
 
     async def connect(self, websocket: WebSocket, session_id: str) -> None:
         """Accept a WebSocket connection and register it for a session."""
@@ -41,23 +117,9 @@ class ConnectionManager:
         if not connections:
             return
 
-        failed_connections: list[WebSocket] = []
-        for connection in connections:
-            try:
-                if connection.client_state == WebSocketState.CONNECTED:
-                    await connection.send_json(message)
-            except Exception as e:
-                logger.warning(f"Failed to send to WebSocket: {e}")
-                failed_connections.append(connection)
-
-        if failed_connections:
-            async with self._lock:
-                if session_id in self.active_connections:
-                    for conn in failed_connections:
-                        if conn in self.active_connections[session_id]:
-                            self.active_connections[session_id].remove(conn)
-                    if not self.active_connections[session_id]:
-                        del self.active_connections[session_id]
+        await self._broadcast_to_connections(
+            message, connections, self.active_connections, session_id
+        )
 
     async def send_personal_message(self, message: dict[str, Any], websocket: WebSocket) -> None:
         """Send a message to a specific WebSocket connection."""
@@ -65,7 +127,7 @@ class ConnectionManager:
             if websocket.client_state == WebSocketState.CONNECTED:
                 await websocket.send_json(message)
         except Exception as e:
-            logger.warning(f"Failed to send personal message: {e}")
+            logger.warning("Failed to send personal message: %s", e)
 
     async def broadcast_all(self, message: dict[str, Any]) -> None:
         """Broadcast a message to ALL connected clients across all sessions."""
@@ -84,16 +146,17 @@ class ConnectionManager:
                 if connection.client_state == WebSocketState.CONNECTED:
                     await connection.send_json(message)
             except Exception as e:
-                logger.warning(f"Failed to broadcast to WebSocket: {e}")
+                logger.warning("Failed to broadcast to WebSocket: %s", e)
                 failed_connections.append((session_id, connection))
 
         if failed_connections:
             async with self._lock:
                 for session_id, conn in failed_connections:
-                    if session_id in self.active_connections:
-                        if conn in self.active_connections[session_id]:
-                            self.active_connections[session_id].remove(conn)
-                        if not self.active_connections[session_id]:
+                    group = self.active_connections.get(session_id)
+                    if group:
+                        if conn in group:
+                            group.remove(conn)
+                        if not group:
                             del self.active_connections[session_id]
 
     # ------------------------------------------------------------------
@@ -125,23 +188,22 @@ class ConnectionManager:
         if not connections:
             return
 
-        failed_connections: list[WebSocket] = []
-        for connection in connections:
-            try:
-                if connection.client_state == WebSocketState.CONNECTED:
-                    await connection.send_json(message)
-            except Exception as e:
-                logger.warning(f"Failed to send to room WebSocket: {e}")
-                failed_connections.append(connection)
-
-        if failed_connections:
-            async with self._lock:
-                if room_id in self.room_connections:
-                    for conn in failed_connections:
-                        if conn in self.room_connections[room_id]:
-                            self.room_connections[room_id].remove(conn)
-                    if not self.room_connections[room_id]:
-                        del self.room_connections[room_id]
+        await self._broadcast_to_connections(message, connections, self.room_connections, room_id)
 
 
 manager = ConnectionManager()
+
+
+def get_manager() -> ConnectionManager:
+    """FastAPI-compatible dependency that returns the ConnectionManager singleton.
+
+    Use via ``Depends(get_manager)`` in route handlers for testability.
+    Tests can call ``override_manager(instance)`` to inject a mock.
+    """
+    return manager
+
+
+def override_manager(instance: ConnectionManager) -> None:
+    """Replace the module-level singleton with *instance* (for testing)."""
+    global manager
+    manager = instance

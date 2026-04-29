@@ -186,12 +186,21 @@ CLAUDE_PATH_CONTAINER=/claude-data
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/v1/sessions` | List all sessions |
+| `GET` | `/api/v1/sessions` | List all sessions (supports `room_id` and `floor_id` query filters) |
 | `DELETE` | `/api/v1/sessions` | Clear all sessions and events |
 | `GET` | `/api/v1/sessions/{id}` | Get session details |
+| `PATCH` | `/api/v1/sessions/{id}` | Update session display name |
 | `DELETE` | `/api/v1/sessions/{id}` | Delete a single session |
 | `GET` | `/api/v1/sessions/{id}/replay` | Get replay data for a session |
+| `POST` | `/api/v1/sessions/{id}/focus` | Bring session terminal to foreground (macOS) and optionally copy message to clipboard |
+| `PATCH` | `/api/v1/sessions/{id}/label` | Update session label |
 | `POST` | `/api/v1/sessions/simulate` | Start background simulation |
+
+### Floors
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/floors` | Return building/floor configuration |
 
 ### Preferences
 
@@ -212,6 +221,7 @@ Preferences are stored as key-value pairs and persist across sessions. Current p
 | Path | Description |
 |------|-------------|
 | `/ws/{session_id}` | Real-time state updates for a session |
+| `/ws/room/{room_id}` | Real-time state updates for all sessions in a room (team view) |
 
 ## Supported Event Types
 
@@ -241,6 +251,7 @@ backend/
 │   ├── api/
 │   │   ├── routes/
 │   │   │   ├── events.py      # Event ingestion endpoint
+│   │   │   ├── floors.py      # Building/floor configuration endpoint
 │   │   │   ├── preferences.py # User preferences endpoints
 │   │   │   └── sessions.py    # Session management endpoints
 │   │   └── websocket.py       # WebSocket connection manager
@@ -249,15 +260,18 @@ backend/
 │   │   │   ├── agent_handler.py       # Subagent lifecycle events
 │   │   │   ├── conversation_handler.py # User conversation events
 │   │   │   ├── session_handler.py     # Session start/end events
+│   │   │   ├── team_handler.py        # Agent Teams events (task_created/completed, teammate_idle)
 │   │   │   └── tool_handler.py        # Tool use events
 │   │   ├── broadcast_service.py   # State broadcast orchestration
 │   │   ├── constants.py       # Shared constants
 │   │   ├── event_processor.py # Event validation and processing
+│   │   ├── floor_config.py    # Building/floor/room configuration models
 │   │   ├── jsonl_parser.py    # Claude transcript parsing
 │   │   ├── logging.py         # Logging configuration
 │   │   ├── office_layout.py   # Office layout constants and zones
 │   │   ├── path_utils.py      # File path utilities
 │   │   ├── quotes.py          # Loading screen quotes
+│   │   ├── room_orchestrator.py # Multi-session merge for team views
 │   │   ├── state_machine.py   # Office state management
 │   │   ├── summary_service.py # AI-powered summaries
 │   │   ├── task_file_poller.py # Claude task file monitoring

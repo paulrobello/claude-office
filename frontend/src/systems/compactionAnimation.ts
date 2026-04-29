@@ -263,14 +263,10 @@ export function useCompactionAnimation(): CompactionAnimationState {
           useGameStore.getState().setIsCompacting(false);
           // Process any queued boss bubbles that accumulated during compaction
           const store = useGameStore.getState();
-          console.log(
-            `[Compaction] ENDED - hasContent=${!!store.boss.bubble.content}, queueLen=${store.boss.bubble.queue.length}`,
-          );
           if (
             !store.boss.bubble.content &&
             store.boss.bubble.queue.length > 0
           ) {
-            console.log(`[Compaction] Advancing queued boss bubble`);
             store.advanceBubble("boss");
           }
           // Notify waiting agents that boss is available again

@@ -649,7 +649,17 @@ class StateMachine:
     # ---------------------------------------------------------------------------
 
     def to_game_state(self, session_id: str) -> GameState:
-        """Convert current state to a GameState for frontend consumption."""
+        """Convert current state to a GameState for frontend consumption.
+
+        Builds a complete snapshot including boss, agents, office layout,
+        whiteboard data, queues, conversation history, and floor assignment.
+
+        Args:
+            session_id: The session identifier to include in the GameState.
+
+        Returns:
+            A GameState instance representing the current office state.
+        """
         boss = Boss(
             state=self.boss_state,
             current_task=self.boss_current_task,
@@ -709,7 +719,14 @@ class StateMachine:
         )
 
     def remove_agent(self, agent_id: str) -> None:
-        """Remove an agent from the office and all queues."""
+        """Remove an agent from the office and all queues.
+
+        Deletes the agent from the agents dict, arrival queue, and
+        handin (departure) queue.
+
+        Args:
+            agent_id: The identifier of the agent to remove.
+        """
         if agent_id in self.agents:
             del self.agents[agent_id]
         if agent_id in self.arrival_queue:
@@ -723,15 +740,38 @@ class StateMachine:
         Uses a dispatch table mapping :class:`EventType` to a handler
         callable instead of an if/elif chain.  Token usage is always
         updated first via :attr:`token_tracker`.
+
+        If the handler raises an exception, a warning is logged but the
+        event is not silently swallowed.  State may be partially updated;
+        callers that need full rollback should wrap this in a higher-level
+        transaction.
         """
         self.token_tracker.update_from_event(event)
 
         handler = _DISPATCH_TABLE.get(event.event_type)
         if handler is not None:
-            handler(self, event)
+            try:
+                handler(self, event)
+            except Exception:
+                logger.warning(
+                    "Handler for %s raised an exception; state may be partially updated",
+                    event.event_type,
+                    exc_info=True,
+                )
+                raise
 
     def tool_to_thought(self, event: Event) -> BubbleContent:
-        """Convert a tool use event to thought bubble content."""
+        """Convert a tool use event to thought bubble content.
+
+        Maps tool names to icons and extracts relevant context (file paths,
+        command snippets) for display in character thought bubbles.
+
+        Args:
+            event: A PRE_TOOL_USE or POST_TOOL_USE event.
+
+        Returns:
+            A BubbleContent with type THOUGHT, a short description, and an icon.
+        """
         tool_icons = {
             "Read": "📖",
             "Write": "✍️",
@@ -773,7 +813,18 @@ class StateMachine:
         return BubbleContent(type=BubbleType.THOUGHT, text=text, icon=icon)
 
     def create_agent(self, data: EventData) -> Agent:
-        """Create a new agent from event data."""
+        """Create a new agent from event data.
+
+        Assigns a color from the palette, generates a short name via the
+        summary service, and sets initial state to ARRIVING.
+
+        Args:
+            data: EventData containing agent_id, agent_name, and
+                task_description fields.
+
+        Returns:
+            A new Agent instance ready to be added to the office.
+        """
         agent_id = data.agent_id or "unknown"
         count = len(self.agents) + 1
         colors = [

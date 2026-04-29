@@ -64,6 +64,20 @@ logger = logging.getLogger(__name__)
 _DISPLAY_NAME_STRIP_PREFIXES = ("repos", "projects", "src", "work", "code", "github")
 
 
+def _todos_unchanged(old_todos: list[TodoItem], new_todos: list[TodoItem]) -> bool:
+    """Return True if two todo lists are semantically identical.
+
+    Avoids serializing and broadcasting when a poller re-reads the same file.
+    Compares by length, then by content/status pairs.
+    """
+    if len(old_todos) != len(new_todos):
+        return False
+    return all(
+        o.content == n.content and o.status == n.status
+        for o, n in zip(old_todos, new_todos, strict=True)
+    )
+
+
 def derive_display_name(working_dir: str | None, project_name: str | None = None) -> str | None:
     """Derive a human-friendly display name from working directory or project name.
 
@@ -184,6 +198,11 @@ class EventProcessor:
         if not sm:
             return
 
+        # Skip broadcast if todos haven't actually changed.
+        old_todos = sm.todos
+        if _todos_unchanged(old_todos, todos):
+            return
+
         sm.todos = todos
         logger.debug(f"Updated todos for session {session_id}: {len(todos)} items")
 
@@ -194,6 +213,11 @@ class EventProcessor:
         """Handle beads issue updates: update SM and broadcast."""
         sm = self.sessions.get(session_id)
         if not sm:
+            return
+
+        # Skip broadcast if todos haven't actually changed.
+        old_todos = sm.todos
+        if _todos_unchanged(old_todos, todos):
             return
 
         sm.todos = todos
@@ -884,3 +908,18 @@ class EventProcessor:
 
 
 event_processor = EventProcessor()
+
+
+def get_event_processor() -> EventProcessor:
+    """FastAPI-compatible dependency that returns the EventProcessor singleton.
+
+    Use via ``Depends(get_event_processor)`` in route handlers for testability.
+    Tests can call ``override_event_processor(instance)`` to inject a mock.
+    """
+    return event_processor
+
+
+def override_event_processor(instance: EventProcessor) -> None:
+    """Replace the module-level singleton with *instance* (for testing)."""
+    global event_processor
+    event_processor = instance

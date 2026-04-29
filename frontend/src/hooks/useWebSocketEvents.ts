@@ -219,25 +219,13 @@ export function useWebSocketEvents({
       if (state.boss.bubble) {
         const bubbleText = state.boss.bubble.text;
         const lastSeen = lastSeenBubbleTextRef.current.get("boss");
-        const isPersistent = state.boss.bubble.persistent;
-        console.log(
-          `[WS] Boss bubble received: "${bubbleText?.slice(0, 30)}..." persistent=${isPersistent} lastSeen="${lastSeen?.slice(0, 20)}..."`,
-        );
         // Only enqueue if backend sent a NEW bubble text (not the same as last time)
         if (bubbleText !== lastSeen) {
           lastSeenBubbleTextRef.current.set("boss", bubbleText);
           const alreadyHas = store.hasBubbleText("boss", bubbleText);
-          console.log(
-            `[WS] Boss bubble NEW text, alreadyHas=${alreadyHas}, compactionPhase=${store.compactionPhase}`,
-          );
           if (!alreadyHas) {
-            console.log(
-              `[WS] Enqueueing boss bubble: "${bubbleText?.slice(0, 30)}..."`,
-            );
             enqueueBubble("boss", state.boss.bubble);
           }
-        } else {
-          console.log(`[WS] Boss bubble SKIPPED (same as lastSeen)`);
         }
       }
 
@@ -461,8 +449,9 @@ export function useWebSocketEvents({
       reconnectTimeoutRef.current = null;
     }
 
-    const wsUrl = `ws://localhost:8000/ws/${sessionId}`;
-    const ws = new WebSocket(wsUrl);
+    const wsUrl =
+      process.env.NEXT_PUBLIC_WS_URL || `ws://${window.location.hostname}:8000`;
+    const ws = new WebSocket(`${wsUrl}/ws/${sessionId}`);
     wsRef.current = ws;
 
     ws.onopen = () => {

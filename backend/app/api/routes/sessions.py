@@ -1,6 +1,8 @@
+import asyncio
 import logging
 import os
 import subprocess
+import sys
 from datetime import UTC
 from typing import Annotated, Any, TypedDict
 
@@ -99,7 +101,36 @@ async def list_sessions(
     """
     logger.debug("API: list_sessions called (room_id=%s, floor_id=%s)", room_id, floor_id)
     try:
-        # Find all session IDs that have at least one session_start event.
+        # Single query with GROUP BY to get event counts for all sessions.
+        # Replaces N+1 pattern where each session required a separate COUNT query.
+        event_count_subq = (
+            select(
+                EventRecord.session_id,
+                func.count(EventRecord.id).label("event_count"),
+            )
+            .group_by(EventRecord.session_id)
+            .subquery()
+        )
+
+        stmt = (
+            select(
+                SessionRecord,
+                func.coalesce(event_count_subq.c.event_count, 0).label("event_count"),
+            )
+            .outerjoin(event_count_subq, SessionRecord.id == event_count_subq.c.session_id)
+            .order_by(SessionRecord.updated_at.desc())
+        )
+
+        # Apply optional room/floor filters
+        if room_id is not None:
+            stmt = stmt.where(SessionRecord.room_id == room_id)
+        if floor_id is not None:
+            stmt = stmt.where(SessionRecord.floor_id == floor_id)
+
+        result = await db.execute(stmt)
+        rows = result.all()
+
+        # Find session IDs that have at least one session_start event.
         # Child @agent sessions never get session_start, so they're excluded.
         sessions_with_start_stmt = (
             select(EventRecord.session_id)
@@ -109,27 +140,15 @@ async def list_sessions(
         start_result = await db.execute(sessions_with_start_stmt)
         sessions_with_start: set[str] = {row[0] for row in start_result.all()}
 
-        stmt = select(SessionRecord).order_by(SessionRecord.updated_at.desc())
-
-        # Apply optional room/floor filters
-        if room_id is not None:
-            stmt = stmt.where(SessionRecord.room_id == room_id)
-        if floor_id is not None:
-            stmt = stmt.where(SessionRecord.floor_id == floor_id)
-
-        result = await db.execute(stmt)
-        records = result.scalars().all()
-
         sessions: list[SessionSummary] = []
-        for rec in records:
+        for row in rows:
+            rec = row[0]
+            count = int(row[1])
+
             # Skip child sessions (no session_start event) unless it's the special
             # simulation session which also lacks one but is always valid.
             if rec.id not in sessions_with_start and not rec.id.startswith("sim_"):
                 continue
-
-            count_stmt = select(func.count(EventRecord.id)).where(EventRecord.session_id == rec.id)
-            count_res = await db.execute(count_stmt)
-            count = count_res.scalar() or 0
 
             created_utc = (
                 rec.created_at.astimezone(UTC)
@@ -160,7 +179,7 @@ async def list_sessions(
         return sessions
     except Exception as e:
         logger.exception("Error in list_sessions: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail="Failed to list sessions") from e
 
 
 class LabelUpdate(BaseModel):
@@ -200,7 +219,8 @@ async def update_session_label(
         raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.exception("Error in update_session_label: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to update session label") from e
 
 
 class DisplayNameUpdate(BaseModel):
@@ -240,7 +260,8 @@ async def update_session(
         raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.exception("Error in update_session: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to update session") from e
 
 
 class FocusRequest(BaseModel):
@@ -257,8 +278,8 @@ async def focus_session(
 ) -> dict[str, str]:
     """Bring a session's terminal to the foreground and optionally copy a message to clipboard.
 
-    Uses macOS AppleScript to activate the Terminal window. If a message is
-    provided, it is copied to the system clipboard.
+    Uses platform-appropriate commands (macOS AppleScript, Linux wmctrl/xdg-terminal).
+    Clipboard copy uses ``pbcopy`` (macOS), ``xclip`` (Linux), or ``clip`` (Windows).
 
     Args:
         session_id: Identifier for the session to focus.
@@ -277,27 +298,60 @@ async def focus_session(
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
-        # Bring Terminal to foreground via AppleScript
-        subprocess.run(
-            ["osascript", "-e", 'tell application "Terminal" to activate'],
-            capture_output=True,
-            timeout=5,
-        )
-
-        # Optionally copy message to clipboard
-        if body and body.message:
-            subprocess.run(
-                ["pbcopy"],
-                input=body.message.encode("utf-8"),
-                capture_output=True,
-                timeout=5,
+        # Bring Terminal to foreground (non-blocking async subprocess)
+        if sys.platform == "darwin":
+            await asyncio.create_subprocess_exec(
+                "osascript",
+                "-e",
+                'tell application "Terminal" to activate',
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
             )
+        elif sys.platform == "linux":
+            # Try common Linux terminal activators; non-fatal if unavailable.
+            for cmd in [
+                ["xdg-terminal", "wait"],
+                ["wmctrl", "-xa", "terminal"],
+            ]:
+                try:
+                    proc = await asyncio.create_subprocess_exec(
+                        *cmd,
+                        stdout=asyncio.subprocess.DEVNULL,
+                        stderr=asyncio.subprocess.DEVNULL,
+                    )
+                    await proc.wait()
+                    break
+                except FileNotFoundError:
+                    continue
+
+        # Optionally copy message to clipboard (non-blocking async subprocess)
+        if body and body.message:
+            clipboard_cmd: list[str] = []
+            if sys.platform == "darwin":
+                clipboard_cmd = ["pbcopy"]
+            elif sys.platform == "linux":
+                clipboard_cmd = ["xclip", "-selection", "clipboard"]
+            elif sys.platform == "win32":
+                clipboard_cmd = ["clip"]
+
+            if clipboard_cmd:
+                try:
+                    proc = await asyncio.create_subprocess_exec(
+                        *clipboard_cmd,
+                        stdin=asyncio.subprocess.PIPE,
+                        stdout=asyncio.subprocess.DEVNULL,
+                        stderr=asyncio.subprocess.DEVNULL,
+                    )
+                    await proc.communicate(input=body.message.encode("utf-8"))
+                except FileNotFoundError:
+                    logger.warning("Clipboard command not found: %s", clipboard_cmd[0])
 
         return {"status": "success", "message": f"Session {session_id} focused"}
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.exception("Error in focus_session: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to focus session") from e
 
 
 @router.get("/{session_id}/replay")
@@ -359,7 +413,7 @@ async def get_session_replay(
         return replay_data
     except Exception as e:
         logger.exception("Error in get_session_replay: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail="Failed to generate replay") from e
 
 
 @router.post("/simulate")
@@ -383,7 +437,8 @@ async def trigger_simulation() -> dict[str, str]:
 
         return {"status": "success", "message": "Simulation started in background"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.exception("Error in trigger_simulation: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to start simulation") from e
 
 
 @router.delete("")
@@ -415,7 +470,8 @@ async def clear_database(db: Annotated[AsyncSession, Depends(get_db)]) -> dict[s
         return {"status": "success", "message": message}
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.exception("Error in clear_database: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to clear database") from e
 
 
 @router.delete("/{session_id}")
@@ -462,4 +518,5 @@ async def delete_session(
         raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.exception("Error in delete_session: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to delete session") from e

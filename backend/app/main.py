@@ -14,7 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.routes import events, floors, preferences, sessions
-from app.api.websocket import manager
+from app.api.websocket import (
+    manager,
+)
 from app.config import get_settings
 from app.core.event_processor import event_processor
 from app.core.summary_service import get_summary_service
@@ -59,6 +61,11 @@ async def _migrate_schema(conn: AsyncConnection) -> None:
 
     Only runs for SQLite. Uses ALTER TABLE ADD COLUMN which is a no-op if
     the column already exists (checked via PRAGMA first).
+
+    NOTE: This project intentionally uses inline schema migration instead of
+    Alembic.  The backend is SQLite-only and single-instance, so the lightweight
+    PRAGMA-based approach is sufficient.  Alembic was removed as a dependency
+    (see pyproject.toml).
     """
     dialect = conn.dialect.name
     if dialect != "sqlite":
