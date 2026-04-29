@@ -1,16 +1,15 @@
-import json
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
-from pathlib import Path
 from typing import Any, cast
 
-from app.config import get_settings
 from app.core.path_utils import compress_path, compress_paths_in_text, truncate_long_words
 from app.core.quotes import get_random_job_completion_quote
 from app.core.summary_service import get_summary_service
+from app.core.token_tracker import TokenTracker
 from app.core.whiteboard_tracker import WhiteboardTracker
 from app.models.agents import (
     Agent,
@@ -35,6 +34,45 @@ from app.models.sessions import (
 )
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Module-level helpers
+# ---------------------------------------------------------------------------
+
+
+def _empty_agents() -> dict[str, Agent]:
+    return cast(dict[str, Agent], {})
+
+
+def _empty_str_list() -> list[str]:
+    return cast(list[str], [])
+
+
+def _empty_history_list() -> list[HistoryEntry]:
+    return cast(list[HistoryEntry], [])
+
+
+def _empty_todo_list() -> list[TodoItem]:
+    return cast(list[TodoItem], [])
+
+
+def _empty_background_tasks() -> list[BackgroundTask]:
+    return cast(list[BackgroundTask], [])
+
+
+def _empty_conversation() -> list[ConversationEntry]:
+    return cast(list[ConversationEntry], [])
+
+
+def _parse_linear_id(subject: str) -> str | None:
+    """Extract a Linear-style ID like REC-42 from a subject string."""
+    m = re.search(r"\[([A-Z]+-\d+)\]", subject)
+    return m.group(1) if m else None
+
+
+# ---------------------------------------------------------------------------
+# Agent resolution (shared by transition and handler modules)
+# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -84,7 +122,6 @@ def resolve_agent_for_stop(
             return ResolvedAgent(agent_id=aid, agent=agent)
 
     # 3. Fallback: link oldest unlinked agent (FIFO from arrival_queue)
-    # This handles the case where SubagentInfo was missed
     for aid in arrival_queue:
         agent = agents.get(aid)
         if agent and agent.native_id is None:
@@ -107,34 +144,318 @@ def resolve_agent_for_stop(
     return None
 
 
-def _empty_agents() -> dict[str, Agent]:
-    return cast(dict[str, Agent], {})
+# ---------------------------------------------------------------------------
+# Todo parsing -- extracted from StateMachine for single-responsibility.
+# ---------------------------------------------------------------------------
 
 
-def _parse_linear_id(subject: str) -> str | None:
-    """Extract a Linear-style ID like REC-42 from a subject string."""
-    m = re.search(r"\[([A-Z]+-\d+)\]", subject)
-    return m.group(1) if m else None
+def parse_todos_from_event(event: Event) -> list[TodoItem]:
+    """Parse TodoWrite tool input from an event and return a new todo list.
+
+    Args:
+        event: A PRE_TOOL_USE event whose ``tool_name`` is ``"TodoWrite"``.
+
+    Returns:
+        A list of parsed :class:`TodoItem` objects, or an empty list if the
+        event data is missing or malformed.
+    """
+    if not event.data or not event.data.tool_input:
+        return []
+
+    tool_input = event.data.tool_input
+    todos_data = tool_input.get("todos", [])
+
+    if not isinstance(todos_data, list):
+        return []
+
+    new_todos: list[TodoItem] = []
+    typed_todos_data: list[Any] = cast(list[Any], todos_data)
+    for item in typed_todos_data:
+        if not isinstance(item, dict):
+            continue
+
+        item_dict: dict[str, Any] = cast(dict[str, Any], item)
+        content: str = str(item_dict.get("content", ""))
+        status_str: str = str(item_dict.get("status", "pending"))
+        active_form_raw: Any = item_dict.get("activeForm")
+        active_form: str | None = str(active_form_raw) if active_form_raw else None
+
+        try:
+            status = TodoStatus(status_str)
+        except ValueError:
+            status = TodoStatus.PENDING
+
+        if content:
+            new_todos.append(TodoItem(content=content, status=status, active_form=active_form))
+
+    return new_todos
 
 
-def _empty_str_list() -> list[str]:
-    return cast(list[str], [])
+# ---------------------------------------------------------------------------
+# Dispatch table handlers.
+# Each handler receives the StateMachine instance and the Event,
+# and mutates state in place.  These are plain functions, not methods,
+# so the dispatch table can reference them without circular definition issues.
+# ---------------------------------------------------------------------------
 
 
-def _empty_history_list() -> list[HistoryEntry]:
-    return cast(list[HistoryEntry], [])
+def _handle_session_start(sm: "StateMachine", event: Event) -> None:
+    sm.phase = OfficePhase.STARTING
+    sm.boss_state = BossState.IDLE
+    sm.whiteboard.reset()
+    sm.whiteboard.add_news_item("session", "New session started - ready for work!")
 
 
-def _empty_todo_list() -> list[TodoItem]:
-    return cast(list[TodoItem], [])
+def _handle_context_compaction(sm: "StateMachine", event: Event) -> None:
+    sm.tool_uses_since_compaction = 0
+    sm.whiteboard.record_compaction()
+    sm.whiteboard.add_news_item(
+        "coffee",
+        f"Coffee break #{sm.whiteboard.coffee_cups}! Context compacted.",
+    )
 
 
-def _empty_background_tasks() -> list[BackgroundTask]:
-    return cast(list[BackgroundTask], [])
+def _handle_pre_tool_use(sm: "StateMachine", event: Event) -> None:
+    tool_name = event.data.tool_name if event.data else None
+
+    if tool_name == "TodoWrite":
+        parsed = parse_todos_from_event(event)
+        if parsed:
+            sm.todos = parsed
+
+    if tool_name in ("Task", "Agent"):
+        sm.phase = OfficePhase.DELEGATING
+        sm.boss_state = BossState.DELEGATING
+        sm.elevator_state = ElevatorState.ARRIVING
+    else:
+        agent_id = (event.data.agent_id if event.data else None) or "main"
+
+        bubble = sm.tool_to_thought(event)
+        if agent_id == "main":
+            sm.boss_bubble = bubble
+            sm.boss_state = BossState.WORKING
+        else:
+            if agent_id not in sm.agents and len(sm.agents) < sm.MAX_AGENTS:
+                new_agent = sm.create_agent(
+                    EventData(
+                        agent_id=agent_id,
+                        agent_name=f"Ghost {agent_id[-4:]}",
+                        task_description="Resumed mid-session",
+                    )
+                )
+                new_agent.state = AgentState.WORKING
+                sm.agents[agent_id] = new_agent
+
+            if agent_id in sm.agents:
+                sm.agents[agent_id].bubble = bubble
+                sm.agents[agent_id].state = AgentState.WORKING
+                if agent_id in sm.arrival_queue:
+                    sm.arrival_queue.remove(agent_id)
 
 
-def _empty_conversation() -> list[ConversationEntry]:
-    return cast(list[ConversationEntry], [])
+def _handle_user_prompt_submit(sm: "StateMachine", event: Event) -> None:
+    sm.boss_state = BossState.RECEIVING
+    prompt_text = event.data.prompt if event.data else ""
+    sm.print_report = False
+    sm.last_user_prompt = prompt_text
+    if prompt_text:
+        sm.boss_bubble = BubbleContent(
+            type=BubbleType.SPEECH,
+            text=prompt_text,
+            icon="📞",
+        )
+        sm.boss_current_task = prompt_text
+
+
+def _handle_permission_request(sm: "StateMachine", event: Event) -> None:
+    agent_id = (event.data.agent_id if event.data else None) or "main"
+    tool_name = event.data.tool_name if event.data else "permission"
+
+    waiting_bubble = BubbleContent(
+        type=BubbleType.THOUGHT,
+        text=f"Waiting: {tool_name}",
+        icon="❓",
+    )
+
+    if agent_id == "main":
+        sm.boss_state = BossState.WAITING_PERMISSION
+        sm.boss_bubble = waiting_bubble
+    else:
+        if agent_id in sm.agents:
+            sm.agents[agent_id].state = AgentState.WAITING_PERMISSION
+            sm.agents[agent_id].bubble = waiting_bubble
+
+
+def _handle_post_tool_use(sm: "StateMachine", event: Event) -> None:
+    agent_id = (event.data.agent_id if event.data else None) or "main"
+    if agent_id == "main":
+        sm.boss_state = BossState.IDLE
+    elif agent_id in sm.agents and sm.agents[agent_id].state == AgentState.WAITING_PERMISSION:
+        sm.agents[agent_id].state = AgentState.WORKING
+
+    sm.tool_uses_since_compaction += 1
+    sm.whiteboard.track_tool_use(event)
+
+
+def _handle_subagent_start(sm: "StateMachine", event: Event) -> None:
+    if event.data and event.data.agent_id and len(sm.agents) < sm.MAX_AGENTS:
+        agent = sm.create_agent(event.data)
+        sm.boss_state = BossState.DELEGATING
+        sm.elevator_state = ElevatorState.OPEN
+
+        if agent.id not in sm.arrival_queue:
+            sm.arrival_queue.append(agent.id)
+
+        sm.agents[agent.id] = agent
+        sm.phase = OfficePhase.BUSY
+
+        short_name = agent.name or f"Agent-{agent.id[-4:]}"
+        sm.whiteboard.record_agent_start(agent.id, short_name, agent.color)
+        sm.whiteboard.add_news_item("agent", f"{short_name} joins the team!")
+
+
+def _handle_subagent_stop(sm: "StateMachine", event: Event) -> None:
+    if event.data:
+        resolved = resolve_agent_for_stop(
+            agents=sm.agents,
+            arrival_queue=sm.arrival_queue,
+            agent_id=event.data.agent_id,
+            native_agent_id=event.data.native_agent_id,
+        )
+
+        if resolved:
+            agent_id = resolved.agent_id
+            stopping_agent = resolved.agent
+            stopping_agent.state = AgentState.WAITING
+            if agent_id not in sm.handin_queue:
+                sm.handin_queue.append(agent_id)
+
+            sm.boss_state = BossState.IDLE
+
+            if not sm.agents:
+                sm.phase = OfficePhase.WORKING
+
+            if event.data.agent_transcript_path:
+                tool_count = sm.token_tracker.count_tool_uses_from_jsonl(
+                    event.data.agent_transcript_path
+                )
+                if tool_count > 0:
+                    sm.tool_uses_since_compaction += tool_count
+                    logger.debug(f"Credited {tool_count} subagent tool uses to safety counter")
+
+            sm.whiteboard.record_agent_stop(agent_id)
+
+            agent_name = stopping_agent.name or f"Agent-{agent_id[-4:]}"
+            sm.whiteboard.add_news_item("agent", f"{agent_name} completed their task!")
+
+
+def _handle_cleanup(sm: "StateMachine", event: Event) -> None:
+    if event.data and event.data.agent_id:
+        sm.remove_agent(event.data.agent_id)
+
+
+def _handle_stop(sm: "StateMachine", event: Event) -> None:
+    sm.phase = OfficePhase.COMPLETING
+    sm.boss_state = BossState.COMPLETING
+
+    speech_text = (
+        event.data.speech_content.boss_phone
+        if event.data and event.data.speech_content and event.data.speech_content.boss_phone
+        else get_random_job_completion_quote()
+    )
+    sm.boss_bubble = BubbleContent(
+        type=BubbleType.SPEECH,
+        text=speech_text,
+        icon="📞",
+        persistent=True,
+    )
+
+    sm.whiteboard.add_news_item("session", "Job completed! Great work everyone!")
+
+
+def _handle_session_end(sm: "StateMachine", event: Event) -> None:
+    sm.phase = OfficePhase.ENDED
+    sm.boss_state = BossState.IDLE
+    sm.boss_current_task = None
+
+
+def _handle_background_task_notification(sm: "StateMachine", event: Event) -> None:
+    if event.data:
+        task_id = event.data.background_task_id or "unknown"
+        status = event.data.background_task_status or "completed"
+        summary = event.data.background_task_summary
+
+        sm.whiteboard.update_background_task(task_id, status, summary)
+
+        status_emoji = "Completed" if status == "completed" else "Failed"
+        task_id_short = task_id[:8] if len(task_id) > 8 else task_id
+        summary_short = (summary[:30] + "...") if summary and len(summary) > 30 else summary
+        headline = f"{status_emoji} Task {task_id_short}: {summary_short or status}"
+        sm.whiteboard.add_news_item("agent", headline)
+
+
+def _handle_task_created(sm: "StateMachine", event: Event) -> None:
+    task_id = event.data.task_id if event.data else None
+    if not task_id:
+        return
+    subject = event.data.task_subject or "" if event.data else ""
+    sm.kanban_tasks[task_id] = KanbanTask(
+        task_id=task_id,
+        subject=subject,
+        status="pending",
+        assignee=sm.teammate_name,
+        linear_id=_parse_linear_id(subject),
+    )
+
+
+def _handle_task_completed(sm: "StateMachine", event: Event) -> None:
+    task_id = event.data.task_id if event.data else None
+    if not task_id:
+        return
+    subject = event.data.task_subject or "" if event.data else ""
+    if task_id in sm.kanban_tasks:
+        sm.kanban_tasks[task_id].status = "completed"
+    else:
+        sm.kanban_tasks[task_id] = KanbanTask(
+            task_id=task_id,
+            subject=subject,
+            status="completed",
+            assignee=sm.teammate_name,
+            linear_id=_parse_linear_id(subject),
+        )
+
+
+def _handle_teammate_idle(sm: "StateMachine", event: Event) -> None:
+    sm.boss_state = BossState.IDLE
+    sm.boss_bubble = None
+
+
+# ---------------------------------------------------------------------------
+# Dispatch table: EventType -> handler callable.
+# ---------------------------------------------------------------------------
+
+_DISPATCH_TABLE: dict[EventType, Callable[["StateMachine", Event], None]] = {
+    EventType.SESSION_START: _handle_session_start,
+    EventType.CONTEXT_COMPACTION: _handle_context_compaction,
+    EventType.PRE_TOOL_USE: _handle_pre_tool_use,
+    EventType.USER_PROMPT_SUBMIT: _handle_user_prompt_submit,
+    EventType.PERMISSION_REQUEST: _handle_permission_request,
+    EventType.POST_TOOL_USE: _handle_post_tool_use,
+    EventType.SUBAGENT_START: _handle_subagent_start,
+    EventType.SUBAGENT_STOP: _handle_subagent_stop,
+    EventType.CLEANUP: _handle_cleanup,
+    EventType.STOP: _handle_stop,
+    EventType.SESSION_END: _handle_session_end,
+    EventType.BACKGROUND_TASK_NOTIFICATION: _handle_background_task_notification,
+    EventType.TASK_CREATED: _handle_task_created,
+    EventType.TASK_COMPLETED: _handle_task_completed,
+    EventType.TEAMMATE_IDLE: _handle_teammate_idle,
+}
+
+
+# ---------------------------------------------------------------------------
+# OfficePhase enum
+# ---------------------------------------------------------------------------
 
 
 class OfficePhase(Enum):
@@ -148,9 +469,20 @@ class OfficePhase(Enum):
     ENDED = auto()  # Session complete
 
 
+# ---------------------------------------------------------------------------
+# StateMachine
+# ---------------------------------------------------------------------------
+
+
 @dataclass
 class StateMachine:
-    """Manages office state and processes events to track agents, boss, and office elements."""
+    """Manages office state and processes events to track agents, boss, and office elements.
+
+    State mutation happens exclusively through :meth:`transition`, which
+    delegates to a dispatch table of handler functions.  External handler
+    modules (in ``app.core.handlers``) perform enrichment, polling, and
+    broadcasting but should not set core state fields directly.
+    """
 
     MAX_AGENTS = 8
     MAX_CONTEXT_TOKENS = 200_000
@@ -165,8 +497,7 @@ class StateMachine:
     handin_queue: list[str] = field(default_factory=_empty_str_list)
     history: list[HistoryEntry] = field(default_factory=_empty_history_list)
     todos: list[TodoItem] = field(default_factory=_empty_todo_list)
-    total_input_tokens: int = 0
-    total_output_tokens: int = 0
+    token_tracker: TokenTracker = field(default_factory=TokenTracker)
     tool_uses_since_compaction: int = 0
     print_report: bool = False
     last_user_prompt: str | None = None
@@ -293,6 +624,30 @@ class StateMachine:
     def file_edits(self, value: dict[str, int]) -> None:
         self.whiteboard.file_edits = value
 
+    # ---------------------------------------------------------------------------
+    # Backward-compatible property aliases for token fields.
+    # ---------------------------------------------------------------------------
+
+    @property
+    def total_input_tokens(self) -> int:
+        return self.token_tracker.total_input_tokens
+
+    @total_input_tokens.setter
+    def total_input_tokens(self, value: int) -> None:
+        self.token_tracker.total_input_tokens = value
+
+    @property
+    def total_output_tokens(self) -> int:
+        return self.token_tracker.total_output_tokens
+
+    @total_output_tokens.setter
+    def total_output_tokens(self, value: int) -> None:
+        self.token_tracker.total_output_tokens = value
+
+    # ---------------------------------------------------------------------------
+    # Core methods
+    # ---------------------------------------------------------------------------
+
     def to_game_state(self, session_id: str) -> GameState:
         """Convert current state to a GameState for frontend consumption."""
         boss = Boss(
@@ -305,8 +660,7 @@ class StateMachine:
 
         agents_list: list[Agent] = list(self.agents.values())
 
-        total_tokens = self.total_input_tokens + self.total_output_tokens
-        context_utilization = min(1.0, total_tokens / self.MAX_CONTEXT_TOKENS)
+        context_utilization = self.token_tracker.context_utilization
 
         office = OfficeState(
             desk_count=desk_count,
@@ -363,383 +717,20 @@ class StateMachine:
         if agent_id in self.handin_queue:
             self.handin_queue.remove(agent_id)
 
-    def _extract_token_usage_from_jsonl(self, transcript_path: str) -> dict[str, int] | None:
-        """Extract the latest token usage from a Claude JSONL transcript file."""
-        try:
-            settings = get_settings()
-            translated_path = settings.translate_path(transcript_path)
-            path = Path(translated_path).expanduser()
-            if not path.exists():
-                return None
-
-            with open(path, "rb") as f:
-                f.seek(0, 2)  # Go to end
-                file_size = f.tell()
-                read_size = min(20000, file_size)
-                f.seek(max(0, file_size - read_size))
-                content = f.read().decode("utf-8", errors="ignore")
-
-            lines = content.strip().split("\n")
-            for line in reversed(lines):
-                try:
-                    if not line.startswith("{"):
-                        continue
-                    data = json.loads(line)
-                    # Look for usage in message object
-                    if "message" in data and isinstance(data["message"], dict):
-                        message: dict[str, Any] = cast(dict[str, Any], data["message"])
-                        usage = message.get("usage")
-                        if usage and isinstance(usage, dict):
-                            usage_dict: dict[str, Any] = cast(dict[str, Any], usage)
-                            # Calculate total input tokens (fresh + cache)
-                            input_tokens: int = (
-                                int(usage_dict.get("input_tokens", 0) or 0)
-                                + int(usage_dict.get("cache_creation_input_tokens", 0) or 0)
-                                + int(usage_dict.get("cache_read_input_tokens", 0) or 0)
-                            )
-                            output_tokens: int = int(usage_dict.get("output_tokens", 0) or 0)
-                            return {
-                                "input_tokens": input_tokens,
-                                "output_tokens": output_tokens,
-                            }
-                except (json.JSONDecodeError, KeyError):
-                    continue
-
-        except Exception:
-            pass
-
-        return None
-
-    def _count_tool_uses_from_jsonl(self, transcript_path: str) -> int:
-        """Count the number of tool_use blocks in a JSONL transcript."""
-        try:
-            path = Path(transcript_path).expanduser()
-            if not path.exists():
-                return 0
-
-            with open(path, encoding="utf-8", errors="ignore") as f:
-                content = f.read()
-
-            count = content.count('"type":"tool_use"')
-            count += content.count('"type": "tool_use"')
-
-            return count
-
-        except Exception:
-            return 0
-
-    def _extract_thinking_from_jsonl(
-        self, transcript_path: str, max_length: int = 200
-    ) -> str | None:
-        """Extract the most recent thinking block from a JSONL transcript."""
-        try:
-            path = Path(transcript_path).expanduser()
-            if not path.exists():
-                return None
-
-            with open(path, "rb") as f:
-                f.seek(0, 2)  # Go to end
-                file_size = f.tell()
-                read_size = min(50000, file_size)
-                f.seek(max(0, file_size - read_size))
-                content = f.read().decode("utf-8", errors="ignore")
-
-            latest_thinking: str | None = None
-            search_start = 0
-            while True:
-                idx = content.find('"type":"thinking"', search_start)
-                if idx == -1:
-                    break
-
-                thinking_start = content.find('"thinking":"', idx)
-                if thinking_start == -1:
-                    search_start = idx + 1
-                    continue
-
-                content_start = thinking_start + len('"thinking":"')
-                # Find closing quote (handle escaped quotes)
-                pos = content_start
-                while pos < len(content):
-                    if content[pos] == '"' and content[pos - 1] != "\\":
-                        break
-                    pos += 1
-
-                if pos < len(content):
-                    thinking_text = content[content_start:pos]
-                    # Unescape basic JSON escapes
-                    thinking_text = (
-                        thinking_text.replace('\\"', '"').replace("\\n", " ").replace("\\t", " ")
-                    )
-                    latest_thinking = thinking_text
-
-                search_start = pos + 1
-
-            if latest_thinking:
-                if len(latest_thinking) > max_length:
-                    latest_thinking = latest_thinking[: max_length - 3] + "..."
-                return latest_thinking
-
-        except Exception:
-            pass
-
-        return None
-
-    def _update_token_usage(self, event: Event) -> None:
-        """Update token counts from event data or JSONL transcript."""
-        if not event.data:
-            return
-
-        if event.data.input_tokens is not None or event.data.output_tokens is not None:
-            if event.data.input_tokens is not None:
-                self.total_input_tokens = event.data.input_tokens
-            if event.data.output_tokens is not None:
-                self.total_output_tokens = event.data.output_tokens
-            total = self.total_input_tokens + self.total_output_tokens
-            util = min(1.0, total / self.MAX_CONTEXT_TOKENS)
-            logger.info(f"Context: {util:.1%} ({total:,}/{self.MAX_CONTEXT_TOKENS:,} tokens)")
-            return
-
-        transcript_path = event.data.transcript_path or event.data.agent_transcript_path
-        if not transcript_path:
-            return
-
-        usage = self._extract_token_usage_from_jsonl(transcript_path)
-        if not usage:
-            logger.debug(f"No token usage found in {transcript_path}")
-            return
-
-        self.total_input_tokens = usage["input_tokens"]
-        self.total_output_tokens = usage["output_tokens"]
-        total = self.total_input_tokens + self.total_output_tokens
-        util = min(1.0, total / self.MAX_CONTEXT_TOKENS)
-        logger.info(f"Context: {util:.1%} ({total:,}/{self.MAX_CONTEXT_TOKENS:,} tokens)")
-
     def transition(self, event: Event) -> None:
-        """Process an event and update state accordingly."""
-        self._update_token_usage(event)
+        """Process an event and update state accordingly.
 
-        if event.event_type == EventType.SESSION_START:
-            self.phase = OfficePhase.STARTING
-            self.boss_state = BossState.IDLE
-            self.whiteboard.reset()
-            self.whiteboard.add_news_item("session", "New session started - ready for work!")
+        Uses a dispatch table mapping :class:`EventType` to a handler
+        callable instead of an if/elif chain.  Token usage is always
+        updated first via :attr:`token_tracker`.
+        """
+        self.token_tracker.update_from_event(event)
 
-        elif event.event_type == EventType.CONTEXT_COMPACTION:
-            self.tool_uses_since_compaction = 0
-            self.whiteboard.record_compaction()
-            self.whiteboard.add_news_item(
-                "coffee",
-                f"Coffee break #{self.whiteboard.coffee_cups}! Context compacted.",
-            )
+        handler = _DISPATCH_TABLE.get(event.event_type)
+        if handler is not None:
+            handler(self, event)
 
-        elif event.event_type == EventType.PRE_TOOL_USE:
-            tool_name = event.data.tool_name if event.data else None
-
-            if tool_name == "TodoWrite":
-                self._parse_todo_write(event)
-
-            if tool_name in ("Task", "Agent"):
-                # Spawning a subagent (Claude Code may use "Task" or "Agent")
-                self.phase = OfficePhase.DELEGATING
-                self.boss_state = BossState.DELEGATING
-                self.elevator_state = ElevatorState.ARRIVING
-            else:
-                agent_id = (event.data.agent_id if event.data else None) or "main"
-
-                bubble = self._tool_to_thought(event)
-                if agent_id == "main":
-                    self.boss_bubble = bubble
-                    self.boss_state = BossState.WORKING
-                else:
-                    if agent_id not in self.agents and len(self.agents) < self.MAX_AGENTS:
-                        new_agent = self._create_agent(
-                            EventData(
-                                agent_id=agent_id,
-                                agent_name=f"Ghost {agent_id[-4:]}",
-                                task_description="Resumed mid-session",
-                            )
-                        )
-                        new_agent.state = AgentState.WORKING
-                        self.agents[agent_id] = new_agent
-
-                    if agent_id in self.agents:
-                        self.agents[agent_id].bubble = bubble
-                        self.agents[agent_id].state = AgentState.WORKING
-                        if agent_id in self.arrival_queue:
-                            self.arrival_queue.remove(agent_id)
-
-        elif event.event_type == EventType.USER_PROMPT_SUBMIT:
-            self.boss_state = BossState.RECEIVING
-            prompt_text = event.data.prompt if event.data else ""
-            self.print_report = False
-            self.last_user_prompt = prompt_text
-            if prompt_text:
-                self.boss_bubble = BubbleContent(
-                    type=BubbleType.SPEECH,
-                    text=prompt_text,
-                    icon="📞",
-                )
-                self.boss_current_task = prompt_text
-
-        elif event.event_type == EventType.PERMISSION_REQUEST:
-            agent_id = (event.data.agent_id if event.data else None) or "main"
-            tool_name = event.data.tool_name if event.data else "permission"
-
-            waiting_bubble = BubbleContent(
-                type=BubbleType.THOUGHT,
-                text=f"Waiting: {tool_name}",
-                icon="❓",
-            )
-
-            if agent_id == "main":
-                self.boss_state = BossState.WAITING_PERMISSION
-                self.boss_bubble = waiting_bubble
-            else:
-                if agent_id in self.agents:
-                    self.agents[agent_id].state = AgentState.WAITING_PERMISSION
-                    self.agents[agent_id].bubble = waiting_bubble
-
-        elif event.event_type == EventType.POST_TOOL_USE:
-            agent_id = (event.data.agent_id if event.data else None) or "main"
-            if agent_id == "main":
-                self.boss_state = BossState.IDLE
-            elif (
-                agent_id in self.agents
-                and self.agents[agent_id].state == AgentState.WAITING_PERMISSION
-            ):
-                self.agents[agent_id].state = AgentState.WORKING
-
-            self.tool_uses_since_compaction += 1
-            self.whiteboard.track_tool_use(event)
-
-        elif event.event_type == EventType.SUBAGENT_START:
-            if event.data and event.data.agent_id and len(self.agents) < self.MAX_AGENTS:
-                agent = self._create_agent(event.data)
-                self.boss_state = BossState.DELEGATING
-                self.elevator_state = ElevatorState.OPEN
-
-                if agent.id not in self.arrival_queue:
-                    self.arrival_queue.append(agent.id)
-
-                self.agents[agent.id] = agent
-                self.phase = OfficePhase.BUSY
-
-                short_name = agent.name or f"Agent-{agent.id[-4:]}"
-                self.whiteboard.record_agent_start(agent.id, short_name, agent.color)
-                self.whiteboard.add_news_item("agent", f"{short_name} joins the team!")
-
-        elif event.event_type == EventType.SUBAGENT_STOP:
-            if event.data:
-                # Use shared resolution logic with fallback linking
-                resolved = resolve_agent_for_stop(
-                    agents=self.agents,
-                    arrival_queue=self.arrival_queue,
-                    agent_id=event.data.agent_id,
-                    native_agent_id=event.data.native_agent_id,
-                )
-
-                if resolved:
-                    agent_id = resolved.agent_id
-                    stopping_agent = resolved.agent
-                    stopping_agent.state = AgentState.WAITING
-                    if agent_id not in self.handin_queue:
-                        self.handin_queue.append(agent_id)
-
-                    self.boss_state = BossState.IDLE
-
-                    if not self.agents:
-                        self.phase = OfficePhase.WORKING
-
-                    if event.data.agent_transcript_path:
-                        tool_count = self._count_tool_uses_from_jsonl(
-                            event.data.agent_transcript_path
-                        )
-                        if tool_count > 0:
-                            self.tool_uses_since_compaction += tool_count
-                            logger.debug(
-                                f"Credited {tool_count} subagent tool uses to safety counter"
-                            )
-
-                    self.whiteboard.record_agent_stop(agent_id)
-
-                    agent_name = stopping_agent.name or f"Agent-{agent_id[-4:]}"
-                    self.whiteboard.add_news_item("agent", f"{agent_name} completed their task!")
-
-        elif event.event_type == EventType.CLEANUP:
-            if event.data and event.data.agent_id:
-                self.remove_agent(event.data.agent_id)
-
-        elif event.event_type == EventType.STOP:
-            self.phase = OfficePhase.COMPLETING
-            self.boss_state = BossState.COMPLETING
-
-            speech_text = (
-                event.data.speech_content.boss_phone
-                if event.data and event.data.speech_content and event.data.speech_content.boss_phone
-                else get_random_job_completion_quote()
-            )
-            self.boss_bubble = BubbleContent(
-                type=BubbleType.SPEECH,
-                text=speech_text,
-                icon="📞",
-                persistent=True,
-            )
-
-            self.whiteboard.add_news_item("session", "Job completed! Great work everyone!")
-
-        elif event.event_type == EventType.SESSION_END:
-            self.phase = OfficePhase.ENDED
-            self.boss_state = BossState.IDLE
-            self.boss_current_task = None
-
-        elif event.event_type == EventType.BACKGROUND_TASK_NOTIFICATION:
-            if event.data:
-                task_id = event.data.background_task_id or "unknown"
-                status = event.data.background_task_status or "completed"
-                summary = event.data.background_task_summary
-
-                self.whiteboard.update_background_task(task_id, status, summary)
-
-                status_emoji = "Completed" if status == "completed" else "Failed"
-                task_id_short = task_id[:8] if len(task_id) > 8 else task_id
-                summary_short = (summary[:30] + "...") if summary and len(summary) > 30 else summary
-                headline = f"{status_emoji} Task {task_id_short}: {summary_short or status}"
-                self.whiteboard.add_news_item("agent", headline)
-
-        elif event.event_type == EventType.TASK_CREATED:
-            task_id = event.data.task_id if event.data else None
-            if not task_id:
-                return
-            subject = event.data.task_subject or "" if event.data else ""
-            self.kanban_tasks[task_id] = KanbanTask(
-                task_id=task_id,
-                subject=subject,
-                status="pending",
-                assignee=self.teammate_name,
-                linear_id=_parse_linear_id(subject),
-            )
-
-        elif event.event_type == EventType.TASK_COMPLETED:
-            task_id = event.data.task_id if event.data else None
-            if not task_id:
-                return
-            subject = event.data.task_subject or "" if event.data else ""
-            if task_id in self.kanban_tasks:
-                self.kanban_tasks[task_id].status = "completed"
-            else:
-                self.kanban_tasks[task_id] = KanbanTask(
-                    task_id=task_id,
-                    subject=subject,
-                    status="completed",
-                    assignee=self.teammate_name,
-                    linear_id=_parse_linear_id(subject),
-                )
-
-        elif event.event_type == EventType.TEAMMATE_IDLE:
-            self.boss_state = BossState.IDLE
-            self.boss_bubble = None
-
-    def _tool_to_thought(self, event: Event) -> BubbleContent:
+    def tool_to_thought(self, event: Event) -> BubbleContent:
         """Convert a tool use event to thought bubble content."""
         tool_icons = {
             "Read": "📖",
@@ -781,7 +772,7 @@ class StateMachine:
 
         return BubbleContent(type=BubbleType.THOUGHT, text=text, icon=icon)
 
-    def _create_agent(self, data: EventData) -> Agent:
+    def create_agent(self, data: EventData) -> Agent:
         """Create a new agent from event data."""
         agent_id = data.agent_id or "unknown"
         count = len(self.agents) + 1
@@ -812,37 +803,3 @@ class StateMachine:
             bubble=None,
             current_task=data.task_description,
         )
-
-    def _parse_todo_write(self, event: Event) -> None:
-        """Parse TodoWrite tool input and update the todo list state."""
-        if not event.data or not event.data.tool_input:
-            return
-
-        tool_input = event.data.tool_input
-        todos_data = tool_input.get("todos", [])
-
-        if not isinstance(todos_data, list):
-            return
-
-        new_todos: list[TodoItem] = []
-        typed_todos_data: list[Any] = cast(list[Any], todos_data)
-        for item in typed_todos_data:
-            if not isinstance(item, dict):
-                continue
-
-            item_dict: dict[str, Any] = cast(dict[str, Any], item)
-            content: str = str(item_dict.get("content", ""))
-            status_str: str = str(item_dict.get("status", "pending"))
-            active_form_raw: Any = item_dict.get("activeForm")
-            active_form: str | None = str(active_form_raw) if active_form_raw else None
-
-            # Map status string to TodoStatus enum
-            try:
-                status = TodoStatus(status_str)
-            except ValueError:
-                status = TodoStatus.PENDING
-
-            if content:
-                new_todos.append(TodoItem(content=content, status=status, active_form=active_form))
-
-        self.todos = new_todos

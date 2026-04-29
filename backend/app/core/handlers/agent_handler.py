@@ -84,7 +84,8 @@ async def handle_subagent_start(
 
     await broadcast_state(event.session_id, sm)
 
-    sm.boss_state = BossState.DELEGATING
+    # Note: boss_state is already set to DELEGATING by StateMachine.transition().
+    # The dispatch table in state_machine.py is the sole owner of core state mutations.
 
     transcript_path = event.data.agent_transcript_path
     if transcript_path:
@@ -94,6 +95,8 @@ async def handle_subagent_start(
             await poller.start_polling(agent_id, event.session_id, transcript_path)
 
     await update_agent_state_fn(event.session_id, agent_id, AgentState.WALKING_TO_DESK)
+    # Boss returns to IDLE after the agent starts walking to desk.
+    # This is a post-transition adjustment for the animation sequence.
     sm.boss_state = BossState.IDLE
     await broadcast_state(event.session_id, sm)
 
