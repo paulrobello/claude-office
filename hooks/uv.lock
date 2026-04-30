@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "defusedxml" }]
+requires-dist = [{ name = "defusedxml", specifier = ">=0.7.1" }]
 
 [[package]]
 name = "defusedxml"

@@ -1,7 +1,7 @@
 import importlib
 import logging
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -93,7 +93,7 @@ async def _migrate_schema(conn: AsyncConnection) -> None:
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     """Manage application startup and shutdown lifecycle."""
     importlib.import_module("app.db.models")
     engine = get_engine()

@@ -9,9 +9,10 @@ Output suppression is handled in main.py before this module is imported.
 
 import os
 import re
-import defusedxml.ElementTree as ET
 from pathlib import Path
 from typing import Any, cast
+
+import defusedxml.ElementTree as ET  # noqa: N817
 
 from claude_office_hooks.config import STRIP_PREFIXES
 from claude_office_hooks.debug_logger import get_iso_timestamp
@@ -55,7 +56,7 @@ def get_project_name(raw_data: dict[str, Any], strip_prefixes: list[str] | None 
                     sorted_prefixes: list[str] = sorted(prefixes, key=len, reverse=True)
                     for prefix in sorted_prefixes:
                         if project_name.startswith(prefix):
-                            project_name = project_name[len(prefix):]
+                            project_name = project_name[len(prefix) :]
                             break
 
                 return project_name
@@ -150,7 +151,8 @@ def _handle_post_tool_use(
         tool_input_raw = raw_data.get("tool_input", {})
         is_background = False
         if isinstance(tool_input_raw, dict):
-            is_background = bool(tool_input_raw.get("run_in_background"))
+            tool_input = cast(dict[str, Any], tool_input_raw)
+            is_background = bool(tool_input.get("run_in_background"))
 
         if is_background:
             # Background agent — let native SubagentStop handle completion

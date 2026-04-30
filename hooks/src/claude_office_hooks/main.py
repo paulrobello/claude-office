@@ -19,8 +19,6 @@ sys.stderr = io.StringIO()
 
 # debug_logger defines DEBUG_LOG_PATH and is safe to import here because
 # it never writes to stdout/stderr.
-from pathlib import Path  # noqa: E402
-
 from claude_office_hooks.debug_logger import log_error  # noqa: E402
 
 # Wrap ALL remaining logic in try/except to guarantee exit 0

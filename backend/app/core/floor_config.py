@@ -8,6 +8,7 @@ table under the key ``building_config``, and can also be loaded from
 
 import json
 import logging
+import tomllib
 from pathlib import Path
 from typing import Any, cast
 
@@ -166,17 +167,15 @@ def load_building_config_from_toml(
     Returns:
         A :class:`BuildingConfig`. Returns an empty config on errors.
     """
-    import tomli
-
     raw: dict[str, Any] = {}
 
     if toml_string is not None:
-        raw = tomli.loads(toml_string)
+        raw = tomllib.loads(toml_string)
     elif toml_path is not None:
         if not toml_path.exists():
             logger.warning("floors.toml not found at %s — using empty config", toml_path)
             return BuildingConfig()
-        raw = tomli.loads(toml_path.read_text(encoding="utf-8"))
+        raw = tomllib.loads(toml_path.read_text(encoding="utf-8"))
     else:
         return BuildingConfig()
 

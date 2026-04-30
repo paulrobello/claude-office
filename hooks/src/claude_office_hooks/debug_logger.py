@@ -19,11 +19,20 @@ DEBUG_LOG_PATH = Path.home() / ".claude" / "claude-office-hooks.log"
 # Patterns for sensitive values that must be redacted from debug logs.
 _REDACT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # OAuth / Bearer tokens in env vars or data fields
-    (re.compile(r"(oauth[_-]?token[\":\s]*[=\"]?\s*)([^\s\"',}]+)", re.IGNORECASE), r"\1[REDACTED]"),
+    (
+        re.compile(r"(oauth[_-]?token[\":\s]*[=\"]?\s*)([^\s\"',}]+)", re.IGNORECASE),
+        r"\1[REDACTED]",
+    ),
     (re.compile(r"(bearer\s+)([^\s]+)", re.IGNORECASE), r"\1[REDACTED]"),
     (re.compile(r"(sk-[a-zA-Z0-9-]{10,})", re.IGNORECASE), r"[REDACTED]"),
     # Generic token/password fields in JSON-like output
-    (re.compile(r"\"(token|password|secret|api[_-]?key)\"[\":\s]*\"([^\"]+)\"", re.IGNORECASE), r'"\1":"[REDACTED]"'),
+    (
+        re.compile(
+            r"\"(token|password|secret|api[_-]?key)\"[\":\s]*\"([^\"]+)\"",
+            re.IGNORECASE,
+        ),
+        r'"\1":"[REDACTED]"',
+    ),
 ]
 
 
