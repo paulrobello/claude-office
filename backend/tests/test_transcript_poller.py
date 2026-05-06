@@ -190,6 +190,45 @@ class TestTranscriptPoller:
             Path(temp_path).unlink(missing_ok=True)
 
     @pytest.mark.asyncio
+    async def test_emits_synthetic_subagent_stop_for_zombie(self) -> None:
+        """When a transcript stays inactive past the zombie threshold,
+        the poller should emit a synthetic SUBAGENT_STOP event."""
+        from datetime import timedelta
+
+        callback = AsyncMock()
+        poller = TranscriptPoller(callback)
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            temp_path = f.name
+
+        try:
+            # Force the zombie timeout to fire on the very first tick.
+            with (
+                patch("app.core.transcript_poller.POLL_INTERVAL_SECONDS", TEST_POLL_INTERVAL),
+                patch(
+                    "app.core.transcript_poller._zombie_timeout",
+                    return_value=timedelta(seconds=0),
+                ),
+            ):
+                await poller.start_polling("agent_zombie", "session1", temp_path)
+                # Give the poll loop time to detect the zombie and dispatch
+                await asyncio.sleep(0.3)
+                await poller.stop_polling("agent_zombie")
+
+            # Callback must have received exactly one synthetic SUBAGENT_STOP
+            stop_calls = [
+                call
+                for call in callback.call_args_list
+                if call[0][0].event_type == EventType.SUBAGENT_STOP
+            ]
+            assert len(stop_calls) == 1
+            event = stop_calls[0][0][0]
+            assert event.data.agent_id == "agent_zombie"
+            assert event.session_id == "session1"
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+    @pytest.mark.asyncio
     async def test_stop_all(self) -> None:
         """Should stop all polling tasks."""
         callback = AsyncMock()

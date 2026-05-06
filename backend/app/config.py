@@ -31,6 +31,14 @@ class Settings(BaseSettings):
     CLAUDE_PATH_HOST: str = ""
     CLAUDE_PATH_CONTAINER: str = ""
 
+    # When a subagent's transcript stays inactive for more than this many
+    # seconds, the transcript poller assumes the agent crashed (rate-limit,
+    # interruption, ...) and emits a synthetic SubagentStop so the office
+    # visualizer can clean it up. A regular agent makes a tool-call every
+    # few seconds, so 90s is comfortably above the noise floor while still
+    # catching zombies quickly.
+    ZOMBIE_SUBAGENT_TIMEOUT_SECONDS: int = 90
+
     model_config = SettingsConfigDict(env_file=".env")
 
     def translate_path(self, path: str) -> str:
