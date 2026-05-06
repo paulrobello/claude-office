@@ -167,6 +167,12 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
                 on: {
                   BUBBLE_DISPLAYED: "agent_responds",
                 },
+                // Safety net: if BUBBLE_DISPLAYED is never sent (e.g. boss
+                // bubble was suppressed during session completion), advance
+                // anyway so the agent does not freeze in front of the boss.
+                after: {
+                  CONVERSATION_TIMEOUT: "agent_responds",
+                },
               },
               agent_responds: {
                 entry: ["incrementConversationStep", "showArrivalAgentBubble"],
@@ -287,11 +293,20 @@ export const createAgentMachine = (actions: AgentMachineActions) =>
                 on: {
                   BUBBLE_DISPLAYED: "boss_responds",
                 },
+                after: {
+                  CONVERSATION_TIMEOUT: "boss_responds",
+                },
               },
               boss_responds: {
                 entry: ["incrementConversationStep", "showDepartureBossBubble"],
                 on: {
                   BUBBLE_DISPLAYED: "done",
+                },
+                // Safety net: if BUBBLE_DISPLAYED never fires (boss bubble
+                // suppressed during completion / session winding down) the
+                // agent would otherwise freeze in front of the boss desk.
+                after: {
+                  CONVERSATION_TIMEOUT: "done",
                 },
               },
               done: {

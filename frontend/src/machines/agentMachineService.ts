@@ -52,6 +52,15 @@ class AgentMachineService {
   // Reference count for elevator usage — only close when all agents are done
   private elevatorUsageCount = 0;
 
+  /**
+   * Agents that the backend has removed but whose frontend animation hasn't
+   * reached "idle" yet. When such an agent finally arrives at its desk, we
+   * fire its departure flow immediately instead of waiting for the next
+   * backend state-update (which may never come if the session is winding
+   * down).
+   */
+  private pendingDepartures: Set<string> = new Set();
+
   constructor() {
     // Initialize actions that bridge state machine to store
     this.actions = {
@@ -149,7 +158,19 @@ class AgentMachineService {
       );
       return;
     }
+    this.pendingDepartures.delete(agentId);
     managed.actor.send({ type: "REMOVE" });
+  }
+
+  /**
+   * Mark an agent as needing to depart once it reaches the idle state.
+   * Used when the backend removes an agent before its arrival animation
+   * has finished — the actual REMOVE event is dispatched in
+   * handlePhaseChanged when phase becomes "idle".
+   */
+  markPendingDeparture(agentId: string): void {
+    if (!this.agents.has(agentId)) return;
+    this.pendingDepartures.add(agentId);
   }
 
   /**
@@ -251,6 +272,7 @@ class AgentMachineService {
     this.agents.clear();
     this.queue.reset();
     this.elevatorUsageCount = 0;
+    this.pendingDepartures.clear();
   }
 
   // ==========================================================================
@@ -394,20 +416,19 @@ class AgentMachineService {
   /**
    * Release the ready position for this agent and notify the next agent in
    * queue that it may now advance (via a microtask to avoid re-entrancy).
+   *
+   * Looks up by agentId rather than queueType because the store's queueType
+   * is cleared in handleQueueLeft (during in_queue → walking_to_ready), so
+   * by the time this runs (entering walking_to_desk / walking_to_elevator)
+   * the agent's stored queueType is already null.
    */
   private releaseReadyAndNotify(
     agentId: string,
-    store: ReturnType<typeof useGameStore.getState>,
+    _store: ReturnType<typeof useGameStore.getState>,
   ): void {
-    const agent = store.agents.get(agentId);
-    if (agent?.queueType) {
-      const released = this.queue.releaseReadyPosition(
-        agentId,
-        agent.queueType,
-      );
-      if (released) {
-        setTimeout(() => this.notifyBossAvailable(), 0);
-      }
+    const released = this.queue.releaseReadyPositionForAgent(agentId);
+    if (released) {
+      setTimeout(() => this.notifyBossAvailable(), 0);
     }
   }
 
@@ -493,6 +514,12 @@ class AgentMachineService {
     if (phase === "in_elevator") {
       store.updateAgentPosition(agentId, ELEVATOR_DEPARTURE_POSITION);
     }
+
+    // If the backend already removed this agent while it was still arriving,
+    // fire its departure now that it has reached its desk.
+    if (phase === "idle" && this.pendingDepartures.has(agentId)) {
+      setTimeout(() => this.triggerDeparture(agentId), 0);
+    }
   }
 
   private handleShowBossBubble(text: string, icon?: string): void {
@@ -505,6 +532,15 @@ class AgentMachineService {
       console.log(
         `[AgentMachineService] Skipping boss bubble "${text.slice(0, 30)}..." - isCompleting=${isCompleting}, hasPersistentBubble=${hasPersistentBubble}`,
       );
+      // Unblock any agent waiting for BUBBLE_DISPLAYED in the conversing
+      // sub-state. Without this, the agent gets stuck at A0 forever (and
+      // every other agent behind it in the queue stays standing too).
+      for (const [agentId, agent] of store.agents) {
+        if (agent.phase === "conversing") {
+          setTimeout(() => this.notifyBubbleComplete(agentId), 0);
+          break;
+        }
+      }
       return;
     }
 
@@ -571,6 +607,7 @@ class AgentMachineService {
     }
 
     this.queue.clearAllReservations(agentId);
+    this.pendingDepartures.delete(agentId);
 
     const queueType = this.queue.releaseReadyPositionForAgent(agentId);
     if (queueType) {
