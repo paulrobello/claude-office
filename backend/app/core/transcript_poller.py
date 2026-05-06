@@ -16,7 +16,15 @@ from app.models.events import Event, EventData, EventType
 logger = logging.getLogger(__name__)
 
 POLL_INTERVAL_SECONDS = 1.0
+
+# Hard upper bound — even if no zombie detection ever fires, give up after
+# this long. Kept high so legitimate long-running subagents are not killed.
 INACTIVITY_TIMEOUT = timedelta(minutes=10)
+
+
+def _zombie_timeout() -> timedelta:
+    """Return the configured zombie-subagent timeout as a timedelta."""
+    return timedelta(seconds=get_settings().ZOMBIE_SUBAGENT_TIMEOUT_SECONDS)
 
 
 @dataclass
@@ -104,8 +112,31 @@ class TranscriptPoller:
                     if not agent:
                         return
 
-                    # Check for inactivity timeout
-                    if datetime.now(UTC) - agent.last_activity > INACTIVITY_TIMEOUT:
+                    inactivity = datetime.now(UTC) - agent.last_activity
+                    zombie_timeout = _zombie_timeout()
+
+                    # Zombie detection: emit a synthetic SubagentStop so the
+                    # state machine can clean up the orphaned agent. This
+                    # covers cases where Claude Code never sends SubagentStop
+                    # itself (rate-limit, crash, user interrupt, ...).
+                    if inactivity > zombie_timeout:
+                        zombie_event = self._build_zombie_stop_event(agent)
+                        session_id = agent.session_id
+                        logger.warning(
+                            f"Agent {agent_id} appears to be a zombie "
+                            f"(no transcript activity for "
+                            f"{inactivity.total_seconds():.0f}s, "
+                            f"threshold {zombie_timeout.total_seconds():.0f}s) "
+                            f"— emitting synthetic SubagentStop on session {session_id}"
+                        )
+                        # Release the lock before invoking the callback to
+                        # avoid holding it across an arbitrarily long await.
+                        break
+
+                    # Hard fallback: if the zombie callback also failed for
+                    # any reason, eventually stop the loop so we do not poll
+                    # forever.
+                    if inactivity > INACTIVITY_TIMEOUT:
                         logger.debug(f"Agent {agent_id} timed out due to inactivity")
                         return
 
@@ -123,12 +154,32 @@ class TranscriptPoller:
                         await self._event_callback(event)
                     except Exception as e:
                         logger.warning(f"Error processing polled event: {e}")
+                continue
+
+            # Reached only when zombie_event was built above.
+            try:
+                await self._event_callback(zombie_event)
+            except Exception as e:
+                logger.warning(f"Error dispatching synthetic SubagentStop: {e}")
+            return
 
         except asyncio.CancelledError:
             logger.debug(f"Poll loop for agent {agent_id} cancelled")
             raise
         except Exception as e:
             logger.exception(f"Error in poll loop for agent {agent_id}: {e}")
+
+    def _build_zombie_stop_event(self, agent: "PolledAgent") -> Event:
+        """Build a synthetic SUBAGENT_STOP for an agent we believe has crashed."""
+        return Event(
+            event_type=EventType.SUBAGENT_STOP,
+            session_id=agent.session_id,
+            timestamp=datetime.now(UTC),
+            data=EventData(
+                agent_id=agent.agent_id,
+                agent_transcript_path=str(agent.transcript_path),
+            ),
+        )
 
     async def _read_new_content(self, agent: PolledAgent) -> list[Event]:
         """Read new content from the transcript file and extract events."""
