@@ -403,6 +403,11 @@ export const sharedDelays = {
   BOSS_PAUSE: 100,
   ELEVATOR_PAUSE: 500,
   DOOR_CLOSE_DELAY: 520, // Wait for door close animation (500ms) + minimal buffer
+  // Maximum time to wait inside a conversing sub-state before forcibly
+  // advancing. The bubble normally lives 3000ms; this is a safety net for
+  // the case where the bubble is suppressed (boss completing / persistent)
+  // and the BUBBLE_DISPLAYED event is never delivered.
+  CONVERSATION_TIMEOUT: 5000,
 } as const;
 
 // ============================================================================

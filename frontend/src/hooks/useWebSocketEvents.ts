@@ -196,10 +196,15 @@ export function useWebSocketEvents({
       for (const agentId of currentAgentIds) {
         if (!backendAgentIds.has(agentId)) {
           const agent = store.agents.get(agentId);
+          if (!agent) continue;
 
-          // Only trigger departure if agent is idle at desk
-          if (agent && agent.phase === "idle") {
+          if (agent.phase === "idle") {
             agentMachineService.triggerDeparture(agentId);
+          } else {
+            // Backend removed the agent before its arrival animation reached
+            // the desk. Queue the departure so it fires once the agent is
+            // idle, instead of waiting for the next state-update.
+            agentMachineService.markPendingDeparture(agentId);
           }
         }
       }
