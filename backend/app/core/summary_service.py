@@ -93,14 +93,20 @@ class SummaryService:
             return " ".join(result.split())
         return fallback
 
-    async def generate_agent_name(self, description: str) -> str:
+    async def generate_agent_name(
+        self, description: str, existing_names: set[str] | None = None
+    ) -> str:
         """Generate a fun, creative nickname for an agent based on its task."""
-        fallback = self.generate_agent_name_fallback(description)
+        fallback = self.generate_agent_name_fallback(description, existing_names)
 
         if not self.enabled or not self.client:
             return fallback
 
         desc = description[:500] if len(description) > 500 else description
+
+        taken = ""
+        if existing_names:
+            taken = f"\nNames already taken (DO NOT use these): {', '.join(sorted(existing_names))}"
 
         result = await self._call_with_retry(
             "Create a 1-3 word nickname that DIRECTLY relates to the task below. "
@@ -110,7 +116,7 @@ class SummaryService:
             "'update documentation' → Doc Holiday; 'debug auth issue' → Bug Bounty. "
             "The name MUST reference the main subject (YAML, tests, database, docs, etc). "
             "Use puns, pop culture, or alliteration. Max 15 chars. "
-            f"Task: {desc}\nNickname:"
+            f"Task: {desc}{taken}\nNickname:"
         )
         if result:
             clean = re.sub(r'["\'\-:.,!?()]', " ", result.strip())
@@ -125,17 +131,23 @@ class SummaryService:
             if len(name) > 15:
                 name = " ".join(words[:2]) if len(words) > 1 else words[0][:15]
 
-            return name if name else fallback
+            name = name if name else fallback
+            if existing_names and name in existing_names:
+                return fallback
+            return name
         return fallback
 
-    def generate_agent_name_fallback(self, description: str) -> str:
+    def generate_agent_name_fallback(
+        self, description: str, existing_names: set[str] | None = None
+    ) -> str:
         """Generate a fun, creative agent name based on task type."""
         import random
 
         if not description or not description.strip():
-            return "The Intern"
+            return self.dedupe_name("The Intern", existing_names)
 
         desc_lower = description.strip().lower()
+        taken = existing_names or set()
 
         # Handle agent_type values (subagent_type from Agent tool)
         agent_type_names: dict[str, list[str]] = {
@@ -156,7 +168,10 @@ class SummaryService:
         # Check for exact agent_type match
         for agent_type, names in agent_type_names.items():
             if desc_lower == agent_type or desc_lower.startswith(agent_type):
-                return random.choice(names)
+                available = [n for n in names if n not in taken]
+                if available:
+                    return random.choice(available)
+                return self.dedupe_name(random.choice(names), taken)
 
         # Fun name mappings by task category - each has multiple options for variety
         task_names: dict[tuple[str, ...], list[str]] = {
@@ -306,7 +321,10 @@ class SummaryService:
         # Check each category for keyword matches
         for keywords, names in task_names.items():
             if any(kw in desc_lower for kw in keywords):
-                return random.choice(names)
+                available = [n for n in names if n not in taken]
+                if available:
+                    return random.choice(available)
+                return self.dedupe_name(random.choice(names), taken)
 
         # Fallback: generic fun names
         generic_names = [
@@ -321,7 +339,20 @@ class SummaryService:
             "Worker Bee",
             "Minion",
         ]
-        return random.choice(generic_names)
+        available = [n for n in generic_names if n not in taken]
+        if available:
+            return random.choice(available)
+        return self.dedupe_name(random.choice(generic_names), taken)
+
+    @staticmethod
+    def dedupe_name(base_name: str, existing_names: set[str] | None) -> str:
+        """Append a numeric suffix if base_name collides with existing names."""
+        if not existing_names or base_name not in existing_names:
+            return base_name
+        n = 2
+        while f"{base_name} {n}" in existing_names:
+            n += 1
+        return f"{base_name} {n}"
 
     async def detect_report_request(self, prompt: str) -> bool:
         """Detect if the user's prompt requests a report or document."""

@@ -516,7 +516,7 @@ export const useGameStore = create<GameStore>()(
           ...agent,
           backendState: meta.backendState,
           name: meta.name ?? agent.name,
-          currentTask: meta.currentTask ?? agent.currentTask,
+          currentTask: meta.currentTask || agent.currentTask,
         });
         return { agents: newAgents };
       }),

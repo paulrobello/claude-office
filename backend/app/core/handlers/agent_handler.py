@@ -73,7 +73,8 @@ async def handle_subagent_start(
     )
 
     if agent_id in sm.agents:
-        await enrich_agent_with_summaries(sm.agents[agent_id], event.data)
+        existing = {a.name for aid, a in sm.agents.items() if aid != agent_id and a.name}
+        await enrich_agent_with_summaries(sm.agents[agent_id], event.data, existing)
         # Propagate enriched short name to the lifespan record.
         enriched_name = sm.agents[agent_id].name
         if enriched_name:
@@ -156,7 +157,12 @@ async def handle_subagent_info(
             if agent.native_id is None:
                 agent.native_id = native_agent_id
                 logger.info(f"Linked agent {agent_id} to native ID {native_agent_id}")
-                await enrich_agent_from_transcript(agent, transcript_path, event.data.agent_type)
+                await enrich_agent_from_transcript(
+                    agent,
+                    transcript_path,
+                    event.data.agent_type,
+                    {a.name for aid, a in sm.agents.items() if aid != agent_id and a.name},
+                )
             if not await poller.is_polling(agent_id):
                 logger.info(
                     f"Starting transcript polling for {agent_id} "
@@ -170,7 +176,12 @@ async def handle_subagent_info(
     synth_id = f"subagent_{native_agent_id}"
     synth_agent = sm.agents.get(synth_id)
     if synth_agent and not synth_agent.current_task:
-        await enrich_agent_from_transcript(synth_agent, transcript_path, event.data.agent_type)
+        await enrich_agent_from_transcript(
+            synth_agent,
+            transcript_path,
+            event.data.agent_type,
+            {a.name for a in sm.agents.values() if a.name},
+        )
 
 
 async def handle_subagent_stop(
@@ -247,12 +258,17 @@ async def handle_agent_update(
         await broadcast_state(event.session_id, sm)
 
 
-async def enrich_agent_with_summaries(agent: Agent, event_data: EventData) -> None:
+async def enrich_agent_with_summaries(
+    agent: Agent,
+    event_data: EventData,
+    existing_names: set[str] | None = None,
+) -> None:
     """Generate a short agent name and task summary using the AI summary service.
 
     Args:
         agent: The agent to enrich in-place.
         event_data: Event payload containing name/task hints.
+        existing_names: Names already in use by other agents, for deduplication.
     """
     summary_service = get_summary_service()
 
@@ -262,10 +278,17 @@ async def enrich_agent_with_summaries(agent: Agent, event_data: EventData) -> No
     task_source = event_data.task_description or event_data.agent_name or ""
 
     if name_source:
-        agent.name = await summary_service.generate_agent_name(name_source)
+        agent.name = await summary_service.generate_agent_name(name_source, existing_names)
+
+        # Final dedup guard in case of race
+        if existing_names and agent.name in existing_names:
+            from app.core.summary_service import SummaryService
+
+            agent.name = SummaryService.dedupe_name(agent.name, existing_names)
 
     if task_source:
-        agent.current_task = await summary_service.summarize_agent_task(task_source)
+        summarized = await summary_service.summarize_agent_task(task_source)
+        agent.current_task = summarized or None
 
     logger.debug(f"Enriched agent {agent.id}: name='{agent.name}', task='{agent.current_task}'")
 
@@ -274,6 +297,7 @@ async def enrich_agent_from_transcript(
     agent: Agent,
     transcript_path: str,
     agent_type: str | None = None,
+    existing_names: set[str] | None = None,
 ) -> None:
     """Read the first user prompt from a transcript and enrich the agent's task/name.
 
@@ -284,6 +308,7 @@ async def enrich_agent_from_transcript(
         agent: The agent to enrich in-place.
         transcript_path: Path to the agent's JSONL transcript file.
         agent_type: Optional agent type used as a name fallback.
+        existing_names: Names already in use by other agents, for deduplication.
     """
     from app.config import get_settings  # local import to avoid cycles
 
@@ -300,7 +325,7 @@ async def enrich_agent_from_transcript(
         agent_name=agent_type,
         task_description=task_text,
     )
-    await enrich_agent_with_summaries(agent, synthetic_data)
+    await enrich_agent_with_summaries(agent, synthetic_data, existing_names)
     logger.info(
         f"Enriched agent {agent.id} from transcript: "
         f"name='{agent.name}', task='{agent.current_task}'"

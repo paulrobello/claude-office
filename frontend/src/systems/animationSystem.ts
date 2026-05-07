@@ -373,6 +373,7 @@ class AnimationSystem {
   // ==========================================================================
 
   private bossLockedSince: number | null = null;
+  private lastNotifiedAgentId: string | null = null;
 
   private checkQueueAdvancement(): void {
     const store = useGameStore.getState();
@@ -380,6 +381,7 @@ class AnimationSystem {
     // If boss is in use, check if any agent is actually interacting with them.
     // If not, the boss is stuck — auto-release after a grace period.
     if (store.boss.inUseBy !== null) {
+      this.lastNotifiedAgentId = null;
       const BOSS_INTERACTION_PHASES = new Set([
         "walking_to_ready",
         "conversing",
@@ -415,11 +417,14 @@ class AnimationSystem {
       // 1. In queue phase
       // 2. At front of queue (index 0)
       // 3. NOT currently walking (no active path)
+      // 4. Not already notified (prevents duplicate BOSS_AVAILABLE per tick)
       if (
         frontAgent?.phase === "in_arrival_queue" &&
         frontAgent.queueIndex === 0 &&
-        frontAgent.path === null
+        frontAgent.path === null &&
+        this.lastNotifiedAgentId !== frontId
       ) {
+        this.lastNotifiedAgentId = frontId;
         agentMachineService.notifyBossAvailable();
         return;
       }
@@ -433,8 +438,10 @@ class AnimationSystem {
       if (
         frontAgent?.phase === "in_departure_queue" &&
         frontAgent.queueIndex === 0 &&
-        frontAgent.path === null
+        frontAgent.path === null &&
+        this.lastNotifiedAgentId !== frontId
       ) {
+        this.lastNotifiedAgentId = frontId;
         agentMachineService.notifyBossAvailable();
       }
     }

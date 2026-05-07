@@ -93,6 +93,8 @@ claude_scratch/
 
 # --- Local Data ---
 backend/visualizer.db
+backend/visualizer.db-shm
+backend/visualizer.db-wal
 
 # --- Build Artifacts ---
 backend/static/

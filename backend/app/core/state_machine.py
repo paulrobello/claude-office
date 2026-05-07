@@ -857,7 +857,10 @@ class StateMachine:
         # Generate short name from description using fallback
         name_source = data.agent_name or data.task_description or ""
         summary_service = get_summary_service()
-        short_name = summary_service.generate_agent_name_fallback(name_source)
+        existing_names = {a.name for a in self.agents.values() if a.name}
+        short_name = summary_service.generate_agent_name_fallback(name_source, existing_names)
+
+        task = data.task_description or data.agent_name or None
 
         return Agent(
             id=agent_id,
@@ -867,5 +870,5 @@ class StateMachine:
             state=AgentState.ARRIVING,
             desk=count,
             bubble=None,
-            current_task=data.task_description,
+            current_task=task,
         )
