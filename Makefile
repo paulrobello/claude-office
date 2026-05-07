@@ -115,7 +115,7 @@ opencode-build:
 	cd opencode-plugin && $(PKG_INSTALL) && $(PKG_MGR) run build
 
 # tmux-based dev targets for better monitoring
-TMUX_SESSION=claude-office
+TMUX_SESSION=claude-office-dev
 
 dev-tmux:
 	@if tmux has-session -t $(TMUX_SESSION) 2>/dev/null; then \

@@ -72,6 +72,8 @@ const en = {
   "settings.building.noFloors": "No floors configured",
   "settings.building.enableHint":
     "Add floors and map project folder names to enable building navigation view",
+  "settings.building.unsavedWarning":
+    "You have unsaved building changes. Discard them?",
 
   // Sessions
   "sessions.title": "Sessions",

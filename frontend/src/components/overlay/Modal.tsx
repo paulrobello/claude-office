@@ -10,6 +10,7 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
+  dismissible?: boolean;
 }
 
 export default function Modal({
@@ -18,27 +19,28 @@ export default function Modal({
   title,
   children,
   footer,
+  dismissible = true,
 }: ModalProps) {
   const { t } = useTranslation();
   const titleId = useId();
 
-  // Close on Escape key
+  // Close on Escape key (only if dismissible)
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && dismissible) onClose();
     };
     if (isOpen) {
       document.addEventListener("keydown", handleEsc);
     }
     return () => document.removeEventListener("keydown", handleEsc);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, dismissible]);
 
   if (!isOpen) return null;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-      onClick={onClose}
+      onClick={dismissible ? onClose : undefined}
     >
       <div
         role="dialog"

@@ -130,26 +130,24 @@ export function ViewTransition({
         </div>
       )}
 
-      {/* FloorView: always mounted, toggled via CSS — never duplicated */}
-      <div
-        className={
-          view === "floor"
-            ? "flex-grow flex gap-2 overflow-hidden min-h-0"
-            : "hidden"
-        }
-        style={
-          view === "floor" && incomingAnimation
-            ? {
-                animation: incomingAnimation,
-                transformOrigin: incomingOrigin,
-                position: "relative",
-                zIndex: 2,
-              }
-            : undefined
-        }
-      >
-        {floorView}
-      </div>
+      {/* FloorView: only rendered when in floor view to avoid duplicate Pixi canvases */}
+      {view === "floor" && (
+        <div
+          className="flex-grow flex gap-2 overflow-hidden min-h-0"
+          style={
+            incomingAnimation
+              ? {
+                  animation: incomingAnimation,
+                  transformOrigin: incomingOrigin,
+                  position: "relative",
+                  zIndex: 2,
+                }
+              : undefined
+          }
+        >
+          {floorView}
+        </div>
+      )}
 
       {/* Outgoing FloorView overlay (zoom-out: dimming effect) */}
       {phase === "animating" && outgoingView === "floor" && (

@@ -38,6 +38,8 @@ interface NavigationActions {
   goToFloor: (floorId: string) => void;
   /** Set building config from API (auto-switches to building view if floors exist) */
   setBuildingConfig: (config: BuildingConfig) => void;
+  /** Update building config in-place without triggering a view change */
+  updateBuildingConfig: (config: BuildingConfig) => void;
   /** Set loading state */
   setLoading: (loading: boolean) => void;
   /** Set transition origin for the next navigation */
@@ -103,6 +105,8 @@ export const useNavigationStore = create<NavigationStore>()((set, get) => ({
         view: newView,
       };
     }),
+
+  updateBuildingConfig: (config) => set({ buildingConfig: config }),
 
   setLoading: (loading) => set({ isLoading: loading }),
 

@@ -83,8 +83,10 @@ async def list_sessions(
     db: Annotated[AsyncSession, Depends(get_db)],
     room_id: str | None = None,
     floor_id: str | None = None,
+    status: str | None = None,
+    limit: int = 100,
 ) -> list[SessionSummary]:
-    """List all sessions with event counts.
+    """List sessions with event counts.
 
     Only returns sessions that have received a ``session_start`` event.  Child
     sessions spawned by OpenCode @agent mentions never receive a ``session_start``
@@ -95,6 +97,8 @@ async def list_sessions(
         db: Database session dependency.
         room_id: Optional filter to only return sessions in a specific room.
         floor_id: Optional filter to only return sessions on a specific floor.
+        status: Optional filter by session status (``active``, ``completed``).
+        limit: Maximum sessions to return (default 100, max 500).
 
     Returns:
         List of session summaries matching the given filters.
@@ -126,7 +130,10 @@ async def list_sessions(
             stmt = stmt.where(SessionRecord.room_id == room_id)
         if floor_id is not None:
             stmt = stmt.where(SessionRecord.floor_id == floor_id)
+        if status is not None:
+            stmt = stmt.where(SessionRecord.status == status)
 
+        stmt = stmt.limit(min(limit, 500))
         result = await db.execute(stmt)
         rows = result.all()
 

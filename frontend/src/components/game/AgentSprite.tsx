@@ -268,7 +268,7 @@ function AgentArmsComponent({ position, isTyping }: AgentArmsProps): ReactNode {
   useTick((ticker) => {
     if (isTyping) {
       setTypingTime((t) => t + ticker.deltaTime * 0.15);
-    } else {
+    } else if (typingTime !== 0) {
       setTypingTime(0);
     }
   });

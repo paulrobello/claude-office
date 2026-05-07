@@ -26,7 +26,7 @@ import {
   type ReactZoomPanPinchRef,
 } from "react-zoom-pan-pinch";
 import { useShallow } from "zustand/react/shallow";
-import { performFullCleanup, getHmrVersion } from "@/systems/hmrCleanup";
+import { performSoftReset, getHmrVersion } from "@/systems/hmrCleanup";
 
 import {
   useGameStore,
@@ -73,7 +73,9 @@ import {
   Bubble as AgentBubble,
 } from "./AgentSprite";
 import { BossSprite, BossBubble, MobileBoss } from "./BossSprite";
-import { isInElevatorZone } from "@/systems/queuePositions";
+import { useNavigationStore } from "@/stores/navigationStore";
+import { LOBBY_FLOOR_ID } from "@/types/navigation";
+import { ELEVATOR_POSITION, isInElevatorZone } from "@/systems/queuePositions";
 import { TrashCanSprite } from "./TrashCanSprite";
 import { WallClock } from "./WallClock";
 import { Whiteboard } from "./Whiteboard";
@@ -124,6 +126,51 @@ function SubagentDot({ x, y, color }: SubagentDotProps): ReactNode {
   return <pixiGraphics draw={drawDot} x={x} y={y} />;
 }
 
+function FloorSign({
+  label,
+  accent,
+}: {
+  label: string;
+  accent: string;
+}): ReactNode {
+  const w = 120;
+  const h = 24;
+  const drawSign = useCallback(
+    (g: Graphics) => {
+      g.clear();
+      // Backing plate
+      g.roundRect(-w / 2, -h / 2, w, h, 4);
+      g.fill({ color: 0x1e1e1e, alpha: 0.9 });
+      // Border
+      g.roundRect(-w / 2, -h / 2, w, h, 4);
+      const hex = /^#[0-9a-fA-F]{6}$/.test(accent)
+        ? parseInt(accent.slice(1), 16)
+        : 0x6366f1;
+      g.stroke({ color: hex, width: 1.5, alpha: 0.7 });
+    },
+    [accent],
+  );
+
+  return (
+    <pixiContainer x={ELEVATOR_POSITION.x} y={ELEVATOR_POSITION.y - 88}>
+      <pixiGraphics draw={drawSign} />
+      <pixiContainer scale={0.5}>
+        <pixiText
+          text={label}
+          anchor={0.5}
+          resolution={2}
+          style={{
+            fontSize: 18,
+            fill: "#ffffff",
+            fontFamily: "monospace",
+            fontWeight: "bold",
+          }}
+        />
+      </pixiContainer>
+    </pixiContainer>
+  );
+}
+
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -146,19 +193,10 @@ export function OfficeGame(): ReactNode {
   // Cleanup on unmount (HMR or navigation)
   useEffect(() => {
     return () => {
-      if (appRef.current) {
-        try {
-          appRef.current.destroy(true, {
-            children: true,
-            texture: true,
-            textureSource: true,
-          });
-        } catch {
-          // Ignore cleanup errors
-        }
-        appRef.current = null;
-      }
-      performFullCleanup();
+      // @pixi/react Application handles Pixi app destruction.
+      // Only reset game systems to avoid double-destroy of the WebGL context.
+      appRef.current = null;
+      performSoftReset();
     };
   }, []);
 
@@ -175,6 +213,16 @@ export function OfficeGame(): ReactNode {
   const contextUtilization = useGameStore(selectContextUtilization);
   const isCompacting = useGameStore(selectIsCompacting);
   const printReport = useGameStore(selectPrintReport);
+
+  // Floor info for elevator label
+  const floorId = useNavigationStore((s) => s.floorId);
+  const buildingConfig = useNavigationStore((s) => s.buildingConfig);
+  const floor = useMemo(() => {
+    if (floorId === LOBBY_FLOOR_ID) {
+      return { name: "Lobby", icon: "\u{1F6AA}", accent: "#94a3b8" };
+    }
+    return buildingConfig?.floors.find((f) => f.id === floorId) ?? null;
+  }, [floorId, buildingConfig]);
 
   // Compaction animation state
   const compactionAnimation = useCompactionAnimation();
@@ -216,6 +264,7 @@ export function OfficeGame(): ReactNode {
   // Keyboard shortcuts for debug
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (document.querySelector("[role='dialog'][aria-modal='true']")) return;
       if (e.key === "d" || e.key === "D") {
         useGameStore.getState().setDebugMode(!debugMode);
       }
@@ -402,6 +451,14 @@ export function OfficeGame(): ReactNode {
                     headsetTexture={textures.headset}
                     sunglassesTexture={textures.sunglasses}
                   />
+
+                  {/* Floor sign above elevator */}
+                  {floor && (
+                    <FloorSign
+                      label={`${floor.icon} ${floor.name}`}
+                      accent={floor.accent}
+                    />
+                  )}
 
                   {/* Y-sorted layer: chairs and agents sorted by Y position (higher Y = in front) */}
                   <pixiContainer sortableChildren={true}>

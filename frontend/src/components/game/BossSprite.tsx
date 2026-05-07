@@ -212,8 +212,7 @@ function BossSpriteComponent({
   useTick((ticker) => {
     if (isTyping) {
       setTypingTime((t) => t + ticker.deltaTime * 0.15);
-    } else {
-      // Reset to 0 when not typing
+    } else if (typingTime !== 0) {
       setTypingTime(0);
     }
   });

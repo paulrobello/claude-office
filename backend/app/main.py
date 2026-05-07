@@ -3,6 +3,7 @@ import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
@@ -10,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from rich.logging import RichHandler
-from sqlalchemy import text
+from sqlalchemy import text, update
 from sqlalchemy.ext.asyncio import AsyncConnection
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -22,6 +23,7 @@ from app.config import get_settings
 from app.core.event_processor import event_processor
 from app.core.summary_service import get_summary_service
 from app.db.database import Base, get_engine
+from app.db.models import SessionRecord
 from app.services.git_service import git_service
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
@@ -101,12 +103,34 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
         await conn.run_sync(Base.metadata.create_all)
         await _migrate_schema(conn)
 
+    await _reap_stale_sessions()
+
     git_service.start()
 
     yield
 
     await git_service.stop()
     await get_engine().dispose()
+
+
+async def _reap_stale_sessions() -> None:
+    """Mark active sessions with no activity for 48+ hours as completed."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    reap_logger = logging.getLogger("claude-office.reaper")
+    session_factory = async_sessionmaker(get_engine(), expire_on_commit=False)
+    cutoff = datetime.now(UTC) - timedelta(hours=48)
+    async with session_factory() as db:
+        result = await db.execute(
+            update(SessionRecord)
+            .where(SessionRecord.status == "active", SessionRecord.updated_at < cutoff)
+            .values(status="completed")
+            .execution_options(synchronize_session="fetch")
+        )
+        await db.commit()
+        count = int(str(getattr(result, "rowcount", 0)))
+        if count > 0:
+            reap_logger.info("Reaped %d stale sessions (inactive >48h)", count)
 
 
 app = FastAPI(

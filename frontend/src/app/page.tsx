@@ -217,6 +217,7 @@ export default function V2TestPage(): React.ReactNode {
   // ------------------------------------------------------------------
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (document.querySelector("[role='dialog'][aria-modal='true']")) return;
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         const prefs = usePreferencesStore.getState();

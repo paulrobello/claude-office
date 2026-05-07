@@ -5,10 +5,10 @@ import { useShallow } from "zustand/react/shallow";
 import { useAttentionStore, type UrgencyLevel } from "@/stores/attentionStore";
 
 const URGENCY_COLORS: Record<UrgencyLevel, string> = {
-  critical: "border-red-500 bg-red-500/10 text-red-400",
-  high: "border-orange-500 bg-orange-500/10 text-orange-400",
-  low: "border-green-500 bg-green-500/10 text-green-400",
-  info: "border-blue-500 bg-blue-500/10 text-blue-400",
+  critical: "border-red-500 bg-red-950/90 text-red-400",
+  high: "border-orange-500 bg-orange-950/90 text-orange-400",
+  low: "border-green-500 bg-green-950/90 text-green-400",
+  info: "border-blue-500 bg-blue-950/90 text-blue-400",
 };
 
 const URGENCY_ICONS: Record<UrgencyLevel, string> = {
@@ -59,7 +59,8 @@ function ToastItem({
   toast: {
     id: string;
     urgencyLevel: UrgencyLevel;
-    agentName: string;
+    agentName: string | null;
+    title: string;
     description: string;
     autoDismissMs: number | null;
   };
@@ -68,6 +69,7 @@ function ToastItem({
 }): ReactNode {
   const colorClass = URGENCY_COLORS[toast.urgencyLevel];
   const icon = URGENCY_ICONS[toast.urgencyLevel];
+  const headline = toast.agentName ?? toast.title;
 
   useEffect(() => {
     if (toast.autoDismissMs === null) return;
@@ -83,7 +85,7 @@ function ToastItem({
     >
       <span className="text-sm shrink-0">{icon}</span>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-bold truncate">{toast.agentName}</p>
+        <p className="text-xs font-bold truncate">{headline}</p>
         {toast.description && (
           <p className="text-[11px] opacity-80 truncate">{toast.description}</p>
         )}

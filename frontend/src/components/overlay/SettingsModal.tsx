@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, ReactNode } from "react";
+import { useState, useEffect, useCallback, ReactNode } from "react";
 import Modal from "./Modal";
 import {
   usePreferencesStore,
@@ -77,6 +77,7 @@ export default function SettingsModal({
   initialTab = "general",
 }: SettingsModalProps): ReactNode {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
+  const [buildingDirty, setBuildingDirty] = useState(false);
 
   // Sync tab when initialTab changes (e.g. edit-building request)
   useEffect(() => {
@@ -126,6 +127,22 @@ export default function SettingsModal({
 
   const { t } = useTranslation();
 
+  const handleDirtyChange = useCallback((dirty: boolean) => {
+    setBuildingDirty(dirty);
+  }, []);
+
+  const handleTabSwitch = (tab: SettingsTab) => {
+    if (
+      activeTab === "building" &&
+      tab !== "building" &&
+      buildingDirty &&
+      !window.confirm(t("settings.building.unsavedWarning"))
+    ) {
+      return;
+    }
+    setActiveTab(tab);
+  };
+
   const handleLanguageChange = (locale: Locale) => {
     setLanguage(locale);
   };
@@ -146,6 +163,7 @@ export default function SettingsModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
+      dismissible={false}
       title={t("settings.title")}
       footer={
         <button
@@ -162,7 +180,7 @@ export default function SettingsModal({
           <button
             key={tab}
             type="button"
-            onClick={() => setActiveTab(tab)}
+            onClick={() => handleTabSwitch(tab)}
             className={`flex-1 px-4 py-2 rounded-md text-sm font-bold transition-colors ${
               activeTab === tab
                 ? "bg-purple-500/20 border border-purple-500 text-purple-300"
@@ -170,6 +188,9 @@ export default function SettingsModal({
             }`}
           >
             {t(`settings.tabs.${tab}`)}
+            {tab === "building" && buildingDirty && (
+              <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-amber-400 align-middle" />
+            )}
           </button>
         ))}
       </div>
@@ -425,7 +446,7 @@ export default function SettingsModal({
           </div>
         </div>
       ) : (
-        <BuildingTab />
+        <BuildingTab onDirtyChange={handleDirtyChange} />
       )}
     </Modal>
   );

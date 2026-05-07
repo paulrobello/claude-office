@@ -74,6 +74,8 @@ const es: Record<TranslationKey, string> = {
   "settings.building.noFloors": "No hay pisos configurados",
   "settings.building.enableHint":
     "Agrega pisos y mapea nombres de carpetas de proyectos para habilitar la vista de edificio",
+  "settings.building.unsavedWarning":
+    "Tienes cambios sin guardar en el edificio. ¿Descartarlos?",
 
   // Sessions
   "sessions.title": "Sesiones",

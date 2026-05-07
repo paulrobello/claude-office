@@ -13,7 +13,7 @@ export type UrgencyLevel = "critical" | "high" | "low" | "info";
 export interface AttentionToast {
   id: string;
   agentId: string | null;
-  agentName: string;
+  agentName: string | null;
   eventType: EventType;
   urgency: number;
   urgencyLevel: UrgencyLevel;
@@ -120,7 +120,7 @@ export const useAttentionStore = create<AttentionState>()((set, get) => ({
     const toast: AttentionToast = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       agentId: event.agentId ?? null,
-      agentName: event.agentName ?? "Unknown",
+      agentName: event.agentName ?? null,
       eventType: event.type,
       urgency,
       urgencyLevel: level,

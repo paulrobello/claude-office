@@ -78,8 +78,11 @@ export function FloorView({
       : false;
 
   // Filter sessions based on whether this is the lobby or a regular floor.
+  // Lobby only shows active unmatched sessions to avoid flooding with stale data.
   const matchedSessions = isLobby
-    ? sessions.filter((s) => !sessionMatchesAnyFloor(s))
+    ? sessions.filter(
+        (s) => s.status === "active" && !sessionMatchesAnyFloor(s),
+      )
     : floor && floor.rooms.length > 0
       ? sessions.filter((s) =>
           floor.rooms.some((room) => {
@@ -121,19 +124,6 @@ export function FloorView({
         data-tour-id="game-canvas"
         className="flex-grow border border-slate-800 rounded-lg shadow-2xl bg-slate-900 overflow-hidden relative"
       >
-        {/* Floor label overlay */}
-        {floor && (
-          <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 px-2 py-1 bg-black/60 rounded text-xs font-mono">
-            <span>{floor.icon}</span>
-            <span style={{ color: floor.accent }}>{floor.name}</span>
-          </div>
-        )}
-        {isLobby && (
-          <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 px-2 py-1 bg-black/60 rounded text-xs font-mono">
-            <span>{"\u{1F6AA}"}</span>
-            <span className="text-slate-400">Lobby</span>
-          </div>
-        )}
         <OfficeGame />
       </div>
 

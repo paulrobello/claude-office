@@ -74,6 +74,8 @@ const ptBR: Record<TranslationKey, string> = {
   "settings.building.noFloors": "Nenhum andar configurado",
   "settings.building.enableHint":
     "Adicione andares e mapeie nomes de pastas de projetos para ativar a visualização de edifício",
+  "settings.building.unsavedWarning":
+    "Você tem alterações não salvas no edifício. Descartá-las?",
 
   // Sessions
   "sessions.title": "Sessões",

@@ -21,6 +21,27 @@ logger = logging.getLogger(__name__)
 _TOKEN_READ_SIZE = 20_000
 _THINKING_READ_SIZE = 50_000
 
+# Model family → max context window (tokens).
+# Any model not in this map falls back to 200k.
+_CONTEXT_WINDOWS: dict[str, int] = {
+    "opus": 1_000_000,
+    "sonnet": 1_000_000,
+    "haiku": 200_000,
+}
+
+
+def _context_window_for_model(model: str) -> int:
+    """Return the context window size for a Claude model ID.
+
+    Examples: ``claude-opus-4-7`` → 1M, ``claude-sonnet-4-6`` → 1M,
+    ``claude-haiku-4-5`` → 200k.
+    """
+    model_lower = model.lower()
+    for family, window in _CONTEXT_WINDOWS.items():
+        if family in model_lower:
+            return window
+    return 200_000
+
 
 @dataclass
 class TokenTracker:
@@ -79,8 +100,11 @@ class TokenTracker:
             logger.debug(f"No token usage found in {transcript_path}")
             return
 
-        self.total_input_tokens = usage["input_tokens"]
-        self.total_output_tokens = usage["output_tokens"]
+        self.total_input_tokens = int(usage["input_tokens"])
+        self.total_output_tokens = int(usage["output_tokens"])
+        model = usage.get("model")
+        if model and isinstance(model, str):
+            self.max_context_tokens = _context_window_for_model(model)
         logger.info(
             f"Context: {self.context_utilization:.1%} "
             f"({self.total_tokens:,}/{self.max_context_tokens:,} tokens)"
@@ -179,7 +203,7 @@ class TokenTracker:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _extract_token_usage_from_jsonl(self, transcript_path: str) -> dict[str, int] | None:
+    def _extract_token_usage_from_jsonl(self, transcript_path: str) -> dict[str, int | str] | None:
         """Extract the latest token usage from a Claude JSONL transcript file.
 
         Reads the last ~20 KB of the file and walks backwards through
@@ -189,7 +213,7 @@ class TokenTracker:
             transcript_path: Path to the JSONL file.
 
         Returns:
-            Dict with ``input_tokens`` and ``output_tokens``, or None.
+            Dict with ``input_tokens``, ``output_tokens``, and optionally ``model``.
         """
         try:
             path = Path(transcript_path).expanduser()
@@ -220,10 +244,14 @@ class TokenTracker:
                                 + int(usage_dict.get("cache_read_input_tokens", 0) or 0)
                             )
                             output_tokens: int = int(usage_dict.get("output_tokens", 0) or 0)
-                            return {
+                            result: dict[str, int | str] = {
                                 "input_tokens": input_tokens,
                                 "output_tokens": output_tokens,
                             }
+                            model = message.get("model")
+                            if model and isinstance(model, str):
+                                result["model"] = model
+                            return result
                 except (json.JSONDecodeError, KeyError):
                     continue
 

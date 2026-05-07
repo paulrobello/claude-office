@@ -137,23 +137,55 @@ function formDataToFloorConfig(data: FloorFormData): {
 // BUILDING TAB COMPONENT
 // ============================================================================
 
-export function BuildingTab(): ReactNode {
+export function BuildingTab({
+  onDirtyChange,
+}: {
+  onDirtyChange?: (dirty: boolean) => void;
+}): ReactNode {
   const buildingConfig = useNavigationStore((s) => s.buildingConfig);
-  const setBuildingConfig = useNavigationStore((s) => s.setBuildingConfig);
+  const updateBuildingConfig = useNavigationStore(
+    (s) => s.updateBuildingConfig,
+  );
   const { t } = useTranslation();
 
   const [buildingName, setBuildingName] = useState("");
   const [floors, setFloors] = useState<FloorFormData[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [initialData, setInitialData] = useState<{
+    buildingName: string;
+    floors: FloorFormData[];
+  } | null>(null);
 
   // Initialize form from store config
   useEffect(() => {
     if (buildingConfig) {
-      setBuildingName(buildingConfig.buildingName);
-      setFloors(buildingConfig.floors.map(floorConfigToFormData));
+      const name = buildingConfig.buildingName;
+      const fl = buildingConfig.floors.map(floorConfigToFormData);
+      setBuildingName(name);
+      setFloors(fl);
+      setInitialData({ buildingName: name, floors: fl });
     }
   }, [buildingConfig]);
+
+  // Detect dirty state
+  useEffect(() => {
+    if (!initialData) {
+      onDirtyChange?.(false);
+      return;
+    }
+    const dirty =
+      buildingName !== initialData.buildingName ||
+      floors.length !== initialData.floors.length ||
+      floors.some(
+        (f, i) =>
+          f.name !== initialData.floors[i]?.name ||
+          f.repos !== initialData.floors[i]?.repos ||
+          f.accent !== initialData.floors[i]?.accent ||
+          f.icon !== initialData.floors[i]?.icon,
+      );
+    onDirtyChange?.(dirty);
+  }, [buildingName, floors, initialData, onDirtyChange]);
 
   const handleAddFloor = () => {
     const nextFloorNumber =
@@ -201,11 +233,12 @@ export function BuildingTab(): ReactNode {
       });
 
       if (res.ok) {
-        // Update local navigation store
-        setBuildingConfig({
+        // Update local navigation store (no view switch)
+        updateBuildingConfig({
           buildingName: config.building_name,
           floors: config.floors,
         });
+        setInitialData({ buildingName: config.building_name, floors });
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       }
