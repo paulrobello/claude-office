@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEffect, useRef } from "react";
 import { useNavigationStore } from "@/stores/navigationStore";
 import { LOBBY_FLOOR_ID } from "@/types/navigation";
 import { SessionSidebar } from "@/components/layout/SessionSidebar";
@@ -106,6 +107,20 @@ export function FloorView({
     // Then by most recently updated
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
+
+  // On floor entry, auto-switch sessionId to the most recent matching session
+  // if the current session doesn't belong to this floor. Tracked per floorId so
+  // re-entering the same floor doesn't override a manual sidebar pick.
+  const lastAutoSelectedFloorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastAutoSelectedFloorRef.current === floorId) return;
+    if (floorSessions.length === 0) return;
+    lastAutoSelectedFloorRef.current = floorId;
+    const currentInFloor = floorSessions.some((s) => s.id === sessionId);
+    if (!currentInFloor) {
+      void onSessionSelect(floorSessions[0].id);
+    }
+  }, [floorId, floorSessions, sessionId, onSessionSelect]);
 
   return (
     <div className="flex-grow flex gap-2 overflow-hidden min-h-0">

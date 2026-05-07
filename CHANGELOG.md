@@ -31,6 +31,8 @@ All notable changes to Claude Office Visualizer are documented here.
 
 ### Fixed
 
+- **Floor view tab hang**: Disabled `reactStrictMode` to avoid `@pixi/react` v8 `<Application>` mount-unmount-mount race that hung the renderer thread on first floor entry. The second mount tried to acquire a WebGL context while the first was still initializing.
+- **Floor switch session**: Entering a floor now auto-switches the active session to the most recent one belonging to that floor when the current selection is from another floor. Tracked per-`floorId` so re-entering the same floor preserves a manual sidebar pick.
 - **N+1 query**: Session listing now uses single GROUP BY query instead of per-session COUNT (QA-002)
 - **Silent exceptions**: Added logging to all catch blocks in TokenTracker (QA-005)
 - **Console.log cleanup**: Removed 12 debug console.log statements from production frontend code (QA-003)
