@@ -392,7 +392,7 @@ export default function V2TestPage(): React.ReactNode {
             {!isMobile && t("app.title")}
             {!isMobile && (
               <span className="text-xs font-mono font-normal px-2 py-0.5 bg-slate-800 rounded text-slate-400 border border-slate-700">
-                v0.14.0
+                v0.15.0
               </span>
             )}
           </h1>

@@ -134,7 +134,9 @@ graph LR
 | `core/broadcast_service.py` | Service for broadcasting state updates to WebSocket clients |
 | `core/whiteboard_tracker.py` | Tracks whiteboard data (tool usage, agent lifespans, etc.) |
 | `core/floor_config.py` | Building/floor/room configuration models for multi-floor navigation |
+| `core/product_mapper.py` | Maps sessions to floors/rooms based on repo/project name resolution |
 | `core/room_orchestrator.py` | Merges multiple session states into a single GameState for team views |
+| `core/token_tracker.py` | Token usage tracking from JSONL transcripts, tool-use counting, thinking-block extraction |
 | `core/handlers/team_handler.py` | Event handlers for Agent Teams (task_created, task_completed, teammate_idle) |
 | `core/constants.py` | Shared constants |
 | `core/logging.py` | Logging configuration |
@@ -169,7 +171,7 @@ graph LR
 | `components/game/TrashCanSprite.tsx` | Context utilization visualization with stomp effect |
 | `components/game/CityWindow.tsx` | City skyline with real-time day/night cycle |
 | `components/game/EmployeeOfTheMonth.tsx` | Employee of the Month wall poster |
-| `components/game/Whiteboard.tsx` | Multi-mode display with 11 visualization modes (see [WHITEBOARD.md](WHITEBOARD.md)) |
+| `components/game/Whiteboard.tsx` | Multi-mode display with 12 visualization modes |
 | `components/game/SafetySign.tsx` | Tool counter since last compaction |
 | `components/game/PrinterStation.tsx` | Animated printer for report generation |
 | `components/game/Elevator.tsx` | Agent arrival/departure elevator with doors |
@@ -186,7 +188,7 @@ graph LR
 | `components/game/city/buildingRenderer.ts` | City building rendering with lit windows |
 | `components/game/city/skyRenderer.ts` | Sky gradient and celestial body rendering |
 | `components/game/city/timeUtils.ts` | Time period calculations for day/night cycle |
-| `components/game/whiteboard/*.tsx` | Whiteboard mode components (11 modes) |
+| `components/game/whiteboard/*.tsx` | Whiteboard mode components (12 modes) and mode registry |
 | `components/game/shared/drawBubble.ts` | Speech/thought bubble rendering utility |
 | `components/game/shared/drawArm.ts` | Clock arm rendering utility |
 | `components/game/shared/iconMap.ts` | Tool name to icon mapping |
@@ -196,10 +198,25 @@ graph LR
 | `components/layout/MobileDrawer.tsx` | Mobile-friendly drawer component |
 | `components/layout/MobileAgentActivity.tsx` | Mobile agent activity display |
 | `components/layout/StatusToast.tsx` | Toast notification component |
+| `components/attention/CommandBar.tsx` | Fuzzy-search command bar for filtering events |
+| `components/attention/AttentionToasts.tsx` | Urgency-based toast notifications for agent events |
+| `components/attention/AgentPopup.tsx` | Popover for focused agent details and terminal access |
+| `components/navigation/Breadcrumb.tsx` | Two-level breadcrumb (Building > Floor) for multi-floor navigation |
+| `components/navigation/ViewTransition.tsx` | Animated transitions between building/floor/single views |
+| `components/views/BuildingView.tsx` | Building overview showing all floors with active sessions |
+| `components/views/FloorView.tsx` | Floor-level view with office canvas and sidebars |
+| `components/settings/BuildingTab.tsx` | Settings tab for building/floor/room configuration |
+| `components/tour/TourOverlay.tsx` | Guided tour orchestrator with step advancement conditions |
+| `components/tour/NarratorBar.tsx` | Bottom bar with tour step title, description, and progress |
+| `components/tour/PointerRing.tsx` | Animated highlight ring targeting elements by data-tour-id |
+| `components/tour/SpotlightDim.tsx` | Dimming overlay with rectangular cutout for targeted element |
 | `components/overlay/Modal.tsx` | Base modal component |
 | `components/overlay/SettingsModal.tsx` | Settings configuration modal |
 | `stores/gameStore.ts` | Unified Zustand store for all game state (includes bubble queue) |
 | `stores/preferencesStore.ts` | User preferences store (clock type, format) |
+| `stores/attentionStore.ts` | Attention system store for toast/popup focus management |
+| `stores/navigationStore.ts` | Navigation state for building/floor/single view modes |
+| `stores/tourStore.ts` | Guided tour state and step definitions |
 | `systems/compactionAnimation.ts` | Boss stomp animation when context compacts |
 | `systems/animationSystem.ts` | Single RAF loop for all movement and timing |
 | `systems/pathfinding.ts` | A* pathfinding with navigation grid |
@@ -213,6 +230,9 @@ graph LR
 | `hooks/useOfficeTextures.ts` | Texture loading and caching |
 | `hooks/useSessions.ts` | Session listing and management hooks |
 | `hooks/useSessionSwitch.ts` | Session switching logic with auto-follow |
+| `hooks/useFloorConfig.ts` | Fetches building configuration from the backend |
+| `hooks/useFloorSessions.ts` | Filters sessions assigned to a specific floor |
+| `hooks/useRoomSessions.ts` | Filters sessions assigned to a specific room |
 | `hooks/useDragResize.ts` | Drag-to-resize sidebar panels |
 | `hooks/useTranslation.ts` | i18n translation hook |
 | `machines/agentArrivalMachine.ts` | XState machine for agent arrival flow |
@@ -224,6 +244,7 @@ graph LR
 | `machines/queueManager.ts` | Queue management for arrival/departure |
 | `types/index.ts` | TypeScript types barrel (re-exports from generated.ts) |
 | `types/generated.ts` | Auto-generated types from backend Pydantic models |
+| `types/navigation.ts` | Navigation types (ViewMode, BuildingConfig, FloorConfig) |
 | `constants/canvas.ts` | Canvas-related constants |
 | `constants/positions.ts` | Position constants for game elements |
 | `constants/quotes.ts` | Work acceptance and completion quotes |
@@ -232,6 +253,7 @@ graph LR
 | `i18n/es.ts` | Spanish translations |
 | `i18n/pt-BR.ts` | Brazilian Portuguese translations |
 | `utils/event-type-styles.ts` | Event type to style mapping for event log |
+| `utils/bubbleText.ts` | Shared bubble text truncation utilities |
 | `components/debug/sprite-debug/*.tsx` | Sprite builder/debug tool (standalone debug page) |
 
 ### Hooks (`hooks/src/claude_office_hooks/`)
@@ -764,5 +786,5 @@ All configuration is managed via environment variables or a `.env` file in the `
 
 - [README.md](../README.md) - Project overview and quick start
 - [CLAUDE.md](../CLAUDE.md) - AI assistant instructions and commands
-- [WHITEBOARD.md](WHITEBOARD.md) - Whiteboard multi-mode display documentation
-- [Claude Code JSONL Format](research/claude-code-jsonl-format.md) - Transcript file format research
+- [WHITEBOARD.md](WHITEBOARD.md) - Whiteboard multi-mode display documentation _(not yet created)_
+- [Claude Code JSONL Format](research/claude-code-jsonl-format.md) - Transcript file format research _(not yet created)_

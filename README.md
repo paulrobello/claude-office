@@ -23,7 +23,10 @@
 
 ## Screenshots
 
-![Office View](https://raw.githubusercontent.com/paulrobello/claude-office/main/screenshot.png)
+| | |
+|---|---|
+| ![Office View](https://raw.githubusercontent.com/paulrobello/claude-office/main/screenshot.png) | ![Multi-Floor Building](https://raw.githubusercontent.com/paulrobello/claude-office/main/screenshots/sc_floor_office.png) |
+| ![Floor View](https://raw.githubusercontent.com/paulrobello/claude-office/main/screenshots/sc_floor_view.png) | ![Building Settings](https://raw.githubusercontent.com/paulrobello/claude-office/main/screenshots/sc_building_settings.png) |
 
 
 ## About
@@ -35,6 +38,12 @@ The application was built with [Next.js](https://nextjs.org/), [PixiJS](https://
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/probello3)
 
 ## What's New
+
+### v0.15.0 (May 2026)
+
+- **Multi-Floor Building Navigation**: Browse a multi-story building with floor-level views, each with its own office layout and agents
+- **Settings Overhaul**: New building configuration and consolidated general settings tabs
+- **Kanban Whiteboard Mode**: 12th whiteboard mode showing task workflow in columns
 
 ### v0.14.0 (April 2026)
 
@@ -48,17 +57,23 @@ For the full release history, see [CHANGELOG.md](CHANGELOG.md).
 ### Core Capabilities
 - **Real-time Visualization**: Watch Claude Code operations as they happen in an animated office
 - **Boss & Employee Agents**: Main Claude agent as boss, subagents as employees
+- **Multi-Floor Building**: Navigate a multi-story building with independent offices per floor, breadcrumb navigation, and automatic session switching
+
+![Multi-Floor Building](https://raw.githubusercontent.com/paulrobello/claude-office/main/screenshots/sc_floor_office.png)
+
 - **Visual State Indicators**: Working, delegating, waiting states clearly displayed
 - **Thought/Speech Bubbles**: See agent activities and communications
 
 ### Advanced Features
-- **Multi-Mode Whiteboard**: 11 display modes with keyboard shortcuts (0-9, T, B) - todo list, remote workers, tool usage pie chart, org chart, stonks, weather, safety board, timeline, news ticker, coffee tracker, heat map
+- **Multi-Mode Whiteboard**: 12 display modes with keyboard shortcuts (0-9, T, B, K) - todo list, remote workers, tool usage pie chart, org chart, stonks, weather, safety board, timeline, news ticker, coffee tracker, heat map, kanban
 - **Background Task Tracking**: Remote Workers display shows background task status in video-call-style tiles
 - **Context Window Tracking**: Animated trashcan fills with paper as context increases
 - **Compaction Animation**: Boss stomps on trashcan to compact context
 - **City Skyline Window**: Real-time day/night cycle based on local time with animated drifting clouds
 - **Wall Clock**: Click to cycle between analog and digital (12h/24h) display modes
 - **User Preferences**: Settings persist across sessions via backend database
+
+![Settings](https://raw.githubusercontent.com/paulrobello/claude-office/main/screenshots/sc_general_settings.png)
 - **Git Status Panel**: See repository status in real-time
 - **Printer Station**: Printer animates when Claude completes work that produces a report or document
 - **Random Quotes**: Agents display random acceptance/completion quotes when receiving or turning in work
@@ -310,7 +325,7 @@ Contributions are welcome! Please ensure that all pull requests:
 
 - [Quick Start Guide](docs/guides/quickstart.md) - Get running in under 5 minutes
 - [Architecture](docs/architecture/ARCHITECTURE.md) - System design, data flow, component details
-- [Whiteboard Modes](docs/reference/whiteboard-modes.md) - 11 display modes with keyboard shortcuts
+- [Whiteboard Modes](docs/reference/whiteboard-modes.md) - 12 display modes with keyboard shortcuts
 - [Docker Guide](docs/guides/deployment.md) - Docker deployment and configuration
 - [AI Summary](docs/reference/ai-summary.md) - AI-powered summary service documentation
 - [Backend README](backend/README.md) - Backend-specific setup

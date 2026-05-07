@@ -72,7 +72,7 @@ make install-all
 This single command:
 - Installs backend Python dependencies via uv
 - Installs frontend dependencies (auto-detects bun or npm)
-- Installs Claude Code hooks
+- Registers Claude Code hooks and the OpenCode plugin
 
 ### Step 3: (Optional) Enable AI Enhancements
 
@@ -261,7 +261,7 @@ rm backend/visualizer.db
 
 ## Related Documentation
 
-- [README.md](../README.md) - Project overview and full feature list
-- [Architecture](ARCHITECTURE.md) - System design and component details
-- [Docker Guide](DOCKER.md) - Container deployment instructions
-- [AI Summary](AI_SUMMARY.md) - AI-powered summary service documentation
+- [Project README](../../README.md) - Project overview and full feature list
+- [Architecture](../architecture/ARCHITECTURE.md) - System design and component details
+- [Deployment Guide](deployment.md) - Docker and container deployment instructions
+- [AI Summary](../reference/ai-summary.md) - AI-powered summary service documentation

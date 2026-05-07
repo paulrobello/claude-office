@@ -1,6 +1,6 @@
 # Whiteboard Display System
 
-The whiteboard is an interactive office element that displays session data in 11 different visualization modes. Click anywhere on the whiteboard to cycle through modes, or use keyboard shortcuts.
+The whiteboard is an interactive office element that displays session data in 12 different visualization modes. Click anywhere on the whiteboard to cycle through modes, or use keyboard shortcuts.
 
 ## Table of Contents
 
@@ -18,6 +18,7 @@ The whiteboard is an interactive office element that displays session data in 11
   - [Mode 8: News Ticker](#mode-8-news-ticker)
   - [Mode 9: Coffee Tracker](#mode-9-coffee-tracker)
   - [Mode 10: Heat Map](#mode-10-heat-map)
+  - [Mode 11: Kanban](#mode-11-kanban)
 - [Data Flow](#data-flow)
 - [Backend Tracking Logic](#backend-tracking-logic)
 - [Related Documentation](#related-documentation)
@@ -26,11 +27,11 @@ The whiteboard is an interactive office element that displays session data in 11
 
 The whiteboard component visualizes real-time session metrics in whimsical, office-themed displays. Each mode transforms raw session data into an engaging visualization that reflects the current state of Claude Code operations.
 
-**Interaction:** Click the whiteboard to cycle through modes (0 → 1 → 2 → ... → 10 → 0), or use keyboard shortcuts.
+**Interaction:** Click the whiteboard to cycle through modes (0 → 1 → 2 → ... → 11 → 0), or use keyboard shortcuts.
 
 **Visual Elements:**
 - Header bar showing current mode name and icon
-- Mode indicator dots (11 dots at bottom, current mode highlighted)
+- Mode indicator dots (12 dots at bottom, current mode highlighted)
 - Marker tray with colored markers (decorative)
 
 ## Keyboard Shortcuts
@@ -49,8 +50,9 @@ The whiteboard component visualizes real-time session metrics in whimsical, offi
 | `9` | 9 | Coffee Tracker |
 | `T` | 0 | Todo List (alias) |
 | `B` | 1 | Background Tasks / Remote Workers (alias) |
+| `K` | 11 | Kanban (alias) |
 
-Mode 10 (Heat Map) is accessible by clicking from mode 9.
+Mode 10 (Heat Map) is accessible by clicking from mode 9. Mode 11 (Kanban) is accessible by clicking from mode 10 or pressing `K`.
 
 ## Display Modes
 
@@ -312,6 +314,31 @@ Bar chart showing most-edited files during the session.
 
 **Data Source:** `fileEdits` dict populated from Edit/Write tool `file_path` parameter
 
+---
+
+### Mode 11: Kanban
+
+**Icon:** `📌` **Name:** KANBAN
+
+Kanban board with Todo, In Progress, and Done columns showing tracked tasks as sticky notes.
+
+**Layout:**
+- Three columns: TODO, IN PROGRESS, DONE
+- Up to 4 sticky notes per column with overflow indicator
+- Each note shows subject text (truncated), Linear badge (if present), and assignee
+
+**Column Colors:**
+
+| Column | Header Color | Note Background |
+|--------|-------------|-----------------|
+| TODO | Gray | Light slate |
+| IN PROGRESS | Blue | Light blue |
+| DONE | Green | Light green |
+
+**Keyboard Shortcut:** `K`
+
+**Data Source:** `kanbanTasks` array from whiteboard data, containing `KanbanTask` objects with `taskId`, `subject`, `status`, `linearId`, and `assignee` fields
+
 ## Data Flow
 
 ```mermaid
@@ -327,6 +354,8 @@ graph TD
     Hook -->|SUBAGENT_STOP| Backend
     Hook -->|CONTEXT_COMPACTION| Backend
     Hook -->|BACKGROUND_TASK_NOTIFICATION| Backend
+    Hook -->|TASK_CREATED| Backend
+    Hook -->|TASK_COMPLETED| Backend
     Backend -->|state_update| WS
     WS -->|whiteboardData| Store
     Store -->|props| WB
@@ -344,10 +373,10 @@ The `WhiteboardTracker` class (in `backend/app/core/whiteboard_tracker.py`) trac
 
 ### Tool Categorization
 
-Tools are grouped into categories for the pizza chart:
+Tools are grouped into categories for the pizza chart using the module-level `TOOL_CATEGORIES` constant:
 
 ```python
-tool_categories = {
+TOOL_CATEGORIES = {
     "Read": "read",
     "Glob": "read",
     "Grep": "read",
@@ -371,8 +400,12 @@ tool_categories = {
 | `SUBAGENT_STOP` | Agent lifespans (end time), news items |
 | `CONTEXT_COMPACTION` | Coffee cups, news items |
 | `SESSION_START` | News items, resets counters |
+| `SESSION_END` | Cleanup on session end |
 | `STOP` | News items (job completion) |
 | `BACKGROUND_TASK_NOTIFICATION` | Background tasks list, news items |
+| `TASK_CREATED` | Kanban tasks (new task in pending status) |
+| `TASK_COMPLETED` | Kanban tasks (task marked completed) |
+| `TEAMMATE_IDLE` | Kanban tasks (in-progress inference) |
 
 ### Success/Failure Tracking
 
@@ -399,8 +432,8 @@ if tool_name in ("Edit", "Write"):
 
 ## Related Documentation
 
-- [Architecture Overview](ARCHITECTURE.md) - System architecture and component interaction
-- [Whiteboard Tracker](../backend/app/core/whiteboard_tracker.py) - Backend whiteboard data tracking
-- [State Machine](../backend/app/core/state_machine.py) - Backend event processing
-- [Game Store](../frontend/src/stores/gameStore.ts) - Frontend state management
-- [Whiteboard Modes](../frontend/src/components/game/whiteboard/) - Individual mode components
+- [Architecture Overview](../architecture/ARCHITECTURE.md) - System architecture and component interaction
+- [Whiteboard Tracker](../../backend/app/core/whiteboard_tracker.py) - Backend whiteboard data tracking
+- [State Machine](../../backend/app/core/state_machine.py) - Backend event processing
+- [Game Store](../../frontend/src/stores/gameStore.ts) - Frontend state management
+- [Whiteboard Modes](../../frontend/src/components/game/whiteboard/) - Individual mode components

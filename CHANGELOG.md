@@ -4,6 +4,8 @@ All notable changes to Claude Office Visualizer are documented here.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-05-07
+
 ### Security
 
 - **Localhost-only middleware**: All API endpoints now reject non-loopback connections (SEC-001)
@@ -44,6 +46,13 @@ All notable changes to Claude Office Visualizer are documented here.
 - **Cyclomatic complexity**: transition() method reduced from 230 lines to 15 lines via dispatch table (QA-006)
 
 ### Added
+
+- **Multi-floor building navigation**: Browse a building view with multiple floors, each containing its own office layout and agents. Breadcrumb navigation and floor switching with automatic session tracking per floor.
+- **Building settings tab**: Configure floors and building layout from the settings modal.
+- **General settings tab**: Consolidated general preferences in the settings modal.
+- **Kanban whiteboard mode**: 12th whiteboard mode showing task workflow in columns (To Do / In Progress / Done) with color-coded cards.
+
+### Added (Documentation)
 
 - **CONTRIBUTING.md**: Development setup, code style, PR process, and code of conduct (DOC-003)
 - **OpenCode plugin README**: Installation, configuration, event mapping, and development docs (DOC-004)
@@ -171,6 +180,7 @@ All notable changes to Claude Office Visualizer are documented here.
 - **EventProcessor split**: `event_processor.py` (911 lines) extracted into `handlers/session_handler.py`, `handlers/agent_handler.py`, `handlers/tool_handler.py`, `handlers/conversation_handler.py`, and `broadcast_service.py`. Main class now a pure router (~390 lines).
 - **page.tsx split**: `page.tsx` (1045 lines) extracted into layout components (`SessionSidebar`, `MobileDrawer`, `HeaderControls`, `StatusToast`, `MobileAgentActivity`, `RightSidebar`) and custom hooks (`useSessions`, `useSessionSwitch`). Main page reduced to 382 lines.
 - **WhiteboardTracker extracted**: Whiteboard data tracking logic split out of `state_machine.py` into `backend/app/core/whiteboard_tracker.py`.
+- **Whiteboard modes**: Expanded from 11 to 12 modes with Kanban mode addition.
 - **agentMachine split**: `agentMachine.ts` (751 lines) split into `agentMachineCommon.ts` (shared types/guards/actions), `agentArrivalMachine.ts`, and `agentDepartureMachine.ts`.
 - **agentMachineService split**: `agentMachineService.ts` (714 lines) split into `queueManager.ts` (queue reservations) and `positionHelpers.ts` (desk/elevator position helpers).
 - **CityWindow split**: `CityWindow.tsx` (703 lines) split into `city/skyRenderer.ts`, `city/buildingRenderer.ts`, and `city/timeUtils.ts`. Component reduced to 298 lines.

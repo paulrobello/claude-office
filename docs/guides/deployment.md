@@ -38,12 +38,18 @@ graph TD
     Backend --> Frontend
     Backend --> DB
 
-    style CC fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
-    style Hooks fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
-    style ClaudeDir fill:#1a237e,stroke:#3f51b5,stroke-width:2px,color:#ffffff
-    style Backend fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
-    style Frontend fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
-    style DB fill:#1a237e,stroke:#3f51b5,stroke-width:2px,color:#ffffff
+    class CC external
+    class Hooks neutral
+    class ClaudeDir database
+    class Backend primary
+    class Frontend data
+    class DB database
+
+    classDef primary fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
+    classDef database fill:#1a237e,stroke:#3f51b5,stroke-width:2px,color:#ffffff
+    classDef data fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
+    classDef external fill:#4a148c,stroke:#9c27b0,stroke-width:2px,color:#ffffff
+    classDef neutral fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
 ```
 
 > **Note:** The Claude Code hooks always run natively on the host system - only the backend and frontend are containerized.
@@ -111,6 +117,12 @@ CLAUDE_PATH_HOST=/Users/yourusername/.claude
 
 # Optional: Disable AI summaries
 # SUMMARY_ENABLED=false
+
+# Optional: Model for AI summaries (default: claude-haiku-4-5-20251001)
+# SUMMARY_MODEL=claude-haiku-4-5-20251001
+
+# Optional: How often to poll git status (seconds, default: 5)
+# GIT_POLL_INTERVAL=5
 ```
 
 ### Path Translation
@@ -128,10 +140,16 @@ graph LR
     Host -->|translate_path| Container
     Container --> File
 
-    style Hook fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
-    style Host fill:#b71c1c,stroke:#f44336,stroke-width:2px,color:#ffffff
-    style Container fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
-    style File fill:#1a237e,stroke:#3f51b5,stroke-width:2px,color:#ffffff
+    class Hook neutral
+    class Host error
+    class Container active
+    class File database
+
+    classDef primary fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
+    classDef active fill:#1b5e20,stroke:#4caf50,stroke-width:2px,color:#ffffff
+    classDef error fill:#b71c1c,stroke:#f44336,stroke-width:2px,color:#ffffff
+    classDef database fill:#1a237e,stroke:#3f51b5,stroke-width:2px,color:#ffffff
+    classDef neutral fill:#37474f,stroke:#78909c,stroke-width:2px,color:#ffffff
 ```
 
 **Example:**
@@ -166,14 +184,12 @@ graph TD
     Static -->|Copy to /static| Serve
     Python --> UV --> FastAPI --> Serve
 
-    style Bun fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
-    style Install fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
-    style Build fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
-    style Static fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
-    style Python fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
-    style UV fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
-    style FastAPI fill:#e65100,stroke:#ff9800,stroke-width:2px,color:#ffffff
-    style Serve fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
+    class Bun,Install,Build,Static data
+    class Python,UV,FastAPI primary
+    class Serve primary
+
+    classDef primary fill:#e65100,stroke:#ff9800,stroke-width:3px,color:#ffffff
+    classDef data fill:#0d47a1,stroke:#2196f3,stroke-width:2px,color:#ffffff
 ```
 
 ### Volume Mounts
@@ -333,6 +349,6 @@ docker compose up -d
 
 ## Related Documentation
 
-- [Architecture](ARCHITECTURE.md) - System design and component details
-- [AI Summary Service](AI_SUMMARY.md) - AI summary configuration
-- [README](../README.md) - Project overview and native development setup
+- [Architecture](../architecture/ARCHITECTURE.md) - System design and component details
+- [AI Summary Service](../reference/ai-summary.md) - AI summary configuration
+- [README](../../README.md) - Project overview and native development setup

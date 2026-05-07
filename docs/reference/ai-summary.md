@@ -32,7 +32,7 @@ In 10 words or less, what does this {tool_name} tool call do?
 **Fallback Logic:**
 - `Read/Glob/Grep/Write/Edit`: Returns compressed file path (home → `~`, truncate from start)
 - `Bash`: Returns first line of command (max 40 chars)
-- `Task`: Returns first sentence of description (max 40 chars)
+- `Task/Agent`: Returns first sentence of `prompt` or `description` field (max 40 chars)
 - `WebSearch`: Returns `"Search: {query}"` (max 35 chars)
 - `WebFetch`: Returns `"Fetch: {domain}"`
 - Other: Returns tool name
@@ -55,7 +55,7 @@ In 10 words or less, summarize this task:
 
 **Fallback:** First sentence of description (max 50 chars)
 
-**Called From:** `enrich_agent_with_summaries()` in `agent_handler.py` when a subagent spawns
+**Called From:** `enrich_agent_with_summaries()` in `agent_handler.py` when a subagent spawns (also indirectly via `enrich_agent_from_transcript()` for ghost agents recovered after restart)
 
 ---
 
@@ -79,15 +79,20 @@ In one sentence, summarize what this request asks for:
 
 ---
 
-### 4. `generate_agent_name(description)`
+### 4. `generate_agent_name(description, existing_names=None)`
 
-Generates a fun, creative nickname for an agent based on its task.
+Generates a fun, creative nickname for an agent based on its task. Deduplicates against already-assigned names.
 
 **Prompt:**
 ```
 Create a 1-3 word nickname that DIRECTLY relates to the task below. Extract the KEY ACTION or SUBJECT from the task and build the name around it. Examples: 'migrate YAML config' -> YAML Yoda or Config King; 'write unit tests' -> Test Pilot; 'fix database queries' -> Query Queen; 'update documentation' -> Doc Holiday; 'debug auth issue' -> Bug Bounty. The name MUST reference the main subject (YAML, tests, database, docs, etc). Use puns, pop culture, or alliteration. Max 15 chars. Task: {description}
+Names already taken (DO NOT use these): {existing_names}
 Nickname:
 ```
+
+**Parameters:**
+- `description` — Task description used to generate the name (truncated to 500 chars)
+- `existing_names` — `set[str] | None` of names already in use; passed to fallback and used for dedup
 
 **Input Truncation:** 500 characters max
 
@@ -97,9 +102,30 @@ Nickname:
 3. Reject responses with > 3 words or > 20 characters (use fallback instead)
 4. Take at most 3 words
 5. Enforce max 15 characters (truncate to fewer words if exceeds)
+6. If result collides with `existing_names`, return fallback
 
 **Fallback Logic (`generate_agent_name_fallback`):**
-Generates fun, creative names by matching task keywords to themed name lists:
+Generates fun, creative names by matching task keywords to themed name lists. First checks for exact `agent_type` matches, then falls through to keyword-based categories. All selections avoid names in `existing_names`.
+
+**Agent Type Names (exact match on description):**
+
+| Agent Type | Example Names |
+|------------|---------------|
+| general-purpose | The Intern, Helper Bot, Agent X, Minion |
+| explore | Explorer X, The Scout, Data Digger, Researcher R |
+| plan | The Planner, Strategy Sam, Blueprint Bob, Road Mapper |
+| audit-architecture | The Architect, Refactor Rex, Code Ninja |
+| audit-code-quality | The Critic, QA Queen, Inspector G |
+| audit-security | Security Sam, Guard Dog, Sec Spec |
+| audit-documentation | The Scribe, Doc Brown, Word Wizard |
+| fix-architecture | The Architect, Refactor Rex, Code Ninja |
+| fix-code-quality | Bug Squasher, Mr. Fixit, The Fixer |
+| fix-security | Lock Smith, Guard Dog, Security Sam |
+| fix-documentation | Doc Brown, The Scribe, Note Taker |
+| markdown-docs-writer | The Scribe, Doc Brown, Word Wizard |
+| webgl-shader-expert | Pixel Pete, Shader Sam, GPU Guru |
+
+**Keyword-Based Categories:**
 
 | Task Category | Keywords | Example Names |
 |---------------|----------|---------------|
@@ -126,11 +152,11 @@ Generates fun, creative names by matching task keywords to themed name lists:
 | Frontend/UI | frontend, ui, component, react, css | UI Ursula, Pixel Pete, Front Fred, Style Steve |
 | Generic | (no match) | Code Cadet, Bit Buddy, Logic Larry, Algo Al, Helper Bot, Task Force, Agent X, The Intern, Worker Bee, Minion |
 
-Names are randomly selected from each category for variety.
+Names are randomly selected from each category, excluding those in `existing_names`. If all names in a category are taken, `dedupe_name()` appends a numeric suffix (e.g. "The Intern 2").
 
 **Called From:**
 - `enrich_agent_with_summaries()` in `agent_handler.py` when a subagent spawns
-- `_create_agent()` in `state_machine.py` for immediate short name generation
+- `_create_agent()` in `state_machine.py` uses `generate_agent_name_fallback` directly for immediate short name generation
 
 ---
 
@@ -149,8 +175,8 @@ In 15 words or less, summarize this response:
 **Fallback:** First sentence of response (max 100 chars)
 
 **Called From:**
-- `extract_and_set_boss_speech()` in `conversation_handler.py` - Boss speech bubble when session stops
-- `extract_and_set_agent_speech()` in `agent_handler.py` - Agent speech bubble when subagent stops
+- `extract_and_set_boss_speech()` in `conversation_handler.py` — Boss speech bubble when session stops
+- `extract_and_set_agent_speech()` in `agent_handler.py` — Agent speech bubble when subagent stops
 
 ---
 
@@ -202,14 +228,26 @@ The service gracefully falls back to text extraction when:
 
 ```python
 async def _call_with_retry(self, prompt: str, max_retries: int = 1) -> str | None:
+    if not self.client:
+        return None
+    settings = get_settings()
     for attempt in range(max_retries + 1):
         try:
-            response = await self.client.messages.create(...)
-            text = response.content[0].text.strip()
-            # Return None for empty responses to trigger fallback
-            if text:
-                return text
-            logger.debug("AI returned empty response, using fallback")
+            response = await self.client.messages.create(
+                model=self.model,
+                max_tokens=settings.SUMMARY_MAX_TOKENS,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            content = response.content
+            if content and len(content) > 0:
+                first_block = content[0]
+                if hasattr(first_block, "text"):
+                    text = str(first_block.text).strip()
+                    if text:
+                        return text
+                    logger.debug("AI returned empty response, using fallback")
+                    return None
+            logger.debug("AI response had no content, using fallback")
             return None
         except Exception as e:
             if attempt < max_retries:
@@ -217,6 +255,7 @@ async def _call_with_retry(self, prompt: str, max_retries: int = 1) -> str | Non
             else:
                 logger.debug(f"Summary API failed after retry, using fallback: {e}")
                 return None
+    return None
 ```
 
 ---
