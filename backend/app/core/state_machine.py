@@ -871,7 +871,9 @@ class StateMachine:
         name_source = data.agent_name or data.task_description or ""
         summary_service = get_summary_service()
         existing_names = {a.name for a in self.agents.values() if a.name}
-        short_name = summary_service.generate_agent_name_fallback(name_source, existing_names)
+        short_name = summary_service.generate_agent_name_fallback(
+            name_source, existing_names, agent_type=data.agent_type
+        )
 
         task = data.task_description or data.agent_name or None
 

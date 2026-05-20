@@ -14,6 +14,30 @@ logger = logging.getLogger(__name__)
 class SummaryService:
     """Service for generating AI-powered summaries using Claude Haiku."""
 
+    # Subagent_type slugs that have a curated name mapping in
+    # generate_agent_name_fallback. When the Agent tool reports one of these as
+    # the explicit subagent_type, we keep the mapped name and skip the AI namer
+    # (otherwise the AI rewrites e.g. an "explore" agent into "Data Diva").
+    # Keep in sync with the keys of `agent_type_names` below.
+    _MAPPED_AGENT_TYPES: frozenset[str] = frozenset({
+        "general-purpose",
+        "explore",
+        "plan",
+        "audit-architecture",
+        "audit-code-quality",
+        "audit-security",
+        "audit-documentation",
+        "fix-architecture",
+        "fix-code-quality",
+        "fix-security",
+        "fix-documentation",
+        "markdown-docs-writer",
+        "webgl-shader-expert",
+    })
+
+    def _known_agent_types(self) -> frozenset[str]:
+        return self._MAPPED_AGENT_TYPES
+
     def __init__(self) -> None:
         """Initialize the summary service with OAuth token if available."""
         settings = get_settings()
@@ -94,10 +118,18 @@ class SummaryService:
         return fallback
 
     async def generate_agent_name(
-        self, description: str, existing_names: set[str] | None = None
+        self,
+        description: str,
+        existing_names: set[str] | None = None,
+        agent_type: str | None = None,
     ) -> str:
         """Generate a fun, creative nickname for an agent based on its task."""
-        fallback = self.generate_agent_name_fallback(description, existing_names)
+        fallback = self.generate_agent_name_fallback(description, existing_names, agent_type)
+
+        # If the name came from an explicit, curated agent_type mapping, keep it
+        # rather than asking the AI to "improve" it.
+        if agent_type and agent_type.strip().lower() in self._known_agent_types():
+            return fallback
 
         if not self.enabled or not self.client:
             return fallback
@@ -138,16 +170,21 @@ class SummaryService:
         return fallback
 
     def generate_agent_name_fallback(
-        self, description: str, existing_names: set[str] | None = None
+        self,
+        description: str,
+        existing_names: set[str] | None = None,
+        agent_type: str | None = None,
     ) -> str:
-        """Generate a fun, creative agent name based on task type."""
+        """Generate a fun, creative agent name based on agent_type or task type."""
         import random
 
-        if not description or not description.strip():
+        taken = existing_names or set()
+
+        if (not description or not description.strip()) and not (agent_type and agent_type.strip()):
             return self.dedupe_name("The Intern", existing_names)
 
-        desc_lower = description.strip().lower()
-        taken = existing_names or set()
+        desc_lower = (description or "").strip().lower()
+        type_lower = (agent_type or "").strip().lower()
 
         # Handle agent_type values (subagent_type from Agent tool)
         agent_type_names: dict[str, list[str]] = {
@@ -165,9 +202,18 @@ class SummaryService:
             "markdown-docs-writer": ["The Scribe", "Doc Brown", "Word Wizard"],
             "webgl-shader-expert": ["Pixel Pete", "Shader Sam", "GPU Guru"],
         }
-        # Check for exact agent_type match
-        for agent_type, names in agent_type_names.items():
-            if desc_lower == agent_type or desc_lower.startswith(agent_type):
+        # Priority 1: exact match on the explicit subagent_type from the Agent tool.
+        # This is the reliable signal — task descriptions rarely start with the slug.
+        if type_lower and type_lower in agent_type_names:
+            names = agent_type_names[type_lower]
+            available = [n for n in names if n not in taken]
+            if available:
+                return random.choice(available)
+            return self.dedupe_name(random.choice(names), taken)
+
+        # Priority 2: legacy heuristic — description literally starts with a slug.
+        for at_key, names in agent_type_names.items():
+            if desc_lower == at_key or desc_lower.startswith(at_key):
                 available = [n for n in names if n not in taken]
                 if available:
                     return random.choice(available)

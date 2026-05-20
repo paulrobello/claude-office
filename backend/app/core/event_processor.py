@@ -937,8 +937,14 @@ class EventProcessor:
             case EventType.SUBAGENT_START:
                 return f"Spawned subagent: {data.agent_name or data.agent_id}"
             case EventType.SUBAGENT_STOP:
-                status = "successfully" if data.success else "with errors"
-                return f"Subagent {data.agent_id} finished {status}"
+                # Native SubagentStop hook only sets native_agent_id; fall back to it,
+                # and default success=True when neither agent_id nor explicit failure marker
+                # is present (native hook fires on success).
+                aid = data.agent_id or (
+                    f"subagent_{data.native_agent_id}" if data.native_agent_id else "unknown"
+                )
+                status = "successfully" if (data.success or data.success is None) else "with errors"
+                return f"Subagent {aid} finished {status}"
             case EventType.STOP:
                 return "Main agent task complete"
             case EventType.CLEANUP:

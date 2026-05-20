@@ -278,7 +278,9 @@ async def enrich_agent_with_summaries(
     task_source = event_data.task_description or event_data.agent_name or ""
 
     if name_source:
-        agent.name = await summary_service.generate_agent_name(name_source, existing_names)
+        agent.name = await summary_service.generate_agent_name(
+            name_source, existing_names, agent_type=event_data.agent_type
+        )
 
         # Final dedup guard in case of race
         if existing_names and agent.name in existing_names:
