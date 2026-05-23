@@ -6,20 +6,16 @@ from typing import Any
 from fastapi import WebSocket
 from starlette.websockets import WebSocketState
 
+from app.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 # Valid session/room IDs: alphanumeric, dashes, underscores only
 _VALID_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{1,128}$")
 
-# Origins permitted for WebSocket connections (localhost only)
-_ALLOWED_WS_ORIGINS = frozenset(
-    {
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-    }
-)
+# Origins permitted for WebSocket connections — sourced from settings.BACKEND_CORS_ORIGINS
+# so a single .env entry controls both HTTP CORS and WebSocket allowlist.
+_ALLOWED_WS_ORIGINS = frozenset(get_settings().BACKEND_CORS_ORIGINS)
 
 
 def validate_websocket_origin(websocket: WebSocket) -> bool:
