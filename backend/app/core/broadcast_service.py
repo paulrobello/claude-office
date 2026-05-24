@@ -11,10 +11,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from app.api.websocket import manager
+from app.core.floor_config import BuildingConfig
 from app.core.state_machine import StateMachine
 from app.models.sessions import GameState, HistoryEntry
 
 if TYPE_CHECKING:
+    from app.core.building_orchestrator import BuildingOrchestrator
     from app.core.room_orchestrator import RoomOrchestrator
 
 __all__ = [
@@ -22,6 +24,7 @@ __all__ = [
     "broadcast_event",
     "broadcast_error",
     "broadcast_room_state",
+    "broadcast_building_state",
 ]
 
 
@@ -91,4 +94,29 @@ async def broadcast_room_state(room_id: str, orchestrator: RoomOrchestrator) -> 
             "state": merged_state.model_dump(mode="json", by_alias=True),
         },
         room_id,
+    )
+
+
+async def broadcast_building_state(
+    orchestrator: BuildingOrchestrator,
+    sessions: dict[str, StateMachine],
+    config: BuildingConfig,
+    display_names: dict[str, str] | None = None,
+) -> None:
+    """Broadcast the compact BuildingState to all /ws/building clients.
+
+    No-ops (and skips building the state) when no clients are connected.
+    Uses the live module-level manager so override_manager() in tests works.
+    """
+    import app.api.websocket as _ws
+
+    live_manager = _ws.manager
+    if not live_manager.building_connections:
+        return
+    state = orchestrator.build_state(sessions, config, display_names)
+    await live_manager.broadcast_building(
+        {
+            "type": "building_state",
+            "state": state.model_dump(mode="json", by_alias=True),
+        }
     )
