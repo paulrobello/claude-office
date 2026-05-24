@@ -20,7 +20,9 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from app.config import get_settings
 from app.core.beads_poller import get_beads_poller, has_beads, init_beads_poller
+from app.core.building_orchestrator import BuildingOrchestrator
 from app.core.broadcast_service import (
+    broadcast_building_state,
     broadcast_error,
     broadcast_event,
     broadcast_room_state,
@@ -53,6 +55,7 @@ from app.core.transcript_poller import init_transcript_poller
 from app.db.database import AsyncSessionLocal
 from app.db.models import EventRecord, SessionRecord
 from app.models.agents import AgentState
+from app.models.building import BuildingState
 from app.models.common import TodoItem
 from app.models.events import Event, EventData, EventType
 from app.models.sessions import ConversationEntry, GameState, HistoryEntry
@@ -161,6 +164,8 @@ class EventProcessor:
         """Initialize the EventProcessor with empty session and orchestrator registries."""
         self.sessions: dict[str, StateMachine] = {}
         self.orchestrators: dict[str, RoomOrchestrator] = {}
+        self.building_orchestrator = BuildingOrchestrator()
+        self._display_names: dict[str, str] = {}
         self._sessions_lock = asyncio.Lock()
         self._transcript_poller_initialized = False
         self._task_poller_initialized = False
@@ -270,6 +275,13 @@ class EventProcessor:
             return sm.to_game_state(session_id)
         return None
 
+    def build_building_snapshot(self) -> BuildingState:
+        """Build the current compact BuildingState from in-memory sessions."""
+        config = get_cached_building_config()
+        return self.building_orchestrator.build_state(
+            self.sessions, config, self._display_names
+        )
+
     async def get_project_root(self, session_id: str) -> str | None:
         """Get the cached project_root for a session from the database.
 
@@ -357,6 +369,18 @@ class EventProcessor:
                 resolved_room_id = assignment.room_id
 
         await self._persist_event(event, resolved_floor_id, resolved_room_id)
+
+        # Track display name + floor activity for the building feed.
+        if event.data:
+            source_dir = event.data.project_dir or event.data.working_dir
+            display = derive_display_name(
+                working_dir=source_dir, project_name=event.data.project_name
+            )
+            if display:
+                self._display_names[event.session_id] = display
+        self.building_orchestrator.record_activity(
+            resolved_floor_id, event.timestamp.isoformat()
+        )
 
         if event.session_id not in self.sessions:
             await self._restore_session(event.session_id)
@@ -455,6 +479,14 @@ class EventProcessor:
         # ------------------------------------------------------------------
         await broadcast_state(event.session_id, sm)
         await broadcast_event(event.session_id, event_dict)
+
+        # Building-level broadcast (all-floors live view)
+        await broadcast_building_state(
+            self.building_orchestrator,
+            self.sessions,
+            building_config,
+            self._display_names,
+        )
 
         # ------------------------------------------------------------------
         # Room orchestrator broadcast (team sessions)
