@@ -47,6 +47,7 @@ export function BuildingView({ sessions }: BuildingViewProps): React.ReactNode {
   const view = useNavigationStore((s) => s.view);
   useBuildingFeed({ enabled: view === "building" });
   const live = useBuildingStore((s) => s.buildingState);
+  const feedConnected = useBuildingStore((s) => s.isConnected);
 
   // Prefer live lobby count from feed; fall back to prop-based unmatched count.
   const lobbyCount =
@@ -71,6 +72,12 @@ export function BuildingView({ sessions }: BuildingViewProps): React.ReactNode {
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold text-white tracking-tight mb-1">
           {buildingConfig.buildingName}
+          <span
+            className={`inline-block w-2 h-2 rounded-full ml-2 align-middle ${
+              feedConnected ? "bg-emerald-500" : "bg-slate-600"
+            }`}
+            title={feedConnected ? "Feed ao vivo conectado" : "Feed desconectado"}
+          />
         </h2>
         <div className="flex items-center justify-center gap-3">
           <p className="text-sm text-slate-500 font-mono">
