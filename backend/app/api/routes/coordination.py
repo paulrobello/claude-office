@@ -6,10 +6,12 @@ Degrade gracioso: qualquer falha de conexão vira HTTP 503 com payload claro.
 
 from __future__ import annotations
 
+import json
 import logging
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, InterfaceError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -208,4 +210,115 @@ async def dashboard(
         }
     except (OperationalError, InterfaceError, DBAPIError) as exc:
         logger.warning("coordination /dashboard unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail=_DOWN_DETAIL) from exc
+
+
+# ── /hitl ─────────────────────────────────────────────────────────────────────
+# Prompts HITL (human-in-the-loop) pendentes + join issues (title/url) p/ contexto.
+_HITL_LIST_SQL = text("""
+SELECT h.id, h.source_ref, h.session_id, h.agent, h.project,
+       h.question, h.context, h.kind, h.options, h.status, h.answer,
+       h.created_at, h.expires_at,
+       i.title AS issue_title, i.url AS issue_url
+FROM hitl_prompts h
+LEFT JOIN issues i ON i.source_ref = h.source_ref
+WHERE (CAST(:status AS text) IS NULL OR h.status = CAST(:status AS text))
+ORDER BY h.created_at DESC
+LIMIT :limit OFFSET :offset
+""")
+
+
+@router.get("/hitl")
+async def list_hitl(
+    db: Annotated[AsyncSession, Depends(get_coordination_db)],
+    status: str | None = Query("pending", pattern="^(pending|answered|expired)$"),
+    limit: int = Query(200, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+) -> dict[str, Any]:
+    try:
+        result = await db.execute(
+            _HITL_LIST_SQL,
+            {"status": status, "limit": limit, "offset": offset},
+        )
+        return {"prompts": _row_dicts(result)}
+    except (OperationalError, InterfaceError, DBAPIError) as exc:
+        logger.warning("coordination /hitl unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail=_DOWN_DETAIL) from exc
+
+
+class HitlAnswerBody(BaseModel):
+    answer: bool | str | list[str]
+    answered_by: str = "web"
+
+
+# UPDATE pontual e escopado: a engine de coordenação é read-only POR CONVENÇÃO
+# (nenhuma outra rota emite DML); este é o ÚNICO write, restrito a hitl_prompts e
+# idempotente pelo WHERE status='pending'. Não relaxa o read-only do resto.
+_HITL_FETCH_SQL = text("SELECT kind, options, status FROM hitl_prompts WHERE id = :id")
+_HITL_ANSWER_SQL = text("""
+UPDATE hitl_prompts
+   SET status='answered', answer = CAST(:answer AS jsonb),
+       answered_at = now(), answered_by = :answered_by
+ WHERE id = :id AND status = 'pending'
+ RETURNING id
+""")
+
+
+def _validate_answer(
+    kind: str, options: Any, answer: bool | str | list[str]
+) -> str | None:
+    """Retorna mensagem de erro se a resposta não casa com o kind/options; None se ok."""
+    opt_list = cast("list[dict[str, str]]", options) if isinstance(options, list) else []
+    keys = {o["key"] for o in opt_list}
+    if kind == "yesno":
+        ok = isinstance(answer, bool)
+    elif kind == "text":
+        ok = isinstance(answer, str)
+    elif kind == "choice":
+        ok = isinstance(answer, str) and answer in keys
+    elif kind == "multi":
+        ok = isinstance(answer, list) and len(answer) > 0 and set(answer) <= keys
+    else:
+        ok = True
+    return None if ok else f"resposta inválida para kind={kind}"
+
+
+@router.post("/hitl/{prompt_id}/answer")
+async def answer_hitl(
+    prompt_id: int,
+    body: HitlAnswerBody,
+    db: Annotated[AsyncSession, Depends(get_coordination_db)],
+) -> dict[str, Any]:
+    try:
+        row = (await db.execute(_HITL_FETCH_SQL, {"id": prompt_id})).mappings().first()
+        if row is None:
+            raise HTTPException(status_code=404, detail={"error": "hitl_not_found"})
+        if row["status"] != "pending":
+            raise HTTPException(
+                status_code=409,
+                detail={"error": "hitl_already_resolved", "status": row["status"]},
+            )
+        err = _validate_answer(row["kind"], row["options"], body.answer)
+        if err:
+            raise HTTPException(
+                status_code=422, detail={"error": "invalid_answer", "message": err}
+            )
+
+        result = await db.execute(
+            _HITL_ANSWER_SQL,
+            {
+                "id": prompt_id,
+                "answer": json.dumps(body.answer),
+                "answered_by": body.answered_by,
+            },
+        )
+        updated = result.first()
+        await db.commit()
+        if updated is None:  # corrida entre fetch e update
+            raise HTTPException(status_code=409, detail={"error": "hitl_already_resolved"})
+        return {"id": prompt_id, "status": "answered"}
+    except HTTPException:
+        raise
+    except (OperationalError, InterfaceError, DBAPIError) as exc:
+        logger.warning("coordination /hitl answer unavailable: %s", exc)
         raise HTTPException(status_code=503, detail=_DOWN_DETAIL) from exc
