@@ -8,6 +8,7 @@ Outputs ../frontend/src/types/generated.ts via json-schema-to-typescript.
 """
 
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -83,10 +84,13 @@ schema_path.write_text(json.dumps(full_schema, indent=2), encoding="utf-8")
 
 # Convert to TypeScript
 output_path = Path(__file__).parent.parent / "frontend" / "src" / "types" / "generated.ts"
+
+# Prefer bunx, fall back to npx when bun is not installed.
+_runner = "bunx" if shutil.which("bunx") else "npx"
 try:
     result = subprocess.run(
         [
-            "bunx",
+            _runner,
             "json2ts",
             "--input",
             str(schema_path),

@@ -1,5 +1,17 @@
 """Tests for building-level aggregation models and orchestrator."""
 
+from unittest.mock import AsyncMock
+
+import pytest
+from starlette.websockets import WebSocketState
+
+from app.api.websocket import ConnectionManager, override_manager
+from app.core.broadcast_service import broadcast_building_state
+from app.core.building_orchestrator import BuildingOrchestrator
+from app.core.event_processor import EventProcessor
+from app.core.floor_config import BuildingConfig, FloorConfig, RoomConfig
+from app.core.state_machine import OfficePhase, StateMachine
+from app.models.agents import Agent, AgentState, BossState
 from app.models.building import (
     AgentLive,
     BuildingState,
@@ -8,6 +20,39 @@ from app.models.building import (
     LobbyLive,
     SessionLive,
 )
+
+
+def _config() -> BuildingConfig:
+    return BuildingConfig(
+        building_name="HMTrack",
+        floors=[
+            FloorConfig(
+                id="backend",
+                name="Backend",
+                floor_number=4,
+                accent="#0ea5e9",
+                icon="⚙️",
+                rooms=[RoomConfig(id="hmtrack-api-py", repo_name="hmtrack-api-py")],
+            ),
+            FloorConfig(
+                id="frontend",
+                name="Frontend",
+                floor_number=2,
+                accent="#7c3aed",
+                icon="🖥️",
+                rooms=[RoomConfig(id="hmtrack-front", repo_name="hmtrack-front")],
+            ),
+        ],
+    )
+
+
+def _active_sm(floor_id: str | None) -> StateMachine:
+    sm = StateMachine()
+    sm.phase = OfficePhase.WORKING
+    sm.boss_state = BossState.WORKING
+    sm.boss_current_task = "doing work"
+    sm.floor_id = floor_id
+    return sm
 
 
 class TestBuildingModels:
@@ -55,45 +100,6 @@ class TestBuildingModels:
         assert dumped["totals"]["activeAgents"] == 2
 
 
-from app.core.building_orchestrator import BuildingOrchestrator
-from app.core.floor_config import BuildingConfig, FloorConfig, RoomConfig
-from app.core.state_machine import OfficePhase, StateMachine
-from app.models.agents import Agent, AgentState, BossState
-
-
-def _config() -> BuildingConfig:
-    return BuildingConfig(
-        building_name="HMTrack",
-        floors=[
-            FloorConfig(
-                id="backend",
-                name="Backend",
-                floor_number=4,
-                accent="#0ea5e9",
-                icon="⚙️",
-                rooms=[RoomConfig(id="hmtrack-api-py", repo_name="hmtrack-api-py")],
-            ),
-            FloorConfig(
-                id="frontend",
-                name="Frontend",
-                floor_number=2,
-                accent="#7c3aed",
-                icon="🖥️",
-                rooms=[RoomConfig(id="hmtrack-front", repo_name="hmtrack-front")],
-            ),
-        ],
-    )
-
-
-def _active_sm(floor_id: str | None) -> StateMachine:
-    sm = StateMachine()
-    sm.phase = OfficePhase.WORKING
-    sm.boss_state = BossState.WORKING
-    sm.boss_current_task = "doing work"
-    sm.floor_id = floor_id
-    return sm
-
-
 class TestBuildingOrchestrator:
     def test_groups_sessions_by_floor(self) -> None:
         orch = BuildingOrchestrator()
@@ -123,6 +129,15 @@ class TestBuildingOrchestrator:
         orch = BuildingOrchestrator()
         sm = _active_sm("backend")
         sm.phase = OfficePhase.ENDED
+        state = orch.build_state({"s1": sm}, _config())
+        assert all(len(f.sessions) == 0 for f in state.floors)
+        assert state.totals.active_sessions == 0
+
+    def test_empty_phase_session_excluded(self) -> None:
+        """A freshly-created StateMachine (phase EMPTY) is not yet active."""
+        orch = BuildingOrchestrator()
+        sm = StateMachine()  # defaults to OfficePhase.EMPTY
+        sm.floor_id = "backend"
         state = orch.build_state({"s1": sm}, _config())
         assert all(len(f.sessions) == 0 for f in state.floors)
         assert state.totals.active_sessions == 0
@@ -157,19 +172,9 @@ class TestBuildingOrchestrator:
         assert backend.last_activity_at == "2026-05-23T10:00:00"
 
 
-import pytest
-
-from app.api.websocket import ConnectionManager, override_manager
-
-
 class TestBroadcastBuildingState:
     @pytest.mark.asyncio
     async def test_broadcast_builds_and_sends_when_connected(self) -> None:
-        from unittest.mock import AsyncMock
-        from starlette.websockets import WebSocketState
-
-        from app.core.broadcast_service import broadcast_building_state
-
         mgr = ConnectionManager()
         ws = AsyncMock()
         ws.client_state = WebSocketState.CONNECTED
@@ -187,8 +192,6 @@ class TestBroadcastBuildingState:
 
     @pytest.mark.asyncio
     async def test_broadcast_noop_when_no_connections(self) -> None:
-        from app.core.broadcast_service import broadcast_building_state
-
         override_manager(ConnectionManager())
         orch = BuildingOrchestrator()
         # Must not raise and must not build needlessly — just returns.
@@ -197,8 +200,6 @@ class TestBroadcastBuildingState:
 
 class TestEventProcessorWiring:
     def test_processor_exposes_building_snapshot(self) -> None:
-        from app.core.event_processor import EventProcessor
-
         ep = EventProcessor()
         assert hasattr(ep, "building_orchestrator")
         assert isinstance(ep.build_building_snapshot(), BuildingState)
