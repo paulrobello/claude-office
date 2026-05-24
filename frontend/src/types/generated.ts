@@ -49,6 +49,11 @@ export type Agentname = string;
 export type Color1 = string;
 export type Starttime = string;
 export type Endtime = string | null;
+export type Id1 = string;
+export type Name1 = string | null;
+export type State = string;
+export type Task = string | null;
+export type Color2 = string;
 export type Taskid = string;
 export type Status = string;
 export type Summary = string | null;
@@ -71,6 +76,27 @@ export type BossState =
   | "reviewing"
   | "completing";
 export type Currenttask1 = string | null;
+export type Buildingname = string;
+export type Floorid = string;
+export type Name2 = string;
+export type Floornumber = number;
+export type Accent = string;
+export type Icon1 = string;
+export type Sessionid = string;
+export type Displayname = string;
+export type Bossstate = string;
+export type Bosstask = string | null;
+export type Agents = AgentLive[];
+export type Sessions = SessionLive[];
+export type Agentcount = number;
+export type Isactive = boolean;
+export type Lastactivityat = string | null;
+export type Floors = FloorLive[];
+export type Sessions1 = SessionLive[];
+export type Agentcount1 = number;
+export type Activeagents = number;
+export type Activefloors = number;
+export type Activesessions = number;
 export type Path = string;
 /**
  * Git file status codes.
@@ -94,7 +120,7 @@ export type Timestamp = string;
  * Human-readable relative time (e.g., '2 hours ago')
  */
 export type RelativeTime = string;
-export type Id1 = string;
+export type Id2 = string;
 export type Role = string;
 export type Agentid1 = string;
 export type Text1 = string;
@@ -183,8 +209,8 @@ export type TaskId = string | null;
 export type TaskSubject = string | null;
 export type Filepath = string;
 export type Editcount = number;
-export type Sessionid = string;
-export type Agents = Agent[];
+export type Sessionid1 = string;
+export type Agents1 = Agent[];
 export type Deskcount = number;
 /**
  * Visual states for the elevator.
@@ -198,7 +224,7 @@ export type Contextutilization = number;
 export type Toolusessincecompaction = number;
 export type Printreport = boolean;
 export type Lastupdated = string;
-export type Id2 = string;
+export type Id3 = string;
 export type Type = string;
 export type Agentid2 = string;
 export type Summary2 = string;
@@ -247,7 +273,7 @@ export type Newsitems = NewsItem[];
 export type Coffeecups = number;
 export type Backgroundtasks = BackgroundTask[];
 export type Conversation = ConversationEntry[];
-export type Floorid = string | null;
+export type Floorid1 = string | null;
 export type Roomid = string | null;
 /**
  * Current branch name
@@ -278,7 +304,7 @@ export type RepoPath = string;
  * via the `definition` "PhoneState".
  */
 export type PhoneState1 = "idle" | "ringing" | "in_use";
-export type Id3 = string;
+export type Id4 = string;
 export type CreatedAt = string;
 export type UpdatedAt = string;
 export type Status2 = string;
@@ -341,6 +367,20 @@ export interface AgentLifespan {
   [k: string]: unknown;
 }
 /**
+ * A single agent projected for the building view.
+ *
+ * This interface was referenced by `ClaudeOfficeBackendTypes`'s JSON-Schema
+ * via the `definition` "AgentLive".
+ */
+export interface AgentLive {
+  id: Id1;
+  name?: Name1;
+  state: State;
+  task?: Task;
+  color: Color2;
+  [k: string]: unknown;
+}
+/**
  * Background task tracking for remote workers display.
  *
  * This interface was referenced by `ClaudeOfficeBackendTypes`'s JSON-Schema
@@ -369,6 +409,74 @@ export interface Boss {
 }
 export interface Position1 {
   [k: string]: number;
+}
+/**
+ * Complete compact state for the all-floors building view.
+ *
+ * This interface was referenced by `ClaudeOfficeBackendTypes`'s JSON-Schema
+ * via the `definition` "BuildingState".
+ */
+export interface BuildingState {
+  buildingName: Buildingname;
+  floors?: Floors;
+  lobby?: LobbyLive;
+  totals?: BuildingTotals;
+  [k: string]: unknown;
+}
+/**
+ * One floor of the building with its active sessions.
+ *
+ * This interface was referenced by `ClaudeOfficeBackendTypes`'s JSON-Schema
+ * via the `definition` "FloorLive".
+ */
+export interface FloorLive {
+  floorId: Floorid;
+  name: Name2;
+  floorNumber: Floornumber;
+  accent: Accent;
+  icon: Icon1;
+  sessions?: Sessions;
+  agentCount?: Agentcount;
+  isActive?: Isactive;
+  lastActivityAt?: Lastactivityat;
+  [k: string]: unknown;
+}
+/**
+ * One active session within a floor (or the lobby).
+ *
+ * This interface was referenced by `ClaudeOfficeBackendTypes`'s JSON-Schema
+ * via the `definition` "SessionLive".
+ */
+export interface SessionLive {
+  sessionId: Sessionid;
+  displayName: Displayname;
+  bossState: Bossstate;
+  bossTask?: Bosstask;
+  agents?: Agents;
+  [k: string]: unknown;
+}
+/**
+ * Active sessions not assigned to any floor.
+ *
+ * This interface was referenced by `ClaudeOfficeBackendTypes`'s JSON-Schema
+ * via the `definition` "LobbyLive".
+ */
+export interface LobbyLive {
+  sessions?: Sessions1;
+  agentCount?: Agentcount1;
+  [k: string]: unknown;
+}
+/**
+ * Aggregate counts across the whole building.
+ *
+ * This interface was referenced by `ClaudeOfficeBackendTypes`'s JSON-Schema
+ * via the `definition` "BuildingTotals".
+ */
+export interface BuildingTotals {
+  activeAgents?: Activeagents;
+  activeFloors?: Activefloors;
+  activeSessions?: Activesessions;
+  [k: string]: unknown;
 }
 /**
  * A file with changes in the working tree or index.
@@ -403,7 +511,7 @@ export interface Commit {
  * via the `definition` "ConversationEntry".
  */
 export interface ConversationEntry {
-  id: Id1;
+  id: Id2;
   role: Role;
   agentId: Agentid1;
   text: Text1;
@@ -502,9 +610,9 @@ export interface FileEdit {
  * via the `definition` "GameState".
  */
 export interface GameState {
-  sessionId: Sessionid;
+  sessionId: Sessionid1;
   boss: Boss;
-  agents: Agents;
+  agents: Agents1;
   office: OfficeState;
   lastUpdated: Lastupdated;
   history?: History;
@@ -513,7 +621,7 @@ export interface GameState {
   departureQueue?: Departurequeue;
   whiteboardData?: WhiteboardData;
   conversation?: Conversation;
-  floorId?: Floorid;
+  floorId?: Floorid1;
   roomId?: Roomid;
   [k: string]: unknown;
 }
@@ -539,7 +647,7 @@ export interface OfficeState {
  * via the `definition` "HistoryEntry".
  */
 export interface HistoryEntry {
-  id: Id2;
+  id: Id3;
   type: Type;
   agentId: Agentid2;
   summary: Summary2;
@@ -648,7 +756,7 @@ export interface GitStatus {
  * via the `definition` "Session".
  */
 export interface Session {
-  id: Id3;
+  id: Id4;
   created_at: CreatedAt;
   updated_at: UpdatedAt;
   status: Status2;

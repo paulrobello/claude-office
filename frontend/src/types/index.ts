@@ -53,62 +53,17 @@ export type {
 export type { Commit, Commit as GitCommit } from "./generated";
 
 // ============================================================================
-// BUILDING VIEW TYPES — compact live feed models (from backend/app/models/building.py)
-// NOTE: Run `make gen-types` (requires bunx/json2ts) to regenerate generated.ts
-// and replace these inline definitions with re-exports from ./generated.
+// BUILDING VIEW TYPES — compact live feed (re-exported from ./generated)
 // ============================================================================
 
-/** A single agent projected for the building live view. */
-export interface AgentLive {
-  id: string;
-  name?: string | null;
-  state: string;
-  task?: string | null;
-  color: string;
-}
-
-/** One active session within a floor (or the lobby). */
-export interface SessionLive {
-  sessionId: string;
-  displayName: string;
-  bossState: string;
-  bossTask?: string | null;
-  agents: AgentLive[];
-}
-
-/** One floor of the building with its active sessions. */
-export interface FloorLive {
-  floorId: string;
-  name: string;
-  floorNumber: number;
-  accent: string;
-  icon: string;
-  sessions: SessionLive[];
-  agentCount: number;
-  isActive: boolean;
-  lastActivityAt?: string | null;
-}
-
-/** Active sessions not assigned to any floor. */
-export interface LobbyLive {
-  sessions: SessionLive[];
-  agentCount: number;
-}
-
-/** Aggregate counts across the whole building. */
-export interface BuildingTotals {
-  activeAgents: number;
-  activeFloors: number;
-  activeSessions: number;
-}
-
-/** Complete compact state for the all-floors building view. */
-export interface BuildingState {
-  buildingName: string;
-  floors: FloorLive[];
-  lobby: LobbyLive;
-  totals: BuildingTotals;
-}
+export type {
+  AgentLive,
+  SessionLive,
+  FloorLive,
+  LobbyLive,
+  BuildingTotals,
+  BuildingState,
+} from "./generated";
 
 // ============================================================================
 // FRONTEND-ONLY TYPES — not derived from backend models
