@@ -262,7 +262,7 @@ const ptBR: Record<TranslationKey, string> = {
   "hitl.no": "Não",
   "hitl.submit": "Responder",
   "hitl.textPlaceholder": "Digite sua resposta…",
-  "hitl.noIssueSection": "Prompts sem issue",
+  "hitl.noIssueSection": "Outros prompts aguardando",
 };
 
 export default ptBR;

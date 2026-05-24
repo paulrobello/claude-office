@@ -260,7 +260,7 @@ const en = {
   "hitl.no": "No",
   "hitl.submit": "Respond",
   "hitl.textPlaceholder": "Type your answer…",
-  "hitl.noIssueSection": "Prompts without issue",
+  "hitl.noIssueSection": "Other awaiting prompts",
 } as const;
 
 export type TranslationKey = keyof typeof en;

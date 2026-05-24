@@ -64,10 +64,15 @@ export default function TasksPage(): React.ReactNode {
     return m;
   }, [hitlData]);
 
-  const promptsWithoutIssue = useMemo(
-    () => (hitlData?.prompts ?? []).filter((p) => !p.source_ref),
-    [hitlData],
-  );
+  // Prompts que NÃO viram badge numa task renderizada: sem source_ref OU com
+  // source_ref que não casa com nenhuma task da lista atual (filtrada). Sem isso
+  // ficariam invisíveis na UI (fecha a brecha do HITL).
+  const orphanPrompts = useMemo(() => {
+    const renderedRefs = new Set((data?.tasks ?? []).map((t) => t.source_ref));
+    return (hitlData?.prompts ?? []).filter(
+      (p) => !p.source_ref || !renderedRefs.has(p.source_ref),
+    );
+  }, [hitlData, data]);
   const pendingCount = hitlData?.prompts.length ?? 0;
 
   const handleAnswer = async (id: number, answer: HitlAnswerValue) => {
@@ -232,18 +237,25 @@ export default function TasksPage(): React.ReactNode {
         </div>
       )}
 
-      {promptsWithoutIssue.length > 0 && (
+      {orphanPrompts.length > 0 && (
         <div className="mt-4">
           <h2 className="text-sm font-bold text-slate-300 mb-2">
             {tr("hitl.noIssueSection")}
           </h2>
           <ul className="flex flex-col gap-2">
-            {promptsWithoutIssue.map((p) => (
+            {orphanPrompts.map((p) => (
               <li
                 key={p.id}
                 className="flex items-center justify-between border border-slate-800 rounded px-3 py-2"
               >
-                <span className="truncate">{p.question}</span>
+                <span className="truncate">
+                  {p.source_ref && (
+                    <span className="font-mono text-slate-500 mr-2">
+                      {p.source_ref}
+                    </span>
+                  )}
+                  {p.question}
+                </span>
                 <button
                   onClick={() => setSelectedPrompt(p)}
                   className="ml-3 px-3 py-1 text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded hover:bg-amber-500/30"
