@@ -343,12 +343,39 @@ def map_event(
     working_dir = raw_data.get("cwd", "")
     transcript_path: str | None = raw_data.get("transcript_path")
 
+    # ------------------------------------------------------------------
+    # Agent Teams (HMTrack dispatch) — opt-in via env vars.
+    # When set (e.g. by dispatch-agent.sh), they let a dispatched `claude -p`
+    # render as a teammate desk inside the lead's room. Default behaviour
+    # (vars unset) is unchanged — sessions stay solo.
+    #
+    #   CLAUDE_OFFICE_TEAM     -> data.team_name   (groups sessions in one room)
+    #   CLAUDE_OFFICE_TEAMMATE -> data.teammate_name (desk label; lead omits it)
+    #   CLAUDE_OFFICE_PROJECT  -> overrides project_name (the room key)
+    #
+    # The room key is resolved by the backend ProductMapper, which prefers
+    # project_dir (priority 1) over project_name (priority 2). To make the
+    # override land on the lead's room deterministically, when
+    # CLAUDE_OFFICE_PROJECT is set we also blank project_dir so the backend
+    # matches on project_name directly instead of the worktree path.
+    team_name = os.environ.get("CLAUDE_OFFICE_TEAM", "").strip()
+    teammate_name = os.environ.get("CLAUDE_OFFICE_TEAMMATE", "").strip()
+    project_override = os.environ.get("CLAUDE_OFFICE_PROJECT", "").strip()
+    if project_override:
+        project_name = project_override
+        project_dir = ""
+
     data: dict[str, Any] = {
         "project_name": project_name,
         "project_dir": project_dir,
         "working_dir": working_dir,
         "transcript_path": transcript_path,
     }
+
+    if team_name:
+        data["team_name"] = team_name
+    if teammate_name:
+        data["teammate_name"] = teammate_name
 
     task_list_id = os.environ.get("CLAUDE_CODE_TASK_LIST_ID")
     if task_list_id:
