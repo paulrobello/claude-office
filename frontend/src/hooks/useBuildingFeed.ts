@@ -17,6 +17,7 @@ export function useBuildingFeed({ enabled }: UseBuildingFeedOptions): void {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectionIdRef = useRef(0);
+  const connectRef = useRef<() => void>(() => {});
 
   const setBuildingState = useBuildingStore.getState().setBuildingState;
   const setConnected = useBuildingStore.getState().setConnected;
@@ -68,7 +69,7 @@ export function useBuildingFeed({ enabled }: UseBuildingFeedOptions): void {
       if (enabled) {
         reconnectRef.current = setTimeout(() => {
           reconnectRef.current = null;
-          connect();
+          connectRef.current();
         }, 2000);
       }
     };
@@ -78,6 +79,12 @@ export function useBuildingFeed({ enabled }: UseBuildingFeedOptions): void {
       console.error("[WS building] error");
     };
   }, [enabled, setBuildingState, setConnected]);
+
+  // Keep the latest connect in a ref so the reconnect timer can call it
+  // without `connect` referencing itself (react-hooks/immutability).
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   useEffect(() => {
     if (!enabled) {

@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 import { useNavigationStore } from "@/stores/navigationStore";
+import { useBuildingFeed } from "@/hooks/useBuildingFeed";
+import { useBuildingStore } from "@/stores/buildingStore";
 import { LOBBY_FLOOR_ID } from "@/types/navigation";
 import type { FloorConfig } from "@/types/navigation";
 import type { Session } from "@/hooks/useSessions";
@@ -102,6 +104,9 @@ export function BuildingView({ sessions }: BuildingViewProps): React.ReactNode {
   const buildingConfig = useNavigationStore((s) => s.buildingConfig);
   const goToFloor = useNavigationStore((s) => s.goToFloor);
   const requestEditBuilding = useNavigationStore((s) => s.requestEditBuilding);
+  const view = useNavigationStore((s) => s.view);
+  useBuildingFeed({ enabled: view === "building" });
+  const live = useBuildingStore((s) => s.buildingState);
 
   // Active sessions that don't match any floor
   const unmatchedSessions = useMemo(
@@ -151,16 +156,16 @@ export function BuildingView({ sessions }: BuildingViewProps): React.ReactNode {
 
         {/* Floors sorted top-down by floor number (highest first) */}
         {sortedFloors.map((floor) => {
-          const floorSessions = sessions.filter((s) =>
-            sessionMatchesFloor(s, floor),
-          );
+          const liveFloor = live?.floors?.find((f) => f.floorId === floor.id);
+          const activeSessionCount =
+            liveFloor?.sessions?.length ??
+            sessions.filter((s) => sessionMatchesFloor(s, floor) && s.status === "active")
+              .length;
           return (
             <FloorRow
               key={floor.id}
               floor={floor}
-              activeSessionCount={
-                floorSessions.filter((s) => s.status === "active").length
-              }
+              activeSessionCount={activeSessionCount}
               onClick={(origin) => {
                 useNavigationStore.getState().setTransitionOrigin(origin);
                 goToFloor(floor.id);
