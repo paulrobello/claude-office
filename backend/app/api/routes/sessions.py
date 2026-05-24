@@ -15,7 +15,6 @@ from app.api.websocket import manager
 from app.core.event_processor import event_processor
 from app.db.database import get_db
 from app.db.models import EventRecord, SessionRecord, TaskRecord
-from app.services.git_service import git_service
 
 logger = logging.getLogger(__name__)
 

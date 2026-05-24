@@ -15,7 +15,7 @@ from sqlalchemy import text, update
 from sqlalchemy.ext.asyncio import AsyncConnection
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.api.routes import events, floors, preferences, sessions
+from app.api.routes import coordination, events, floors, preferences, sessions
 from app.api.websocket import (
     manager,
 )
@@ -111,6 +111,9 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
 
     await git_service.stop()
     await get_engine().dispose()
+    from app.db.coordination import dispose_coordination_engine
+
+    await dispose_coordination_engine()
 
 
 async def _reap_stale_sessions() -> None:
@@ -154,6 +157,7 @@ app.include_router(events.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(floors.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(preferences.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(sessions.router, prefix=f"{settings.API_V1_STR}")
+app.include_router(coordination.router, prefix=f"{settings.API_V1_STR}")
 
 
 @app.get("/health")

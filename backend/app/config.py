@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     ]
 
     DATABASE_URL: str = f"sqlite+aiosqlite:///{_DEFAULT_DB_PATH}"
+    # Read-only Postgres de coordenação (:5433). Forma asyncpg. Lido do .env como
+    # COORDINATION_DATABASE_URL. Sem senha no default => defina no .env para uso real;
+    # se inacessível, as rotas /coordination/* degradam para 503.
+    COORDINATION_DATABASE_URL: str = (
+        "postgresql+asyncpg://coordinator@127.0.0.1:5433/coordination"
+    )
     GIT_POLL_INTERVAL: int = 5
 
     CLAUDE_CODE_OAUTH_TOKEN: str = ""
