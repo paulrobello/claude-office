@@ -42,6 +42,18 @@ export interface CoordRun {
   issue_title: string | null;
 }
 
+export interface CoordAgent {
+  nome: string;
+  role: string;
+  projetos: string[];
+  mode: string;
+  contratado_em: string | null;
+  last_active_at: string | null;
+  status: string;
+  active_claims: number;
+  queued_requests: number;
+}
+
 export interface CoordDashboard {
   github: { open: number; closed: number; total: number };
   database: { activeClaims: number; runsByStatus: Record<string, number> };
@@ -83,6 +95,9 @@ export const fetchRuns = (qs = ""): Promise<{ runs: CoordRun[] }> =>
 
 export const fetchDashboard = (qs = ""): Promise<CoordDashboard> =>
   getJson<CoordDashboard>(`/dashboard${qs}`);
+
+export const fetchAgents = (qs = ""): Promise<{ agents: CoordAgent[] }> =>
+  getJson<{ agents: CoordAgent[] }>(`/agents${qs}`);
 
 // ── HITL (human-in-the-loop): prompts que aguardam resposta do usuário ──────
 export type HitlKind = "yesno" | "choice" | "multi" | "text";
