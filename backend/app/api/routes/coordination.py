@@ -213,6 +213,40 @@ async def dashboard(
         raise HTTPException(status_code=503, detail=_DOWN_DETAIL) from exc
 
 
+# ── /agents (roster) ──────────────────────────────────────────────────────────
+# Roster (Camada 1) + status derivado de active_work + carga (requests na fila).
+# NB: o join active_work.agent = agents.nome depende da padronização do nome de
+# mesa (follow-up); claim com nome divergente não conta como 'busy'.
+_AGENTS_SQL = text("""
+SELECT a.nome, a.role, a.projetos, a.mode,
+       a.contratado_em, a.last_active_at,
+       CASE WHEN COALESCE(aw.cnt, 0) > 0 THEN 'busy' ELSE a.status END AS status,
+       COALESCE(aw.cnt, 0)   AS active_claims,
+       COALESCE(q.queued, 0) AS queued_requests
+FROM agents a
+LEFT JOIN (SELECT agent, COUNT(*) AS cnt FROM active_work GROUP BY agent) aw
+       ON aw.agent = a.nome
+LEFT JOIN (SELECT to_agent, COUNT(*) AS queued FROM requests
+           WHERE status = 'queued' GROUP BY to_agent) q
+       ON q.to_agent = a.nome
+WHERE (CAST(:role AS text) IS NULL OR a.role = CAST(:role AS text))
+ORDER BY a.role, a.nome
+""")
+
+
+@router.get("/agents")
+async def list_agents(
+    db: Annotated[AsyncSession, Depends(get_coordination_db)],
+    role: str | None = None,
+) -> dict[str, Any]:
+    try:
+        result = await db.execute(_AGENTS_SQL, {"role": role})
+        return {"agents": _row_dicts(result)}
+    except (OperationalError, InterfaceError, DBAPIError) as exc:
+        logger.warning("coordination /agents unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail=_DOWN_DETAIL) from exc
+
+
 # ── /hitl ─────────────────────────────────────────────────────────────────────
 # Prompts HITL (human-in-the-loop) pendentes + join issues (title/url) p/ contexto.
 _HITL_LIST_SQL = text("""
@@ -264,9 +298,7 @@ UPDATE hitl_prompts
 """)
 
 
-def _validate_answer(
-    kind: str, options: Any, answer: bool | str | list[str]
-) -> str | None:
+def _validate_answer(kind: str, options: Any, answer: bool | str | list[str]) -> str | None:
     """Retorna mensagem de erro se a resposta não casa com o kind/options; None se ok."""
     opt_list = cast("list[dict[str, str]]", options) if isinstance(options, list) else []
     keys = {o["key"] for o in opt_list}
@@ -300,9 +332,7 @@ async def answer_hitl(
             )
         err = _validate_answer(row["kind"], row["options"], body.answer)
         if err:
-            raise HTTPException(
-                status_code=422, detail={"error": "invalid_answer", "message": err}
-            )
+            raise HTTPException(status_code=422, detail={"error": "invalid_answer", "message": err})
 
         result = await db.execute(
             _HITL_ANSWER_SQL,
