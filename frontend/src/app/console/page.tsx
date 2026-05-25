@@ -10,6 +10,7 @@ import {
   type CoordAgent,
   type CoordDashboard,
 } from "@/components/coordination/coordinationApi";
+import { OfficeMap } from "@/components/coordination/OfficeMap";
 
 // ── Camada 3, slice 1: shell do console de operações (3 painéis), tokens do
 // design (Agents-Office mockup). O painel esquerdo (mapa pixel-art PixiJS) entra
@@ -117,11 +118,8 @@ export default function ConsolePage(): React.ReactNode {
               {rooms.reduce((s, r) => s + r.queued, 0)} na fila
             </Chip>
           </div>
-          <div className="flex-1 m-3 mt-0 rounded-lg border border-dashed border-[#2e3653] grid place-items-center text-center text-[#4b5573] text-sm">
-            <div>
-              <div className="font-mono text-xs">mapa espacial (PixiJS)</div>
-              <div className="text-[11px] mt-1">slice 2 — Gather-style, salas = departamentos</div>
-            </div>
+          <div className="flex-1 m-3 mt-0 rounded-lg border border-[#232a40] bg-[#0a0e1a] overflow-hidden">
+            <OfficeMap agents={agents} />
           </div>
         </section>
 
