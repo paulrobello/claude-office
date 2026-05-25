@@ -56,6 +56,10 @@ const STATUS_COLOR: Record<string, string> = {
   offline: "#6b7280",
 };
 
+// CEO-(Humano): presença do usuário no mapa (não é agente/roster). Spawn na área
+// central. Movimento click-to-walk (A*) = enhancement visual posterior.
+const CEO_SPAWN = { cx: 16 * TILE, cy: 21 * TILE };
+
 function px(ctx: CanvasRenderingContext2D, x: number, y: number, c: string, w = 1, h = 1) {
   ctx.fillStyle = c;
   ctx.fillRect(x, y, w, h);
@@ -119,6 +123,22 @@ function drawAgent(ctx: CanvasRenderingContext2D, cx: number, cy: number, color:
   px(ctx, x + 5, y + 2, "#0a0a0a", 1, 1);
 }
 
+// CEO-(Humano): corpo violeta + coroa dourada — visual distinto dos agentes.
+function drawCEO(ctx: CanvasRenderingContext2D, cx: number, cy: number) {
+  const x = Math.round(cx) - 4;
+  const y = Math.round(cy) - 8;
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fillRect(x + 1, y + 10, 6, 1);
+  px(ctx, x + 2, y + 4, "#a78bfa", 4, 5); // corpo
+  px(ctx, x + 2, y + 1, "#f4d4b0", 4, 3); // cabeça
+  px(ctx, x + 3, y + 3, "#0a0a0a", 1, 1);
+  px(ctx, x + 5, y + 3, "#0a0a0a", 1, 1);
+  px(ctx, x + 2, y - 1, "#fbbf24", 4, 1); // coroa
+  px(ctx, x + 2, y - 2, "#fbbf24", 1, 1);
+  px(ctx, x + 4, y - 2, "#fbbf24", 1, 1);
+  px(ctx, x + 6, y - 2, "#fbbf24", 1, 1);
+}
+
 interface Placed {
   agent: CoordAgent;
   cx: number;
@@ -156,6 +176,7 @@ export function OfficeMap({ agents }: { agents: CoordAgent[] }): React.ReactNode
     for (const p of placed) {
       drawAgent(ctx, p.cx, p.cy, STATUS_COLOR[p.agent.status] ?? "#a78bfa");
     }
+    drawCEO(ctx, CEO_SPAWN.cx, CEO_SPAWN.cy);
   }, [placed]);
 
   const W = COLS * TILE;
@@ -207,6 +228,13 @@ export function OfficeMap({ agents }: { agents: CoordAgent[] }): React.ReactNode
             {r.label}
           </div>
         ))}
+        {/* CEO-(Humano): label da presença do usuário */}
+        <div
+          className="absolute -translate-x-1/2 -translate-y-full text-[8px] font-mono text-[#a78bfa] pointer-events-none whitespace-nowrap"
+          style={{ left: `${(CEO_SPAWN.cx * 100) / W}%`, top: `${((CEO_SPAWN.cy - 12) * 100) / H}%` }}
+        >
+          CEO (Humano)
+        </div>
         {/* tooltip do agente */}
         {hover && (
           <div

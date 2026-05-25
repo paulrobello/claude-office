@@ -106,10 +106,10 @@ export default function ConsolePage(): React.ReactNode {
         </Link>
       </header>
 
-      {/* ── 3 PAINÉIS ── */}
-      <div className="flex-1 flex min-h-0">
+      {/* ── 3 PAINÉIS (portrait → coluna, p/ monitor 27" vertical) ── */}
+      <div className="flex-1 flex min-h-0 portrait:flex-col">
         {/* CENTRAL OFFICE (40%) — mapa pixel-art entra no slice 2 */}
-        <section className="basis-2/5 border-r border-[#232a40] flex flex-col min-h-0">
+        <section className="basis-2/5 border-r border-[#232a40] flex flex-col min-h-0 portrait:basis-1/2 portrait:border-r-0 portrait:border-b">
           <PanelHead title="CENTRAL OFFICE" right={`${rooms.length} salas`} />
           <div className="flex gap-2 px-3 py-2 text-[11px] font-mono">
             <Chip>{total} agentes</Chip>
@@ -124,7 +124,7 @@ export default function ConsolePage(): React.ReactNode {
         </section>
 
         {/* COLLABORATIVE ROOMS (35%) — salas = roles do roster */}
-        <section className="basis-[35%] border-r border-[#232a40] flex flex-col min-h-0">
+        <section className="basis-[35%] border-r border-[#232a40] flex flex-col min-h-0 portrait:basis-auto portrait:flex-1 portrait:border-r-0">
           <PanelHead title="COLLABORATIVE ROOMS" right={`${rooms.filter((r) => r.status !== "IDLE").length} ativas`} />
           <div className="flex-1 overflow-y-auto p-3 grid grid-cols-2 gap-2 content-start">
             {rooms.map((r) => (
@@ -155,7 +155,7 @@ export default function ConsolePage(): React.ReactNode {
         </section>
 
         {/* CEO DASHBOARD (25%) */}
-        <section className="basis-1/4 flex flex-col min-h-0">
+        <section className="basis-1/4 flex flex-col min-h-0 portrait:basis-auto portrait:flex-1 portrait:border-t portrait:border-[#232a40]">
           <PanelHead title="CEO DASHBOARD" right={dash ? "live" : "—"} />
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
             <div className="grid grid-cols-2 gap-2">
