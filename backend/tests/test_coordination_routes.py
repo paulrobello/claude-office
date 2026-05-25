@@ -86,6 +86,23 @@ def _delete_prompt(pid: int) -> None:
     asyncio.run(_del())
 
 
+def _delete_request(rid: int) -> None:
+    """Remove um request de teste do :5433 (evita poluir o DB live de coordenação)."""
+    from sqlalchemy import text
+
+    from app.db.coordination import get_coordination_session_factory
+
+    async def _del() -> None:
+        factory = get_coordination_session_factory()
+        async with factory() as session:
+            await session.execute(
+                text("DELETE FROM requests WHERE id = :id"), {"id": rid}
+            )
+            await session.commit()
+
+    asyncio.run(_del())
+
+
 @pytest.mark.skipif(not _coord_up(), reason=":5433 coordination DB indisponível")
 class TestCoordinationLive:
     def test_tasks_shape(self) -> None:
@@ -139,6 +156,65 @@ class TestCoordinationLive:
             assert bad.status_code == 422
         finally:
             _delete_prompt(pid)
+
+    def test_create_request_success(self) -> None:
+        """Convocação do CEO: POST /requests grava na caixa (status queued)."""
+        client = TestClient(app)
+        r = client.post(
+            "/api/v1/coordination/requests",
+            json={"to_role": "dev-front", "kind": "work",
+                  "payload": {"motivo": "teste e2e"}},
+        )
+        assert r.status_code == 201, r.text
+        req = r.json()["request"]
+        try:
+            assert req["from_kind"] == "human" and req["from_ref"] == "ceo"
+            assert req["to_role"] == "dev-front" and req["status"] == "queued"
+            assert isinstance(req["id"], int)
+        finally:
+            _delete_request(req["id"])
+
+    def test_create_request_to_agent(self) -> None:
+        client = TestClient(app)
+        r = client.post(
+            "/api/v1/coordination/requests",
+            json={"to_agent": "DEV-FRONT-1", "kind": "question"},
+        )
+        assert r.status_code == 201, r.text
+        req = r.json()["request"]
+        try:
+            assert req["to_agent"] == "DEV-FRONT-1" and req["kind"] == "question"
+        finally:
+            _delete_request(req["id"])
+
+    def test_create_request_requires_target(self) -> None:
+        client = TestClient(app)
+        r = client.post("/api/v1/coordination/requests", json={"kind": "work"})
+        assert r.status_code == 422
+        assert r.json()["detail"]["error"] == "target_required"
+
+    def test_create_request_invalid_kind(self) -> None:
+        client = TestClient(app)
+        r = client.post(
+            "/api/v1/coordination/requests",
+            json={"to_role": "dba", "kind": "dance"},
+        )
+        assert r.status_code == 422
+
+
+def test_create_request_degrade_503_when_db_down() -> None:
+    async def _boom():  # type: ignore[no-untyped-def]
+        yield _BoomSession()
+
+    app.dependency_overrides[get_coordination_db] = _boom
+    try:
+        client = TestClient(app)
+        r = client.post(
+            "/api/v1/coordination/requests", json={"to_role": "dba"}
+        )
+        assert r.status_code == 503
+    finally:
+        app.dependency_overrides.pop(get_coordination_db, None)
 
 
 class _BoomSession:

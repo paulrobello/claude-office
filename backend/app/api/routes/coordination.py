@@ -134,6 +134,70 @@ async def create_task(body: CreateTaskBody) -> dict[str, Any]:
     return {"url": out.decode().strip()}
 
 
+# ── POST /requests (produtor da caixa, #407) ───────────────────────────────────
+# `requests` é tabela INTERNA de coordenação (a "caixa"/telemetria de demanda) —
+# NÃO vem do GitHub como as issues. Por isso o write é DIRETO no :5433 (diferente
+# do POST /tasks, que cria issue via gh e deixa o coletor sincronizar de volta).
+# Convocação do CEO no cockpit → from_kind=human/from_ref=ceo. Alimenta o detector
+# de gargalo (role_load/agent_demand), hoje cego por falta de produtor. (EPIC #395)
+_REQUEST_KINDS = ("work", "question", "meeting")
+
+
+class CreateRequestBody(BaseModel):
+    from_kind: str = "human"
+    from_ref: str | None = "ceo"
+    to_role: str | None = None
+    to_agent: str | None = None
+    kind: str = "work"
+    payload: dict[str, Any] | None = None
+
+
+_INSERT_REQUEST_SQL = text("""
+INSERT INTO requests (from_kind, from_ref, to_role, to_agent, kind, payload, status)
+VALUES (:from_kind, :from_ref, :to_role, :to_agent, :kind, CAST(:payload AS jsonb), 'queued')
+RETURNING id, from_kind, from_ref, to_role, to_agent, kind, payload, status, queued_at
+""")
+
+
+@router.post("/requests", status_code=201)
+async def create_request(
+    body: CreateRequestBody,
+    db: Annotated[AsyncSession, Depends(get_coordination_db)],
+) -> dict[str, Any]:
+    if body.from_kind not in ("human", "agent"):
+        raise HTTPException(status_code=422, detail={"error": "invalid_from_kind"})
+    if body.kind not in _REQUEST_KINDS:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "invalid_kind", "allowed": list(_REQUEST_KINDS)},
+        )
+    to_role = (body.to_role or "").strip() or None
+    to_agent = (body.to_agent or "").strip() or None
+    if to_role is None and to_agent is None:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "target_required", "message": "informe to_role ou to_agent"},
+        )
+    try:
+        result = await db.execute(
+            _INSERT_REQUEST_SQL,
+            {
+                "from_kind": body.from_kind,
+                "from_ref": (body.from_ref or "").strip() or None,
+                "to_role": to_role,
+                "to_agent": to_agent,
+                "kind": body.kind,
+                "payload": json.dumps(body.payload) if body.payload is not None else None,
+            },
+        )
+        row = result.mappings().one()
+        await db.commit()
+        return {"request": dict(row)}
+    except (OperationalError, InterfaceError, DBAPIError) as exc:
+        logger.warning("coordination POST /requests unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail=_DOWN_DETAIL) from exc
+
+
 # ── /agent-runs ───────────────────────────────────────────────────────────────
 _RUNS_SQL = text("""
 SELECT r.id, r.source_ref, r.project, r.agent, r.session_id, r.mechanism,

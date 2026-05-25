@@ -116,6 +116,48 @@ export async function createTask(input: {
   return (await res.json()) as { url: string };
 }
 
+/** Linha da caixa de pedidos (`requests` :5433) — alimenta o detector de gargalo. */
+export interface CoordRequest {
+  id: number;
+  from_kind: string;
+  from_ref: string | null;
+  to_role: string | null;
+  to_agent: string | null;
+  kind: string;
+  payload: Record<string, unknown> | null;
+  status: string;
+  queued_at: string;
+}
+
+/**
+ * Convoca um agente: grava um pedido na caixa (`requests`) — produtor que acende
+ * o detector de gargalo. Alvo por função (to_role) OU por agente (to_agent).
+ */
+export async function createRequest(input: {
+  to_role?: string;
+  to_agent?: string;
+  kind?: "work" | "question" | "meeting";
+  payload?: Record<string, unknown>;
+}): Promise<{ request: CoordRequest }> {
+  const res = await fetch(`${BASE}/requests`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 503) throw new CoordUnavailableError();
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try {
+      const j = (await res.json()) as { detail?: { message?: string; error?: string } };
+      msg = j?.detail?.message ?? j?.detail?.error ?? msg;
+    } catch {
+      /* mantém msg padrão */
+    }
+    throw new Error(msg);
+  }
+  return (await res.json()) as { request: CoordRequest };
+}
+
 export const fetchRuns = (qs = ""): Promise<{ runs: CoordRun[] }> =>
   getJson<{ runs: CoordRun[] }>(`/agent-runs${qs}`);
 

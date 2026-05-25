@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { CoordinationNav } from "@/components/coordination/CoordinationNav";
+import { ConvocarAgentForm } from "@/components/coordination/ConvocarAgentForm";
 import { useCoordinationPoll } from "@/components/coordination/useCoordinationPoll";
 import { fetchAgents } from "@/components/coordination/coordinationApi";
 
@@ -69,6 +70,12 @@ export default function AgentsPage(): React.ReactNode {
           </span>
         )}
       </div>
+
+      {data && !unavailable && (
+        <div className="mb-3">
+          <ConvocarAgentForm agents={data.agents} onCreated={() => void refetch()} />
+        </div>
+      )}
 
       {unavailable && (
         <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded text-sm">
