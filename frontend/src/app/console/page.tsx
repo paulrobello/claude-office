@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { useCoordinationPoll } from "@/components/coordination/useCoordinationPoll";
@@ -74,6 +74,15 @@ export default function ConsolePage(): React.ReactNode {
   const rooms = useMemo(() => buildRooms(agents), [agents]);
   const total = agents.length;
   const active = agents.filter((a) => a.status === "busy").length;
+
+  // Relógio renderizado só no cliente (evita hydration mismatch SSR vs client).
+  const [clock, setClock] = useState("");
+  useEffect(() => {
+    const tick = () => setClock(new Date().toLocaleTimeString());
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <main className="h-screen flex flex-col bg-[#07090f] text-[#c7d0e0] font-[var(--font-ui)]">
@@ -193,7 +202,7 @@ export default function ConsolePage(): React.ReactNode {
       {/* ── BOTTOM STRIP ── */}
       <footer className="h-7 flex items-center gap-3 px-3 border-t border-[#232a40] bg-[#0a0e1a] text-[10px] font-mono text-[#4b5573] shrink-0">
         <span className="text-[#4ade80]">OK</span>
-        <span>{new Date().toLocaleTimeString()}</span>
+        <span>{clock || "--:--:--"}</span>
         <span>cockpit interno · Camada 3 (shell)</span>
         <div className="flex-1" />
         <span>{total} agentes · {active} ativos</span>
