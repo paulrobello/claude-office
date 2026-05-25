@@ -9,6 +9,7 @@ const TABS = [
   { href: "/tasks", label: "Tasks" },
   { href: "/agent-runs", label: "Histórico" },
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/ajuda", label: "Ajuda" },
 ];
 
 /** Sub-navegação (abas) entre as 3 páginas de coordenação. */
