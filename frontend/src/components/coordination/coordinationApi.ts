@@ -158,6 +158,35 @@ export async function createRequest(input: {
   return (await res.json()) as { request: CoordRequest };
 }
 
+/**
+ * Contrata/atualiza um agente no roster (upsert por nome). Caminho do cockpit pra
+ * contratação manual pelo CEO — par do hire-executor (lado coletor, via HITL).
+ */
+export async function createAgent(input: {
+  nome: string;
+  role: string;
+  projetos?: string[];
+  mode?: "on-demand" | "persistent-24-7";
+}): Promise<{ agent: CoordAgent }> {
+  const res = await fetch(`${BASE}/agents`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 503) throw new CoordUnavailableError();
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try {
+      const j = (await res.json()) as { detail?: { message?: string; error?: string } };
+      msg = j?.detail?.message ?? j?.detail?.error ?? msg;
+    } catch {
+      /* mantém msg padrão */
+    }
+    throw new Error(msg);
+  }
+  return (await res.json()) as { agent: CoordAgent };
+}
+
 export const fetchRuns = (qs = ""): Promise<{ runs: CoordRun[] }> =>
   getJson<{ runs: CoordRun[] }>(`/agent-runs${qs}`);
 

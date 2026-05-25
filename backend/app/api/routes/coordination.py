@@ -13,7 +13,8 @@ from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import Text, bindparam, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.exc import DBAPIError, InterfaceError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -195,6 +196,57 @@ async def create_request(
         return {"request": dict(row)}
     except (OperationalError, InterfaceError, DBAPIError) as exc:
         logger.warning("coordination POST /requests unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail=_DOWN_DETAIL) from exc
+
+
+# ── POST /agents (contratar / upsert no roster, #408) ──────────────────────────
+# Caminho do cockpit pra contratação manual pelo CEO. Faz upsert por nome
+# (ON CONFLICT) no roster `agents`. É a base do botão "Contratar"; o hire-executor
+# (agents-ia#417, lado coletor) faz o mesmo via decisão HITL. (EPIC #395)
+_AGENT_MODES = ("on-demand", "persistent-24-7")
+
+
+class CreateAgentBody(BaseModel):
+    nome: str
+    role: str
+    projetos: list[str] = []
+    mode: str = "on-demand"
+
+
+_INSERT_AGENT_SQL = text("""
+INSERT INTO agents (nome, role, projetos, mode, status)
+VALUES (:nome, :role, :projetos, :mode, 'offline')
+ON CONFLICT (nome) DO UPDATE
+   SET role = EXCLUDED.role, projetos = EXCLUDED.projetos, mode = EXCLUDED.mode
+RETURNING nome, role, projetos, mode, status, contratado_em, last_active_at
+""").bindparams(bindparam("projetos", type_=ARRAY(Text)))
+
+
+@router.post("/agents", status_code=201)
+async def create_agent(
+    body: CreateAgentBody,
+    db: Annotated[AsyncSession, Depends(get_coordination_db)],
+) -> dict[str, Any]:
+    nome = body.nome.strip()
+    role = body.role.strip()
+    if not nome or not role:
+        raise HTTPException(status_code=422, detail={"error": "nome_and_role_required"})
+    if body.mode not in _AGENT_MODES:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "invalid_mode", "allowed": list(_AGENT_MODES)},
+        )
+    projetos = [p.strip() for p in body.projetos if p.strip()]
+    try:
+        result = await db.execute(
+            _INSERT_AGENT_SQL,
+            {"nome": nome, "role": role, "projetos": projetos, "mode": body.mode},
+        )
+        row = result.mappings().one()
+        await db.commit()
+        return {"agent": dict(row)}
+    except (OperationalError, InterfaceError, DBAPIError) as exc:
+        logger.warning("coordination POST /agents unavailable: %s", exc)
         raise HTTPException(status_code=503, detail=_DOWN_DETAIL) from exc
 
 

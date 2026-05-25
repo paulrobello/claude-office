@@ -103,6 +103,23 @@ def _delete_request(rid: int) -> None:
     asyncio.run(_del())
 
 
+def _delete_agent(nome: str) -> None:
+    """Remove um agente de teste do :5433 (evita poluir o roster live)."""
+    from sqlalchemy import text
+
+    from app.db.coordination import get_coordination_session_factory
+
+    async def _del() -> None:
+        factory = get_coordination_session_factory()
+        async with factory() as session:
+            await session.execute(
+                text("DELETE FROM agents WHERE nome = :nome"), {"nome": nome}
+            )
+            await session.commit()
+
+    asyncio.run(_del())
+
+
 @pytest.mark.skipif(not _coord_up(), reason=":5433 coordination DB indisponível")
 class TestCoordinationLive:
     def test_tasks_shape(self) -> None:
@@ -201,6 +218,46 @@ class TestCoordinationLive:
         )
         assert r.status_code == 422
 
+    def test_create_agent_success_and_upsert(self) -> None:
+        """Botão Contratar: cria agente no roster; 2ª chamada faz upsert por nome."""
+        nome = "__TEST_HIRE__"
+        client = TestClient(app)
+        try:
+            r = client.post(
+                "/api/v1/coordination/agents",
+                json={"nome": nome, "role": "__test__",
+                      "projetos": ["hmtrack-front"], "mode": "on-demand"},
+            )
+            assert r.status_code == 201, r.text
+            ag = r.json()["agent"]
+            assert ag["nome"] == nome and ag["role"] == "__test__"
+            assert ag["mode"] == "on-demand" and ag["status"] == "offline"
+            assert ag["projetos"] == ["hmtrack-front"]
+            # upsert: promove para 24/7
+            r2 = client.post(
+                "/api/v1/coordination/agents",
+                json={"nome": nome, "role": "__test__", "mode": "persistent-24-7"},
+            )
+            assert r2.status_code == 201, r2.text
+            assert r2.json()["agent"]["mode"] == "persistent-24-7"
+        finally:
+            _delete_agent(nome)
+
+    def test_create_agent_invalid_mode(self) -> None:
+        client = TestClient(app)
+        r = client.post(
+            "/api/v1/coordination/agents",
+            json={"nome": "__x__", "role": "__test__", "mode": "boss"},
+        )
+        assert r.status_code == 422
+
+    def test_create_agent_requires_nome_and_role(self) -> None:
+        client = TestClient(app)
+        r = client.post(
+            "/api/v1/coordination/agents", json={"nome": "  ", "role": "dba"}
+        )
+        assert r.status_code == 422
+
 
 def test_create_request_degrade_503_when_db_down() -> None:
     async def _boom():  # type: ignore[no-untyped-def]
@@ -211,6 +268,22 @@ def test_create_request_degrade_503_when_db_down() -> None:
         client = TestClient(app)
         r = client.post(
             "/api/v1/coordination/requests", json={"to_role": "dba"}
+        )
+        assert r.status_code == 503
+    finally:
+        app.dependency_overrides.pop(get_coordination_db, None)
+
+
+def test_create_agent_degrade_503_when_db_down() -> None:
+    async def _boom():  # type: ignore[no-untyped-def]
+        yield _BoomSession()
+
+    app.dependency_overrides[get_coordination_db] = _boom
+    try:
+        client = TestClient(app)
+        r = client.post(
+            "/api/v1/coordination/agents",
+            json={"nome": "__x__", "role": "__test__"},
         )
         assert r.status_code == 503
     finally:
