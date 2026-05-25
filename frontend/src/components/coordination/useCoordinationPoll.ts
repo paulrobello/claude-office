@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CoordUnavailableError } from "./coordinationApi";
+import { useCoordinationWS } from "./useCoordinationWS";
 
 /**
- * Faz fetch de um endpoint de coordenação com poll periódico (default 15s) e
- * refetch manual. Trata o 503 (DB fora) como estado `unavailable` em vez de erro.
+ * Faz fetch de um endpoint de coordenação. Tempo-real via WebSocket (#412): o
+ * servidor empurra `coordination_update` quando o :5433 muda e disparamos um
+ * refetch na hora. O poll periódico vira só um FALLBACK lento (default 30s) caso
+ * o WS caia. Trata o 503 (DB fora) como estado `unavailable` em vez de erro.
  *
  * `loading` parte como true e vira false após o primeiro fetch. O setState só
  * acontece dentro de callbacks assíncronos (nunca síncrono no corpo do effect),
@@ -15,7 +18,7 @@ import { CoordUnavailableError } from "./coordinationApi";
 export function useCoordinationPoll<T>(
   fetcher: () => Promise<T>,
   deps: unknown[] = [],
-  intervalMs = 15000,
+  intervalMs = 30000,
 ): {
   data: T | null;
   loading: boolean;
@@ -57,6 +60,9 @@ export function useCoordinationPoll<T>(
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
+
+  // Tempo-real: refetch imediato quando o servidor sinaliza mudança no :5433.
+  useCoordinationWS(() => void refetch());
 
   return { data, loading, unavailable, error, refetch };
 }

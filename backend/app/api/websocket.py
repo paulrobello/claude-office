@@ -44,6 +44,7 @@ class ConnectionManager:
         self.active_connections: dict[str, list[WebSocket]] = {}
         self.room_connections: dict[str, list[WebSocket]] = {}
         self.building_connections: list[WebSocket] = []
+        self.coordination_connections: list[WebSocket] = []
         self._lock = asyncio.Lock()
 
     # ------------------------------------------------------------------
@@ -222,6 +223,46 @@ class ConnectionManager:
                 for conn in failed:
                     if conn in self.building_connections:
                         self.building_connections.remove(conn)
+
+    # ------------------------------------------------------------------
+    # Coordination cockpit feed (:5433) — substitui o poll de 15s do cockpit
+    # ------------------------------------------------------------------
+
+    async def connect_coordination(self, websocket: WebSocket) -> None:
+        """Accept a WebSocket connection for the coordination cockpit feed."""
+        await websocket.accept()
+        async with self._lock:
+            self.coordination_connections.append(websocket)
+
+    async def disconnect_coordination(self, websocket: WebSocket) -> None:
+        """Remove a WebSocket connection from the coordination feed."""
+        async with self._lock:
+            if websocket in self.coordination_connections:
+                self.coordination_connections.remove(websocket)
+
+    async def broadcast_coordination(self, message: dict[str, Any]) -> None:
+        """Send a message to all clients connected to the coordination feed."""
+        async with self._lock:
+            connections = self.coordination_connections.copy()
+        if not connections:
+            return
+        failed: list[WebSocket] = []
+        for connection in connections:
+            try:
+                if connection.client_state == WebSocketState.CONNECTED:
+                    await connection.send_json(message)
+            except Exception as e:
+                logger.warning("Failed to send to coordination WebSocket: %s", e)
+                failed.append(connection)
+        if failed:
+            async with self._lock:
+                for conn in failed:
+                    if conn in self.coordination_connections:
+                        self.coordination_connections.remove(conn)
+
+    def coordination_client_count(self) -> int:
+        """Nº de clientes no feed de coordenação (o poller pula o poll se 0)."""
+        return len(self.coordination_connections)
 
 
 manager = ConnectionManager()

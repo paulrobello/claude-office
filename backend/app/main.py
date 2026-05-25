@@ -1,8 +1,9 @@
+import asyncio
 import importlib
 import logging
 import os
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -107,8 +108,17 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
 
     git_service.start()
 
+    # Poller do feed de coordenação (#412): 1 poll server-side → broadcast WS,
+    # substitui o poll de 15s por-cliente do cockpit.
+    from app.core.coordination_poller import coordination_poller_loop
+
+    coordination_task = asyncio.create_task(coordination_poller_loop())
+
     yield
 
+    coordination_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await coordination_task
     await git_service.stop()
     await get_engine().dispose()
     from app.db.coordination import dispose_coordination_engine
@@ -173,6 +183,32 @@ async def get_status() -> dict[str, bool | str | None]:
         "aiSummaryEnabled": summary_service.enabled,
         "aiSummaryModel": summary_service.model if summary_service.enabled else None,
     }
+
+
+@app.websocket("/ws/coordination")
+async def websocket_coordination(websocket: WebSocket) -> None:
+    """Feed de coordenação (:5433): empurra `coordination_update` quando o estado
+    muda, substituindo o poll de 15s do cockpit (#412). O cliente faz o fetch real
+    (REST) ao receber o sinal — o WS só avisa "mudou".
+
+    DEVE vir ANTES de `/ws/{session_id}`: Starlette casa a 1ª rota, e o param route
+    greedy capturaria "coordination" como session_id (idem /ws/building/room)."""
+    from app.api.websocket import validate_websocket_origin
+
+    if not validate_websocket_origin(websocket):
+        await websocket.close(code=4003, reason="Origin not allowed")
+        return
+
+    await manager.connect_coordination(websocket)
+    try:
+        # "hello" no connect — o cliente já dispara o 1º fetch ao montar.
+        await websocket.send_json({"type": "coordination_hello"})
+        while True:
+            await websocket.receive_text()
+    except Exception:
+        pass
+    finally:
+        await manager.disconnect_coordination(websocket)
 
 
 @app.websocket("/ws/{session_id}")

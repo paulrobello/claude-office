@@ -290,6 +290,28 @@ def test_create_agent_degrade_503_when_db_down() -> None:
         app.dependency_overrides.pop(get_coordination_db, None)
 
 
+@pytest.mark.skipif(not _coord_up(), reason=":5433 coordination DB indisponível")
+def test_coordination_version_changes_on_request() -> None:
+    """O poller WS (#412) detecta mudança via current_version: inserir um request
+    altera a versão → dispara broadcast."""
+    import asyncio as _aio
+
+    from app.core.coordination_poller import current_version
+
+    v1 = _aio.run(current_version())
+    assert v1 is not None
+    client = TestClient(app)
+    r = client.post(
+        "/api/v1/coordination/requests", json={"to_role": "dev-front", "kind": "work"}
+    )
+    rid = r.json()["request"]["id"]
+    try:
+        v2 = _aio.run(current_version())
+        assert v2 != v1  # versão mudou → poller fará broadcast
+    finally:
+        _delete_request(rid)
+
+
 def test_find_duplicate_normalized_match() -> None:
     from app.api.routes.coordination import _find_duplicate
 
