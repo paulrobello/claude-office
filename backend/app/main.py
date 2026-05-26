@@ -185,6 +185,37 @@ async def get_status() -> dict[str, bool | str | None]:
     }
 
 
+@app.websocket("/ws/building")
+async def websocket_building(websocket: WebSocket) -> None:
+    """Building-level WebSocket: compact live state for all floors.
+
+    DEVE vir ANTES de `/ws/{session_id}` (param route greedy capturava "building"
+    como session_id e mandava git_status em vez de building_state — bug latente
+    descoberto no #412)."""
+    from app.api.websocket import validate_websocket_origin
+
+    if not validate_websocket_origin(websocket):
+        await websocket.close(code=4003, reason="Origin not allowed")
+        return
+
+    await manager.connect_building(websocket)
+    try:
+        # Send a snapshot on connect.
+        snapshot = event_processor.build_building_snapshot()
+        await websocket.send_json(
+            {
+                "type": "building_state",
+                "state": snapshot.model_dump(mode="json", by_alias=True),
+            }
+        )
+        while True:
+            await websocket.receive_text()
+    except Exception:
+        pass
+    finally:
+        await manager.disconnect_building(websocket)
+
+
 @app.websocket("/ws/coordination")
 async def websocket_coordination(websocket: WebSocket) -> None:
     """Feed de coordenação (:5433): empurra `coordination_update` quando o estado
@@ -296,31 +327,6 @@ async def websocket_room(websocket: WebSocket, room_id: str) -> None:
         await manager.disconnect_room(websocket, room_id)
 
 
-@app.websocket("/ws/building")
-async def websocket_building(websocket: WebSocket) -> None:
-    """Building-level WebSocket: compact live state for all floors."""
-    from app.api.websocket import validate_websocket_origin
-
-    if not validate_websocket_origin(websocket):
-        await websocket.close(code=4003, reason="Origin not allowed")
-        return
-
-    await manager.connect_building(websocket)
-    try:
-        # Send a snapshot on connect.
-        snapshot = event_processor.build_building_snapshot()
-        await websocket.send_json(
-            {
-                "type": "building_state",
-                "state": snapshot.model_dump(mode="json", by_alias=True),
-            }
-        )
-        while True:
-            await websocket.receive_text()
-    except Exception:
-        pass
-    finally:
-        await manager.disconnect_building(websocket)
 
 
 def _safe_static_path(requested_path: str) -> Path | None:
