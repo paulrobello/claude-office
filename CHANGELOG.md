@@ -2,6 +2,23 @@
 
 All notable changes to Claude Office Visualizer are documented here.
 
+## [Unreleased]
+
+### Security
+
+- **API URL validation**: Hook config now validates `CLAUDE_OFFICE_API_URL` is localhost-only, rejecting external URLs that could exfiltrate event data (#37)
+- **Transcript path validation**: Backend now validates all transcript file reads are under `~/.claude/` with `.jsonl` extension, preventing arbitrary file reads via crafted events (#37)
+- **API key authentication**: Backend accepts an optional `CLAUDE_OFFICE_API_KEY` — when set, all hook and WebSocket requests must include it. Key is auto-generated at install time (#37)
+- **WebSocket origin hardening**: Non-browser WebSocket connections (no `Origin` header) now require a valid API key when configured, closing the previous bypass (#37)
+
+### Fixed
+
+- **Incomplete uninstall**: `uninstall.sh` now removes the installed tool binary, config file, and debug log (#37)
+
+### Changed
+
+- **Dead code removal**: Removed unused `summarize_tool_call()` and `_get_tool_fallback()` from `SummaryService` (#37)
+
 ## [0.16.0] - 2026-05-20
 
 ### Fixed

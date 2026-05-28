@@ -1,12 +1,10 @@
 """AI-powered summary generation using Claude Haiku."""
 
-import json
 import logging
 import re
 from typing import Any
 
 from app.config import get_settings
-from app.core.path_utils import compress_path, compress_paths_in_text
 
 logger = logging.getLogger(__name__)
 
@@ -60,20 +58,6 @@ class SummaryService:
                 logger.info("Summary service disabled via SUMMARY_ENABLED=False")
             else:
                 logger.info("CLAUDE_CODE_OAUTH_TOKEN not set - using fallback summaries")
-
-    async def summarize_tool_call(self, tool_name: str, tool_input: dict[str, Any] | None) -> str:
-        """Generate a short summary of what a tool call does."""
-        fallback = self._get_tool_fallback(tool_name, tool_input)
-
-        if not self.enabled or not self.client:
-            return fallback
-
-        input_str = json.dumps(tool_input or {}, indent=2)[:500]
-
-        result = await self._call_with_retry(
-            f"In 10 words or less, what does this {tool_name} tool call do?\n{input_str}"
-        )
-        return result or fallback
 
     async def summarize_agent_task(self, task_description: str) -> str:
         """Generate a short summary of a subagent's task."""
@@ -442,50 +426,6 @@ class SummaryService:
             f"In 15 words or less, summarize this response:\n{text}"
         )
         return result or fallback
-
-    def _get_tool_fallback(self, tool_name: str, tool_input: dict[str, Any] | None) -> str:
-        """Generate a simple fallback summary for a tool call without AI."""
-        if not tool_input:
-            return tool_name
-
-        result: str | None = None
-
-        if tool_name in ("Read", "Glob", "Grep", "Write", "Edit"):
-            path = tool_input.get("file_path") or tool_input.get("pattern", "")
-            if path:
-                result = compress_path(path, max_len=35)
-
-        elif tool_name == "Bash":
-            cmd = tool_input.get("command", "")
-            if cmd:
-                cmd_clean = cmd.strip().split("\n")[0]
-                if len(cmd_clean) > 40:
-                    cmd_clean = f"{cmd_clean[:37]}..."
-                result = cmd_clean
-
-        elif tool_name in ("Task", "Agent"):
-            desc = tool_input.get("prompt") or tool_input.get("description", "")
-            if desc:
-                result = self._extract_first_sentence(desc, max_len=40)
-
-        elif tool_name == "WebSearch":
-            query = tool_input.get("query", "")
-            if query:
-                if len(query) > 35:
-                    query = f"{query[:32]}..."
-                result = f"Search: {query}"
-
-        elif tool_name == "WebFetch":
-            url = tool_input.get("url", "")
-            if url:
-                match = re.search(r"https?://([^/]+)", url)
-                if match:
-                    result = f"Fetch: {match.group(1)}"
-
-        if result:
-            return compress_paths_in_text(result)
-
-        return tool_name
 
     def _extract_first_sentence(self, text: str, max_len: int = 100) -> str:
         """Extract the first sentence as a fallback summary."""

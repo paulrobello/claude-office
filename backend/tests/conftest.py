@@ -10,6 +10,7 @@ import asyncio
 import tempfile
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
@@ -80,6 +81,27 @@ def _reset_rate_limiter() -> None:  # pyright: ignore[reportUnusedFunction]
     from app.api.routes.events import reset_rate_limiter
 
     reset_rate_limiter()
+
+
+@pytest.fixture(autouse=True)
+def _allow_test_transcript_paths() -> Iterator[None]:  # pyright: ignore[reportUnusedFunction]
+    """Allow transcript reads from temp directories in tests.
+
+    Production code validates that transcript paths are under ~/.claude/,
+    but tests use temp directories. Patch is_safe_transcript_path to always
+    return True so existing tests don't need to change.
+    """
+    from contextlib import ExitStack
+
+    with ExitStack() as stack:
+        for target in (
+            "app.core.path_utils.is_safe_transcript_path",
+            "app.core.jsonl_parser.is_safe_transcript_path",
+            "app.core.transcript_poller.is_safe_transcript_path",
+            "app.core.handlers.conversation_handler.is_safe_transcript_path",
+        ):
+            stack.enter_context(patch(target, return_value=True))
+        yield
 
 
 @pytest.fixture

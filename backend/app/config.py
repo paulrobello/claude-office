@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     # catching zombies quickly.
     ZOMBIE_SUBAGENT_TIMEOUT_SECONDS: int = 90
 
+    # API key for authenticating hook requests. When set, all requests
+    # must include this value in the X-API-Key header. When empty, auth
+    # is skipped (backwards-compatible).
+    CLAUDE_OFFICE_API_KEY: str = ""
+
     model_config = SettingsConfigDict(env_file=".env")
 
     def translate_path(self, path: str) -> str:

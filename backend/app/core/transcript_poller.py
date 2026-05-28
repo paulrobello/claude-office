@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from app.config import get_settings
+from app.core.path_utils import is_safe_transcript_path
 from app.models.common import BubbleContent, BubbleType
 from app.models.events import Event, EventData, EventType
 
@@ -56,6 +57,10 @@ class TranscriptPoller:
         settings = get_settings()
         translated_path = settings.translate_path(transcript_path)
         path = Path(translated_path).expanduser()
+
+        if not is_safe_transcript_path(path):
+            logger.warning(f"Rejected transcript path outside ~/.claude/: {translated_path}")
+            return
 
         async with self._lock:
             if agent_id in self._agents:
@@ -186,6 +191,10 @@ class TranscriptPoller:
         events: list[Event] = []
 
         if not agent.transcript_path.exists():
+            return events
+
+        if not is_safe_transcript_path(agent.transcript_path):
+            logger.warning(f"Rejected transcript path outside ~/.claude/: {agent.transcript_path}")
             return events
 
         try:

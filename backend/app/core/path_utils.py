@@ -1,9 +1,22 @@
-"""Path compression utilities for UI display."""
+"""Path compression and validation utilities."""
 
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_PATH_MAX_LEN = 35
 DEFAULT_WORD_MAX_LEN = 30
+
+
+def is_safe_transcript_path(path: str | Path) -> bool:
+    """Return True if *path* is under ~/.claude/ and has a .jsonl extension."""
+    try:
+        resolved = Path(path).expanduser().resolve()
+        claude_dir = Path.home().joinpath(".claude").resolve()
+        return resolved.suffix == ".jsonl" and resolved.is_relative_to(claude_dir)
+    except Exception:
+        return False
 
 
 def compress_path(path: str, max_len: int = DEFAULT_PATH_MAX_LEN) -> str:

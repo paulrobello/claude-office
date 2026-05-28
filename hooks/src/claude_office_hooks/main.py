@@ -29,7 +29,7 @@ try:
     import urllib.request
     from typing import Any, cast
 
-    from claude_office_hooks.config import API_URL, TIMEOUT, load_config
+    from claude_office_hooks.config import API_URL, TIMEOUT, get_api_key, load_config
     from claude_office_hooks.debug_logger import debug_log
     from claude_office_hooks.event_mapper import map_event
 
@@ -46,9 +46,11 @@ try:
         """
         try:
             json_data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(
-                API_URL, data=json_data, headers={"Content-Type": "application/json"}
-            )
+            headers: dict[str, str] = {"Content-Type": "application/json"}
+            api_key = get_api_key()
+            if api_key:
+                headers["X-API-Key"] = api_key
+            req = urllib.request.Request(API_URL, data=json_data, headers=headers)
             with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
                 if response.status >= 300:
                     pass  # Silently fail — never disrupt the user

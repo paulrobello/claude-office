@@ -42,6 +42,18 @@ fi
 # Create config directory if it doesn't exist
 mkdir -p "$(dirname "$CONFIG_FILE")"
 
+# Generate or reuse API key for backend authentication
+if [ -f "$CONFIG_FILE" ]; then
+    EXISTING_KEY=$(grep '^CLAUDE_OFFICE_API_KEY=' "$CONFIG_FILE" | head -1 | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+fi
+if [ -n "$EXISTING_KEY" ]; then
+    API_KEY="$EXISTING_KEY"
+    echo "Reusing existing API key."
+else
+    API_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+    echo "Generated new API key."
+fi
+
 # Save configuration
 echo "Saving configuration to $CONFIG_FILE..."
 cat > "$CONFIG_FILE" << EOF
@@ -54,6 +66,9 @@ CLAUDE_OFFICE_STRIP_PREFIXES="$STRIP_PREFIXES"
 
 # Set to 1 to enable debug logging
 CLAUDE_OFFICE_DEBUG=0
+
+# API key for backend authentication
+CLAUDE_OFFICE_API_KEY="$API_KEY"
 EOF
 
 echo "Configuration saved."

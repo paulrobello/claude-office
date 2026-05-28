@@ -54,6 +54,31 @@ class LocalhostOnlyMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+# Paths that do NOT require an API key (health checks, static assets, etc.)
+_NO_AUTH_PATHS = frozenset({"/health", "/docs", "/openapi.json"})
+
+
+class ApiKeyMiddleware(BaseHTTPMiddleware):
+    """Validate X-API-Key header when CLAUDE_OFFICE_API_KEY is configured.
+
+    When the key is empty (default), auth is skipped for backwards compatibility.
+    """
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        key = settings.CLAUDE_OFFICE_API_KEY
+        if not key:
+            return await call_next(request)
+
+        if request.url.path in _NO_AUTH_PATHS or request.url.path.startswith("/ws/"):
+            return await call_next(request)
+
+        provided = request.headers.get("X-API-Key", "")
+        if provided != key:
+            return JSONResponse(status_code=401, content={"detail": "Invalid API key"})
+
+        return await call_next(request)
+
+
 logging.basicConfig(
     level=logging.INFO, format="%(message)s", handlers=[RichHandler(rich_tracebacks=True)]
 )
@@ -149,6 +174,7 @@ app.add_middleware(
 )
 
 app.add_middleware(LocalhostOnlyMiddleware)
+app.add_middleware(ApiKeyMiddleware)
 
 app.include_router(events.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(floors.router, prefix=f"{settings.API_V1_STR}")

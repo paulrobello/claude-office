@@ -5,6 +5,8 @@ import logging
 from pathlib import Path
 from typing import TypedDict
 
+from app.core.path_utils import is_safe_transcript_path
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,6 +43,9 @@ def get_last_assistant_response(jsonl_path: str | Path) -> str | None:
         The last assistant text response, or None if not found or file doesn't exist.
     """
     path = Path(jsonl_path)
+    if not is_safe_transcript_path(path):
+        logger.warning(f"Rejected transcript path outside ~/.claude/: {jsonl_path}")
+        return None
     if not path.exists():
         logger.debug(f"Transcript file not found: {jsonl_path}")
         return None
@@ -96,6 +101,9 @@ def get_first_user_prompt(jsonl_path: str | Path) -> str | None:
         The first user text prompt, or None if not found or file doesn't exist.
     """
     path = Path(jsonl_path)
+    if not is_safe_transcript_path(path):
+        logger.warning(f"Rejected transcript path outside ~/.claude/: {jsonl_path}")
+        return None
     if not path.exists():
         logger.debug(f"Transcript file not found: {jsonl_path}")
         return None
@@ -148,6 +156,9 @@ def get_session_messages(
         List of message dicts with 'role' and 'text' keys.
     """
     path = Path(jsonl_path)
+    if not is_safe_transcript_path(path):
+        logger.warning(f"Rejected transcript path outside ~/.claude/: {jsonl_path}")
+        return []
     if not path.exists():
         logger.debug(f"Transcript file not found: {jsonl_path}")
         return []

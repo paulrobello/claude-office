@@ -25,15 +25,23 @@ _ALLOWED_WS_ORIGINS = frozenset(
 def validate_websocket_origin(websocket: WebSocket) -> bool:
     """Check the Origin header on a WebSocket handshake.
 
-    Returns True if the origin is allowed (localhost) or absent (non-browser
-    clients like the test suite may not send Origin).  Returns False for
-    disallowed origins.
+    Browser connections must come from an allowed localhost origin.
+    Non-browser connections (no Origin header) must present a valid
+    X-API-Key header when CLAUDE_OFFICE_API_KEY is configured.
+    Returns False for disallowed origins or missing auth.
     """
     origin = websocket.headers.get("origin")
-    if origin is None:
-        # Non-browser clients (curl, test suite) -- rely on localhost middleware
+    if origin is not None:
+        return origin.rstrip("/") in _ALLOWED_WS_ORIGINS
+
+    # Non-browser clients (no Origin) — require API key when configured
+    from app.config import get_settings
+
+    key = get_settings().CLAUDE_OFFICE_API_KEY
+    if not key:
         return True
-    return origin.rstrip("/") in _ALLOWED_WS_ORIGINS
+    provided = websocket.headers.get("x-api-key", "")
+    return provided == key
 
 
 def validate_session_id(session_id: str) -> bool:

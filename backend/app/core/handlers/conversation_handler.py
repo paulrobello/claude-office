@@ -11,6 +11,7 @@ import logging
 
 from app.core.broadcast_service import broadcast_state
 from app.core.jsonl_parser import get_last_assistant_response
+from app.core.path_utils import is_safe_transcript_path
 from app.core.state_machine import StateMachine
 from app.core.summary_service import get_summary_service
 from app.models.common import BubbleContent, BubbleType
@@ -130,6 +131,10 @@ async def extract_and_set_boss_speech(
 
     settings = get_settings()
     translated_path = settings.translate_path(transcript_path)
+
+    if not is_safe_transcript_path(translated_path):
+        logger.warning(f"Rejected transcript path outside ~/.claude/: {translated_path}")
+        return None
 
     response = get_last_assistant_response(translated_path)
     if not response:

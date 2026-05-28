@@ -60,56 +60,6 @@ class TestExtractFirstSentence:
         assert len(result) > 10 or result == text[:50]
 
 
-class TestGetToolFallback:
-    """Tests for _get_tool_fallback method."""
-
-    def test_empty_input_returns_tool_name(self, service: SummaryService) -> None:
-        """Empty input should return just the tool name."""
-        assert service._get_tool_fallback("Read", None) == "Read"
-        assert service._get_tool_fallback("Write", {}) == "Write"
-
-    def test_read_tool_returns_path(self, service: SummaryService) -> None:
-        """Read tool should return compressed file path."""
-        result = service._get_tool_fallback("Read", {"file_path": "/tmp/test.txt"})
-        assert "test.txt" in result
-
-    def test_glob_tool_returns_pattern(self, service: SummaryService) -> None:
-        """Glob tool should return pattern."""
-        result = service._get_tool_fallback("Glob", {"pattern": "**/*.py"})
-        assert "**/*.py" in result
-
-    def test_bash_tool_returns_command(self, service: SummaryService) -> None:
-        """Bash tool should return first line of command."""
-        result = service._get_tool_fallback("Bash", {"command": "ls -la\necho done"})
-        assert result == "ls -la"
-
-    def test_bash_long_command_truncated(self, service: SummaryService) -> None:
-        """Long bash commands should be truncated."""
-        long_cmd = "a" * 100
-        result = service._get_tool_fallback("Bash", {"command": long_cmd})
-        assert len(result) <= 40
-        assert result.endswith("...")
-
-    def test_task_tool_returns_description(self, service: SummaryService) -> None:
-        """Task tool should return task description."""
-        result = service._get_tool_fallback(
-            "Task", {"prompt": "Run the tests and verify everything works correctly."}
-        )
-        assert "Run the tests" in result
-
-    def test_websearch_returns_query(self, service: SummaryService) -> None:
-        """WebSearch should return search query."""
-        result = service._get_tool_fallback("WebSearch", {"query": "python asyncio"})
-        assert result == "Search: python asyncio"
-
-    def test_webfetch_returns_domain(self, service: SummaryService) -> None:
-        """WebFetch should return domain name."""
-        result = service._get_tool_fallback(
-            "WebFetch", {"url": "https://docs.python.org/3/library/asyncio.html"}
-        )
-        assert result == "Fetch: docs.python.org"
-
-
 class TestGenerateAgentNameFallback:
     """Tests for generate_agent_name_fallback method."""
 

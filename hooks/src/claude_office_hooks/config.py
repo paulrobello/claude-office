@@ -6,13 +6,33 @@ Output suppression is handled in main.py before this module is imported.
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 # ---------------------------------------------------------------------------
 # API endpoint and request constants
 # ---------------------------------------------------------------------------
 
-API_URL = os.environ.get("CLAUDE_OFFICE_API_URL", "http://localhost:8000/api/v1/events")
+_LOCALHOST_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1", None})
+
+_raw_api_url = os.environ.get("CLAUDE_OFFICE_API_URL", "http://localhost:8000/api/v1/events")
+_parsed_url = urlparse(_raw_api_url)
+if _parsed_url.hostname not in _LOCALHOST_HOSTNAMES:
+    _raw_api_url = "http://localhost:8000/api/v1/events"
+API_URL = _raw_api_url
+
+# Mutable holder for the API key — populated by load_config().
+_api_key_holder: list[str] = [""]
 TIMEOUT = 0.5  # Seconds — keep short so hooks never block Claude
+
+
+def get_api_key() -> str:
+    """Return the current API key (may be empty string before load_config)."""
+    return _api_key_holder[0]
+
+
+def _set_api_key(key: str) -> None:
+    _api_key_holder[0] = key
+
 
 # ---------------------------------------------------------------------------
 # Config file location
@@ -53,4 +73,6 @@ def load_config() -> dict[str, str]:
         except Exception:
             # Config loading must never raise — hooks must always exit 0
             pass
+    # Set API key from config or env var (env var takes precedence)
+    _set_api_key(os.environ.get("CLAUDE_OFFICE_API_KEY", config.get("CLAUDE_OFFICE_API_KEY", "")))
     return config
