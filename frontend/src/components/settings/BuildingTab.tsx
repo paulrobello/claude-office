@@ -108,6 +108,16 @@ function floorConfigToFormData(floor: FloorConfig): FloorFormData {
   };
 }
 
+function configToFormState(config: {
+  buildingName: string;
+  floors: FloorConfig[];
+}): { buildingName: string; floors: FloorFormData[] } {
+  return {
+    buildingName: config.buildingName,
+    floors: config.floors.map(floorConfigToFormData),
+  };
+}
+
 function formDataToFloorConfig(data: FloorFormData): {
   id: string;
   name: string;
@@ -148,25 +158,31 @@ export function BuildingTab({
   );
   const { t } = useTranslation();
 
-  const [buildingName, setBuildingName] = useState("");
-  const [floors, setFloors] = useState<FloorFormData[]>([]);
+  const [buildingName, setBuildingName] = useState(
+    () => buildingConfig?.buildingName ?? "",
+  );
+  const [floors, setFloors] = useState<FloorFormData[]>(() =>
+    buildingConfig ? buildingConfig.floors.map(floorConfigToFormData) : [],
+  );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [initialData, setInitialData] = useState<{
     buildingName: string;
     floors: FloorFormData[];
-  } | null>(null);
+  } | null>(() => (buildingConfig ? configToFormState(buildingConfig) : null));
 
-  // Initialize form from store config
-  useEffect(() => {
-    if (buildingConfig) {
-      const name = buildingConfig.buildingName;
-      const fl = buildingConfig.floors.map(floorConfigToFormData);
-      setBuildingName(name);
-      setFloors(fl);
-      setInitialData({ buildingName: name, floors: fl });
-    }
-  }, [buildingConfig]);
+  // Re-seed the form whenever the store's building config changes (e.g. after a
+  // save). Done during render via the "adjust state on dependency change"
+  // pattern instead of an effect, to avoid a cascading render. The initial seed
+  // is handled by the useState initializers above.
+  const [prevConfig, setPrevConfig] = useState(buildingConfig);
+  if (buildingConfig && buildingConfig !== prevConfig) {
+    setPrevConfig(buildingConfig);
+    const seeded = configToFormState(buildingConfig);
+    setBuildingName(seeded.buildingName);
+    setFloors(seeded.floors);
+    setInitialData(seeded);
+  }
 
   // Detect dirty state
   useEffect(() => {

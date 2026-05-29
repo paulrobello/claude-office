@@ -44,6 +44,10 @@ export function useWebSocketEvents({
   // Connection ID to track which connection is current (prevents stale onclose handlers)
   const connectionIdRef = useRef(0);
 
+  // Holds the latest `connect` so the reconnect timer can re-invoke it without
+  // `connect` referencing itself (forbidden by react-hooks/immutability).
+  const connectRef = useRef<(() => void) | null>(null);
+
   // Track typing start times and pending timeouts for minimum typing duration (500ms)
   const typingStartTimesRef = useRef<Map<string, number>>(new Map());
   const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -56,9 +60,13 @@ export function useWebSocketEvents({
   const addEventLog = useGameStore.getState().addEventLog;
   const enqueueBubble = useGameStore.getState().enqueueBubble;
 
-  // Track the current session ID for message validation
+  // Track the current session ID for message validation. Updated in an effect
+  // (not during render) — every consumer is an async WS callback that fires
+  // after commit, so they always read the committed sessionId.
   const currentSessionIdRef = useRef(sessionId);
-  currentSessionIdRef.current = sessionId;
+  useEffect(() => {
+    currentSessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   // Track whether initial queue sync has been done for this session
   // (prevents backend queue state from overwriting frontend's animated queue)
@@ -501,12 +509,17 @@ export function useWebSocketEvents({
           reconnectTimeoutRef.current = null;
           // Double-check we're still on the same session before reconnecting
           if (sessionId === currentSessionIdRef.current) {
-            connect();
+            connectRef.current?.();
           }
         }, 2000);
       }
     };
   }, [sessionId, enabled, handleMessage, setConnected, setSessionId]);
+
+  // Keep the reconnect timer pointed at the latest connect implementation.
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   // Effect to manage WebSocket connection
   useEffect(() => {

@@ -80,8 +80,11 @@ export function useSessions(
     return null;
   }, []);
 
-  // Fetch sessions on mount and periodically
+  // Fetch sessions on mount and periodically. The synchronous setState is the
+  // loading flag inside fetchSessions — a legitimate data-fetching effect, not
+  // a render-derived cascade.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount; loading flag is intentional
     fetchSessions();
     const interval = setInterval(fetchSessions, 5000);
     return () => clearInterval(interval);
@@ -142,6 +145,9 @@ export function useSessions(
         candidates[0],
       );
       if (bestSession) {
+        // Auto-select responds to async-fetched sessions and also fires a toast
+        // (showStatus), so it must stay in the effect — not derivable in render.
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot auto-select on async data + toast side-effect
         setSessionId(bestSession.id);
         showStatus(
           t("status.connectedTo", {
