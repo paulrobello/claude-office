@@ -39,7 +39,7 @@ class SessionLive(BaseModel):
     boss_state: str
     boss_task: str | None = None
     boss_color: str | None = None
-    agents: list[AgentLive] = Field(default_factory=list)
+    agents: list[AgentLive] = Field(default_factory=list[AgentLive])
 
 
 class FloorLive(BaseModel):
@@ -52,7 +52,7 @@ class FloorLive(BaseModel):
     floor_number: int
     accent: str
     icon: str
-    sessions: list[SessionLive] = Field(default_factory=list)
+    sessions: list[SessionLive] = Field(default_factory=list[SessionLive])
     agent_count: int = 0
     is_active: bool = False
     last_activity_at: str | None = None
@@ -63,7 +63,7 @@ class LobbyLive(BaseModel):
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
-    sessions: list[SessionLive] = Field(default_factory=list)
+    sessions: list[SessionLive] = Field(default_factory=list[SessionLive])
     agent_count: int = 0
 
 
@@ -83,6 +83,6 @@ class BuildingState(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     building_name: str
-    floors: list[FloorLive] = Field(default_factory=list)
+    floors: list[FloorLive] = Field(default_factory=list[FloorLive])
     lobby: LobbyLive = Field(default_factory=LobbyLive)
     totals: BuildingTotals = Field(default_factory=BuildingTotals)

@@ -158,7 +158,8 @@ class TestTeammateDeskAndColor:
         orch2 = RoomOrchestrator("room-1")
         orch2.add_session("sess-stable", _make_sm())
         assert (
-            orch1._sessions["sess-stable"].color == orch2._sessions["sess-stable"].color
+            orch1._sessions["sess-stable"].color  # pyright: ignore[reportPrivateUsage]
+            == orch2._sessions["sess-stable"].color  # pyright: ignore[reportPrivateUsage]
         )
 
 
