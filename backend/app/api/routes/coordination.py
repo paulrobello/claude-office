@@ -9,6 +9,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import time
+from collections import deque
 from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -28,6 +31,33 @@ _DOWN_DETAIL = {
     "error": "coordination_db_unavailable",
     "message": "DB de coordenação (:5433) indisponível.",
 }
+
+# ── #413: rate-limit nos writes de coordenação ─────────────────────────────────
+# Sliding-window in-memory (mesmo modelo do events.py), adequado ao deploy
+# single-process localhost. Protege os POSTs (requests/agents/tasks/hitl-answer)
+# contra rajada acidental (loop de UI, retry agressivo). Configurável via env.
+_WRITE_RATE_LIMIT = int(os.environ.get("COORDINATION_WRITE_RATE_LIMIT", "60"))
+_WRITE_WINDOW = 60.0  # segundos
+_write_times: deque[float] = deque()
+
+
+def reset_write_rate_limiter() -> None:
+    """Limpa o estado do limiter (uso entre testes)."""
+    _write_times.clear()
+
+
+def enforce_write_rate_limit() -> None:
+    """Dependency: levanta HTTP 429 se a taxa de writes exceder o limite."""
+    now = time.monotonic()
+    cutoff = now - _WRITE_WINDOW
+    while _write_times and _write_times[0] < cutoff:
+        _write_times.popleft()
+    if len(_write_times) >= _WRITE_RATE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail={"error": "rate_limited", "message": "Muitos writes; tente em instantes."},
+        )
+    _write_times.append(now)
 
 
 def _row_dicts(result: Any) -> list[dict[str, Any]]:
@@ -136,7 +166,7 @@ async def _list_open_issues() -> list[dict[str, Any]]:
         return []
 
 
-@router.post("/tasks")
+@router.post("/tasks", dependencies=[Depends(enforce_write_rate_limit)])
 async def create_task(body: CreateTaskBody) -> dict[str, Any]:
     title = body.title.strip()
     if not title:
@@ -197,7 +227,7 @@ RETURNING id, from_kind, from_ref, to_role, to_agent, kind, payload, status, que
 """)
 
 
-@router.post("/requests", status_code=201)
+@router.post("/requests", status_code=201, dependencies=[Depends(enforce_write_rate_limit)])
 async def create_request(
     body: CreateRequestBody,
     db: Annotated[AsyncSession, Depends(get_coordination_db)],
@@ -259,7 +289,7 @@ RETURNING nome, role, projetos, mode, status, contratado_em, last_active_at
 """).bindparams(bindparam("projetos", type_=ARRAY(Text)))
 
 
-@router.post("/agents", status_code=201)
+@router.post("/agents", status_code=201, dependencies=[Depends(enforce_write_rate_limit)])
 async def create_agent(
     body: CreateAgentBody,
     db: Annotated[AsyncSession, Depends(get_coordination_db)],
@@ -514,7 +544,7 @@ def _validate_answer(kind: str, options: Any, answer: bool | str | list[str]) ->
     return None if ok else f"resposta inválida para kind={kind}"
 
 
-@router.post("/hitl/{prompt_id}/answer")
+@router.post("/hitl/{prompt_id}/answer", dependencies=[Depends(enforce_write_rate_limit)])
 async def answer_hitl(
     prompt_id: int,
     body: HitlAnswerBody,

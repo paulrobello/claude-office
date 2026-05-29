@@ -15,13 +15,41 @@ lifespan do app principal.
 from __future__ import annotations
 
 import asyncio
+import os
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.api.routes.coordination import get_coordination_db
 from app.main import app
+
+# Teardown dos testes LIVE usa conexão ADMIN (coordinator), NÃO o cockpit_rw da app.
+# O cockpit_rw é least-privilege (#413): SELECT em tudo + INSERT/UPDATE só em
+# requests/agents/hitl_prompts, SEM DELETE. Limpar fixtures é operação admin.
+# Override via COORDINATION_ADMIN_URL; default = coordinator local-dev (mesma
+# convenção de senha do roles/cockpit_rw.sql e do .env do coletor-task).
+_ADMIN_URL = os.environ.get(
+    "COORDINATION_ADMIN_URL",
+    "postgresql+asyncpg://coordinator:coord_local_dev_2026@127.0.0.1:5433/coordination",
+)
+
+
+def _admin_exec(sql: str, params: dict[str, object]) -> None:
+    """Executa um DELETE de teardown como coordinator (admin)."""
+    from sqlalchemy import text
+
+    async def _run() -> None:
+        engine = create_async_engine(_ADMIN_URL, poolclass=NullPool)
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text(sql), params)
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_run())
 
 
 def _coord_up() -> bool:
@@ -45,79 +73,45 @@ def _coord_up() -> bool:
 
 
 def _seed_prompt(kind: str) -> int:
-    """Insere um hitl_prompt pending no :5433 e retorna o id (testes live)."""
+    """Insere um hitl_prompt pending no :5433 e retorna o id (testes live). Usa
+    conexão ADMIN: criar prompts é papel do detector (coordinator), não do cockpit
+    — cockpit_rw só dá UPDATE em hitl_prompts (responder), sem o sequence p/ INSERT."""
     from sqlalchemy import text
 
-    from app.db.coordination import get_coordination_session_factory
-
     async def _seed() -> int:
-        factory = get_coordination_session_factory()
-        async with factory() as session:
-            row = (
-                await session.execute(
-                    text(
-                        "INSERT INTO hitl_prompts (question, kind, status) "
-                        "VALUES ('t?', :kind, 'pending') RETURNING id"
-                    ),
-                    {"kind": kind},
-                )
-            ).first()
-            await session.commit()
-            assert row is not None
-            return int(row[0])
+        engine = create_async_engine(_ADMIN_URL, poolclass=NullPool)
+        try:
+            async with engine.begin() as conn:
+                row = (
+                    await conn.execute(
+                        text(
+                            "INSERT INTO hitl_prompts (question, kind, status) "
+                            "VALUES ('t?', :kind, 'pending') RETURNING id"
+                        ),
+                        {"kind": kind},
+                    )
+                ).first()
+                assert row is not None
+                return int(row[0])
+        finally:
+            await engine.dispose()
 
     return asyncio.run(_seed())
 
 
 def _delete_prompt(pid: int) -> None:
-    """Remove um prompt de teste do :5433 (evita poluir o DB live de coordenação)."""
-    from sqlalchemy import text
-
-    from app.db.coordination import get_coordination_session_factory
-
-    async def _del() -> None:
-        factory = get_coordination_session_factory()
-        async with factory() as session:
-            await session.execute(
-                text("DELETE FROM hitl_prompts WHERE id = :id"), {"id": pid}
-            )
-            await session.commit()
-
-    asyncio.run(_del())
+    """Remove um prompt de teste do :5433 (admin; evita poluir o DB live)."""
+    _admin_exec("DELETE FROM hitl_prompts WHERE id = :id", {"id": pid})
 
 
 def _delete_request(rid: int) -> None:
-    """Remove um request de teste do :5433 (evita poluir o DB live de coordenação)."""
-    from sqlalchemy import text
-
-    from app.db.coordination import get_coordination_session_factory
-
-    async def _del() -> None:
-        factory = get_coordination_session_factory()
-        async with factory() as session:
-            await session.execute(
-                text("DELETE FROM requests WHERE id = :id"), {"id": rid}
-            )
-            await session.commit()
-
-    asyncio.run(_del())
+    """Remove um request de teste do :5433 (admin; evita poluir o DB live)."""
+    _admin_exec("DELETE FROM requests WHERE id = :id", {"id": rid})
 
 
 def _delete_agent(nome: str) -> None:
-    """Remove um agente de teste do :5433 (evita poluir o roster live)."""
-    from sqlalchemy import text
-
-    from app.db.coordination import get_coordination_session_factory
-
-    async def _del() -> None:
-        factory = get_coordination_session_factory()
-        async with factory() as session:
-            await session.execute(
-                text("DELETE FROM agents WHERE nome = :nome"), {"nome": nome}
-            )
-            await session.commit()
-
-    asyncio.run(_del())
+    """Remove um agente de teste do :5433 (admin; evita poluir o roster live)."""
+    _admin_exec("DELETE FROM agents WHERE nome = :nome", {"nome": nome})
 
 
 @pytest.mark.skipif(not _coord_up(), reason=":5433 coordination DB indisponível")
@@ -288,6 +282,21 @@ def test_create_agent_degrade_503_when_db_down() -> None:
         assert r.status_code == 503
     finally:
         app.dependency_overrides.pop(get_coordination_db, None)
+
+
+def test_coordination_write_rate_limit_429(monkeypatch: pytest.MonkeyPatch) -> None:
+    """#413: writes além do limite recebem 429. O limiter é um dependency que roda
+    ANTES do corpo da rota, então dispara mesmo sem :5433 e sem payload válido."""
+    import app.api.routes.coordination as coord
+
+    monkeypatch.setattr(coord, "_WRITE_RATE_LIMIT", 2)
+    client = TestClient(app)
+    body = {"kind": "work"}  # sem to_role/to_agent → 422 no corpo, mas conta no limiter
+    assert client.post("/api/v1/coordination/requests", json=body).status_code == 422
+    assert client.post("/api/v1/coordination/requests", json=body).status_code == 422
+    r = client.post("/api/v1/coordination/requests", json=body)  # 3ª excede → 429
+    assert r.status_code == 429
+    assert r.json()["detail"]["error"] == "rate_limited"
 
 
 @pytest.mark.skipif(not _coord_up(), reason=":5433 coordination DB indisponível")

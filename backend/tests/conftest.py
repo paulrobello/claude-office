@@ -76,10 +76,12 @@ def temp_dir() -> Iterator[Path]:
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limiter() -> None:  # pyright: ignore[reportUnusedFunction]
-    """Reset the event ingestion rate limiter before each test."""
+    """Reset the event ingestion + coordination write rate limiters before each test."""
+    from app.api.routes.coordination import reset_write_rate_limiter
     from app.api.routes.events import reset_rate_limiter
 
     reset_rate_limiter()
+    reset_write_rate_limiter()
 
 
 @pytest.fixture
