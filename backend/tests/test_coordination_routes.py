@@ -435,7 +435,7 @@ def test_coordination_version_changes_on_request() -> None:
 
 def test_find_duplicate_normalized_match() -> None:
     from app.api.routes.coordination import (
-        _find_duplicate,  # pyright: ignore[reportPrivateUsage]  # test exercises the helper directly
+        _find_duplicate,
     )
 
     existing = [
