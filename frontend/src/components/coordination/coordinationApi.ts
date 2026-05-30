@@ -52,6 +52,9 @@ export interface CoordAgent {
   status: string;
   active_claims: number;
   queued_requests: number;
+  cron_expr: string | null;
+  enabled: boolean;
+  archived_at: string | null;
 }
 
 export interface CoordDashboard {
@@ -241,3 +244,38 @@ export async function answerHitl(
   if (res.status === 409) throw new Error("hitl_already_resolved");
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 }
+
+// ── Mutações de agentes (PATCH / archive / restore / delete) ─────────────────
+
+async function mutate<T>(path: string, method: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 503) throw new CoordUnavailableError();
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try {
+      const j = (await res.json()) as { detail?: { error?: string; message?: string } };
+      msg = j?.detail?.error ?? j?.detail?.message ?? msg;
+    } catch { /* mantém */ }
+    throw new Error(msg);
+  }
+  return (res.status === 204 ? undefined : await res.json()) as T;
+}
+
+export const patchAgent = (
+  nome: string,
+  patch: Partial<{ role: string; projetos: string[]; mode: string; cron_expr: string | null; enabled: boolean }>,
+): Promise<{ agent: CoordAgent }> =>
+  mutate(`/agents/${encodeURIComponent(nome)}`, "PATCH", patch);
+
+export const archiveAgent = (nome: string): Promise<{ agent: CoordAgent }> =>
+  mutate(`/agents/${encodeURIComponent(nome)}/archive`, "POST");
+
+export const restoreAgent = (nome: string): Promise<{ agent: CoordAgent }> =>
+  mutate(`/agents/${encodeURIComponent(nome)}/restore`, "POST");
+
+export const deleteAgent = (nome: string): Promise<void> =>
+  mutate(`/agents/${encodeURIComponent(nome)}`, "DELETE");

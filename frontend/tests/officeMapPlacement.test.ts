@@ -20,6 +20,9 @@ function agent(nome: string, role: string, status = "idle"): CoordAgent {
     status,
     active_claims: 0,
     queued_requests: 0,
+    cron_expr: null,
+    enabled: true,
+    archived_at: null,
   };
 }
 
