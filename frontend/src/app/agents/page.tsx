@@ -55,6 +55,9 @@ export default function AgentsPage(): React.ReactNode {
   }, []);
 
   useEffect(() => {
+    // loadArchived() faz setState só após o await (não síncrono no corpo do efeito):
+    // fetch-on-mount legítimo, sem cascading render. Padrão do #334.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadArchived();
   }, [loadArchived]);
 
