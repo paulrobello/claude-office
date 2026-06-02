@@ -478,3 +478,15 @@ def test_tasks_expose_agent_model_keys() -> None:
     row = tasks[0]
     assert "claim_model" in row
     assert "run_model" in row
+
+
+@pytest.mark.skipif(not _coord_up(), reason=":5433 coordination DB indisponível")
+def test_hitl_exposes_recommended_key() -> None:
+    """/hitl devolve recommended_key (migration 011)."""
+    client = TestClient(app)
+    resp = client.get("/api/v1/coordination/hitl?status=pending&limit=1")
+    assert resp.status_code == 200
+    prompts = resp.json()["prompts"]
+    if not prompts:
+        pytest.skip("sem prompts HITL pendentes para inspecionar o shape")
+    assert "recommended_key" in prompts[0]

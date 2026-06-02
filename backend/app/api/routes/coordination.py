@@ -673,7 +673,8 @@ async def delete_agent(
 # Prompts HITL (human-in-the-loop) pendentes + join issues (title/url) p/ contexto.
 _HITL_LIST_SQL = text("""
 SELECT h.id, h.source_ref, h.session_id, h.agent, h.project,
-       h.question, h.context, h.kind, h.options, h.status, h.answer,
+       h.question, h.context, h.kind, h.options, h.recommended_key,
+       h.status, h.answer,
        h.created_at, h.expires_at,
        i.title AS issue_title, i.url AS issue_url
 FROM hitl_prompts h
