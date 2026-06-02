@@ -1,96 +1,202 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Lock, RefreshCw } from "lucide-react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
 import { CoordinationNav } from "@/components/coordination/CoordinationNav";
-import { useTranslation } from "@/hooks/useTranslation";
+import { useTranslation, type TranslationKey } from "@/hooks/useTranslation";
 import { useCoordinationPoll } from "@/components/coordination/useCoordinationPoll";
 import {
   fetchTasks,
   fetchHitlPending,
   answerHitl,
+  type CoordTask,
   type HitlPrompt,
   type HitlAnswerValue,
 } from "@/components/coordination/coordinationApi";
 import HitlAnswerModal from "@/components/coordination/HitlAnswerModal";
 import { CreateTaskForm } from "@/components/coordination/CreateTaskForm";
+import {
+  deriveStatus,
+  groupAndSortTasks,
+  formatStuckTime,
+  DEFAULT_SLA_MS,
+  type TaskStatus,
+} from "@/components/coordination/taskStatus";
 
-const CLAIM_COLORS: Record<string, string> = {
-  claimed: "text-sky-400",
-  in_progress: "text-amber-400",
-  done: "text-emerald-400",
-  released: "text-slate-500",
-};
+/** Mark do GitHub inline (lucide removeu ícones de marca nesta versão). */
+function GithubMark({ size = 18 }: { size?: number }): React.ReactNode {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+    </svg>
+  );
+}
 
-const RUN_COLORS: Record<string, string> = {
-  running: "text-sky-400",
-  success: "text-emerald-400",
+const STATUS_COLOR: Record<TaskStatus, string> = {
+  pending: "text-amber-400",
   error: "text-rose-400",
-  timeout: "text-amber-400",
+  running: "text-sky-400",
+  waiting_agent: "text-sky-300",
+  todo: "text-slate-200",
+  open: "text-slate-400",
+  done: "text-emerald-400",
+  unknown: "text-slate-500",
 };
+
+// Qual timestamp medir o "tempo parado" por status.
+function stuckSince(t: CoordTask, status: TaskStatus): string | null {
+  if (status === "error") return t.run_ended_at ?? t.run_started_at;
+  if (status === "running" || status === "waiting_agent")
+    return t.claimed_at ?? t.run_started_at;
+  return t.source_updated_at;
+}
+
+function agentModel(t: CoordTask, status: TaskStatus): string {
+  const agent = status === "error" ? t.run_agent : (t.claim_agent ?? t.run_agent);
+  const model = status === "error" ? t.run_model : (t.claim_model ?? t.run_model);
+  if (!agent) return "";
+  return model ? `${agent} · ${model}` : agent;
+}
 
 export default function TasksPage(): React.ReactNode {
   const { t: tr } = useTranslation();
-  const [state, setState] = useState("");
-  const [project, setProject] = useState("");
   const [selectedPrompt, setSelectedPrompt] = useState<HitlPrompt | null>(null);
-  const [onlyWaiting, setOnlyWaiting] = useState(false);
-
-  const qs = useMemo(() => {
-    const p = new URLSearchParams();
-    if (state) p.set("state", state);
-    if (project) p.set("project", project);
-    const s = p.toString();
-    return s ? `?${s}` : "";
-  }, [state, project]);
+  // nowMs sai de estado (lazy init, não Date.now() em render — regra
+  // react-hooks/purity); o intervalo faz o "tempo parado" avançar.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const { data, loading, unavailable, error, refetch } = useCoordinationPoll(
-    () => fetchTasks(qs),
-    [qs],
+    () => fetchTasks(""),
+    [],
   );
-
   const { data: hitlData, refetch: refetchHitl } = useCoordinationPoll(
     fetchHitlPending,
     [],
   );
 
-  const promptsBySourceRef = useMemo(() => {
+  const prompts = useMemo(() => hitlData?.prompts ?? [], [hitlData]);
+  const promptsByRef = useMemo(() => {
     const m = new Map<string, HitlPrompt[]>();
-    for (const p of hitlData?.prompts ?? []) {
+    for (const p of prompts) {
       if (!p.source_ref) continue;
-      const list = m.get(p.source_ref) ?? [];
-      list.push(p);
-      m.set(p.source_ref, list);
+      const l = m.get(p.source_ref) ?? [];
+      l.push(p);
+      m.set(p.source_ref, l);
     }
     return m;
-  }, [hitlData]);
+  }, [prompts]);
 
-  // Prompts que NÃO viram badge numa task renderizada: sem source_ref OU com
-  // source_ref que não casa com nenhuma task da lista atual (filtrada). Sem isso
-  // ficariam invisíveis na UI (fecha a brecha do HITL).
+  const groups = useMemo(
+    () => groupAndSortTasks(data?.tasks ?? [], prompts),
+    [data, prompts],
+  );
+
+  // Prompts sem task casada na lista atual — não podem sumir (brecha HITL).
   const orphanPrompts = useMemo(() => {
-    const renderedRefs = new Set((data?.tasks ?? []).map((t) => t.source_ref));
-    return (hitlData?.prompts ?? []).filter(
-      (p) => !p.source_ref || !renderedRefs.has(p.source_ref),
-    );
-  }, [hitlData, data]);
-  const pendingCount = hitlData?.prompts.length ?? 0;
-
-  // Filtro "aguardando resposta": só tasks com prompt HITL pendente.
-  // (prompts sem task casada continuam na seção orphanPrompts abaixo.)
-  const displayedTasks = useMemo(() => {
-    const tasks = data?.tasks ?? [];
-    return onlyWaiting
-      ? tasks.filter((t) => promptsBySourceRef.has(t.source_ref))
-      : tasks;
-  }, [onlyWaiting, data, promptsBySourceRef]);
+    const refs = new Set((data?.tasks ?? []).map((t) => t.source_ref));
+    return prompts.filter((p) => !p.source_ref || !refs.has(p.source_ref));
+  }, [prompts, data]);
 
   const handleAnswer = async (id: number, answer: HitlAnswerValue) => {
     await answerHitl(id, answer);
     await refetchHitl();
     await refetch();
   };
+
+  const openPrompt = (t: CoordTask) => {
+    const p0 = promptsByRef.get(t.source_ref)?.[0];
+    if (p0) setSelectedPrompt(p0);
+  };
+
+  const renderRow = (t: CoordTask) => {
+    const status = deriveStatus(t, prompts);
+    const stuck = formatStuckTime(stuckSince(t, status), nowMs, DEFAULT_SLA_MS);
+    const am = agentModel(t, status);
+    const hasPrompt = (promptsByRef.get(t.source_ref)?.length ?? 0) > 0;
+    return (
+      <div
+        key={t.source_ref}
+        className="flex items-center gap-3 px-3 py-3 border-t border-slate-900 hover:bg-slate-900/40"
+      >
+        <div className="font-mono font-bold text-base w-16 shrink-0">
+          #{t.number}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="truncate">{t.title ?? "—"}</div>
+          <div className="text-xs text-slate-500 mt-0.5">
+            {t.project ?? "—"}
+            {am && <span> · {am}</span>}
+            {status === "error" && t.run_status && (
+              <span className="text-rose-400/80"> · {t.run_status}</span>
+            )}
+          </div>
+        </div>
+        <div className={`text-sm font-bold w-44 shrink-0 ${STATUS_COLOR[status]}`}>
+          {tr(`tasks.status.${status}` as TranslationKey)}
+          {stuck.label && (
+            <span
+              className={stuck.overdue ? "text-rose-400 ml-1" : "text-slate-500 ml-1"}
+            >
+              {" "}
+              · {stuck.label}
+              {stuck.overdue ? " 🔴" : ""}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {status === "pending" && hasPrompt && (
+            <button
+              onClick={() => openPrompt(t)}
+              className="px-3 py-1.5 rounded text-sm font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30"
+            >
+              {tr("tasks.see")}
+            </button>
+          )}
+          {t.url && (
+            <a
+              href={t.url}
+              target="_blank"
+              rel="noreferrer"
+              title={tr("tasks.openIssue")}
+              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800"
+            >
+              <GithubMark size={18} />
+            </a>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderGroup = (
+    titleKey: TranslationKey,
+    tasks: CoordTask[],
+    accent: string,
+  ) => (
+    <section className="mb-5">
+      <h2 className={`text-sm font-extrabold tracking-wide mb-1 ${accent}`}>
+        {tr(titleKey)} — {tasks.length}
+      </h2>
+      <div className="border border-slate-800 rounded-lg overflow-hidden">
+        {tasks.length === 0 ? (
+          <p className="px-3 py-4 text-slate-600 text-sm">{tr("tasks.empty")}</p>
+        ) : (
+          tasks.map(renderRow)
+        )}
+      </div>
+    </section>
+  );
 
   return (
     <main className="min-h-screen bg-neutral-950 text-slate-200 p-4">
@@ -108,60 +214,14 @@ export default function TasksPage(): React.ReactNode {
 
       <CoordinationNav />
 
-      <div className="mb-3">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <CreateTaskForm onCreated={() => void refetch()} />
-      </div>
-
-      {pendingCount > 0 && (
-        <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-bold">
-          <Lock size={14} />
-          {tr("hitl.waitingCount", { count: pendingCount })}
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-2 items-center mb-3">
-        <select
-          value={state}
-          onChange={(e) => setState(e.target.value)}
-          className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm"
-        >
-          <option value="">Todos estados</option>
-          <option value="OPEN">OPEN</option>
-          <option value="CLOSED">CLOSED</option>
-        </select>
-        <input
-          placeholder="project (ex.: hmtrack-api-py)"
-          value={project}
-          onChange={(e) => setProject(e.target.value)}
-          className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm w-56"
-        />
-        <button
-          onClick={() => setOnlyWaiting((v) => !v)}
-          aria-pressed={onlyWaiting}
-          className={`flex items-center gap-1 px-3 py-1 rounded text-sm font-bold border transition-colors ${
-            onlyWaiting
-              ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-              : "bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200"
-          }`}
-        >
-          <Lock size={14} /> {tr("hitl.filterWaiting")}
-          {pendingCount > 0 && (
-            <span className="ml-1 px-1.5 rounded-full bg-amber-500/30 text-amber-200 text-xs">
-              {pendingCount}
-            </span>
-          )}
-        </button>
         <button
           onClick={() => void refetch()}
-          className="flex items-center gap-1 px-3 py-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded text-sm font-bold transition-colors"
+          className="flex items-center gap-1 px-3 py-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded text-sm font-bold transition-colors shrink-0"
         >
           <RefreshCw size={14} /> Atualizar
         </button>
-        {data && (
-          <span className="text-xs text-slate-500">
-            {displayedTasks.length} tasks
-          </span>
-        )}
       </div>
 
       {unavailable && (
@@ -178,114 +238,18 @@ export default function TasksPage(): React.ReactNode {
           Erro ao carregar: {error}
         </div>
       )}
-      {loading && !data && (
-        <p className="text-slate-500 text-sm">Carregando…</p>
-      )}
+      {loading && !data && <p className="text-slate-500 text-sm">Carregando…</p>}
 
       {data && !unavailable && (
-        <div className="overflow-x-auto border border-slate-800 rounded-lg">
-          <table className="w-full text-sm">
-            <thead className="text-slate-500 text-left bg-slate-900/50">
-              <tr>
-                <th className="px-3 py-2 font-bold">#</th>
-                <th className="px-3 py-2 font-bold">Título</th>
-                <th className="px-3 py-2 font-bold">Estado</th>
-                <th className="px-3 py-2 font-bold">Project</th>
-                <th className="px-3 py-2 font-bold">Claim</th>
-                <th className="px-3 py-2 font-bold">Último run</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayedTasks.map((t) => (
-                <tr
-                  key={t.source_ref}
-                  className="border-t border-slate-900 hover:bg-slate-900/40"
-                >
-                  <td className="px-3 py-2 font-mono text-slate-400">
-                    {t.number}
-                  </td>
-                  <td className="px-3 py-2 max-w-md truncate">
-                    {(promptsBySourceRef.get(t.source_ref)?.length ?? 0) >
-                      0 && (
-                      <button
-                        onClick={() => {
-                          const p0 = promptsBySourceRef.get(t.source_ref)?.[0];
-                          if (p0) setSelectedPrompt(p0);
-                        }}
-                        className="mr-2 inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30"
-                      >
-                        <Lock size={11} /> {tr("hitl.badgeWaiting")}
-                      </button>
-                    )}
-                    {t.url ? (
-                      <a
-                        href={t.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="hover:text-sky-400"
-                      >
-                        {t.title}
-                      </a>
-                    ) : (
-                      (t.title ?? "—")
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={
-                        t.state === "OPEN"
-                          ? "text-emerald-400"
-                          : "text-slate-500"
-                      }
-                    >
-                      {t.state ?? "—"}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-slate-400">
-                    {t.project ?? "—"}
-                  </td>
-                  <td className="px-3 py-2">
-                    {t.claim_status ? (
-                      <span
-                        className={
-                          CLAIM_COLORS[t.claim_status] ?? "text-slate-300"
-                        }
-                      >
-                        {t.claim_status}
-                        {t.claim_agent ? ` (${t.claim_agent})` : ""}
-                      </span>
-                    ) : (
-                      <span className="text-slate-600">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    {t.run_status ? (
-                      <span
-                        className={RUN_COLORS[t.run_status] ?? "text-slate-300"}
-                      >
-                        {t.run_status}
-                      </span>
-                    ) : (
-                      <span className="text-slate-600">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {displayedTasks.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-3 py-6 text-center text-slate-600"
-                  >
-                    {onlyWaiting
-                      ? "Nenhuma task aguardando sua resposta."
-                      : "Nenhuma task encontrada."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {renderGroup("tasks.group.needYou", groups.need_you, "text-amber-400")}
+          {renderGroup(
+            "tasks.group.inProgress",
+            groups.in_progress,
+            "text-sky-400",
+          )}
+          {renderGroup("tasks.group.queue", groups.queue, "text-slate-400")}
+        </>
       )}
 
       {orphanPrompts.length > 0 && (
