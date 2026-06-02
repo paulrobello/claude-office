@@ -264,6 +264,21 @@ const es: Record<TranslationKey, string> = {
   "hitl.textPlaceholder": "Escribe tu respuesta…",
   "hitl.noIssueSection": "Otros prompts en espera",
   "hitl.filterWaiting": "Esperando respuesta",
+  "tasks.group.needYou": "⚠ Te necesita",
+  "tasks.group.inProgress": "⚙ En curso",
+  "tasks.group.queue": "📥 Cola",
+  "tasks.status.pending": "Pendiente",
+  "tasks.status.error": "Error",
+  "tasks.status.running": "En ejecución",
+  "tasks.status.waiting_agent": "Esperando agente",
+  "tasks.status.todo": "Por hacer",
+  "tasks.status.open": "OPEN / Nueva",
+  "tasks.status.unknown": "Indefinido",
+  "tasks.needYouBadge": "Te necesita",
+  "tasks.empty": "Nada aquí.",
+  "tasks.openIssue": "Abrir en GitHub",
+  "tasks.see": "Ver",
+  "tasks.approve": "Aprobar",
 };
 
 export default es;

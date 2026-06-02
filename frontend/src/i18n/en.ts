@@ -262,6 +262,21 @@ const en = {
   "hitl.textPlaceholder": "Type your answer…",
   "hitl.noIssueSection": "Other awaiting prompts",
   "hitl.filterWaiting": "Awaiting response",
+  "tasks.group.needYou": "⚠ Needs you",
+  "tasks.group.inProgress": "⚙ In progress",
+  "tasks.group.queue": "📥 Queue",
+  "tasks.status.pending": "Pending",
+  "tasks.status.error": "Error",
+  "tasks.status.running": "Running",
+  "tasks.status.waiting_agent": "Waiting for agent",
+  "tasks.status.todo": "To do",
+  "tasks.status.open": "OPEN / New",
+  "tasks.status.unknown": "Undefined",
+  "tasks.needYouBadge": "Needs you",
+  "tasks.empty": "Nothing here.",
+  "tasks.openIssue": "Open on GitHub",
+  "tasks.see": "View",
+  "tasks.approve": "Approve",
 } as const;
 
 export type TranslationKey = keyof typeof en;

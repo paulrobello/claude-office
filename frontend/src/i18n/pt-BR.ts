@@ -264,6 +264,21 @@ const ptBR: Record<TranslationKey, string> = {
   "hitl.textPlaceholder": "Digite sua resposta…",
   "hitl.noIssueSection": "Outros prompts aguardando",
   "hitl.filterWaiting": "Aguardando resposta",
+  "tasks.group.needYou": "⚠ Precisa de você",
+  "tasks.group.inProgress": "⚙ Em andamento",
+  "tasks.group.queue": "📥 Fila",
+  "tasks.status.pending": "Pendente",
+  "tasks.status.error": "Erro",
+  "tasks.status.running": "Em execução",
+  "tasks.status.waiting_agent": "Aguardando agente",
+  "tasks.status.todo": "A fazer",
+  "tasks.status.open": "OPEN / Nova",
+  "tasks.status.unknown": "Indefinido",
+  "tasks.needYouBadge": "Precisa de você",
+  "tasks.empty": "Nada aqui.",
+  "tasks.openIssue": "Abrir no GitHub",
+  "tasks.see": "Ver",
+  "tasks.approve": "Aprovar",
 };
 
 export default ptBR;
