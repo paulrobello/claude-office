@@ -14,7 +14,10 @@ import { useTranslation } from "@/hooks/useTranslation";
  */
 export function NeedYouIndicator(): React.ReactNode {
   const { t: tr } = useTranslation();
-  const { data: tasksData } = useCoordinationPoll(() => fetchTasks(""), []);
+  const { data: tasksData } = useCoordinationPoll(
+    () => fetchTasks("?state=OPEN"),
+    [],
+  );
   const { data: hitlData } = useCoordinationPoll(fetchHitlPending, []);
 
   const n = needYouCount(tasksData?.tasks ?? [], hitlData?.prompts ?? []);

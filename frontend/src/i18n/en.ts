@@ -263,6 +263,7 @@ const en = {
   "hitl.noIssueSection": "Other awaiting prompts",
   "hitl.filterWaiting": "Awaiting response",
   "hitl.recommended": "★ recommended",
+  "tasks.group.errors": "✗ Errors",
   "tasks.group.needYou": "⚠ Needs you",
   "tasks.group.inProgress": "⚙ In progress",
   "tasks.group.queue": "📥 Queue",
@@ -285,6 +286,7 @@ const en = {
   "tasks.batchSkip": "Skip selected",
   "tasks.processing": "processing…",
   "tasks.removeFromQueue": "Remove from queue",
+  "tasks.prioritize": "Prioritize",
 } as const;
 
 export type TranslationKey = keyof typeof en;
