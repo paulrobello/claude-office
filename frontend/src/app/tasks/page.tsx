@@ -77,6 +77,11 @@ export default function TasksPage(): React.ReactNode {
   const [detailTask, setDetailTask] = useState<CoordTask | null>(null);
   const [feedback, setFeedback] = useState<string>("");
   const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  // refs aprovados nesta sessão: somem de "Precisa de você" na hora (otimista),
+  // sem esperar o coletor re-sincronizar o relabel hitl→afc no /tasks.
+  const [resolved, setResolved] = useState<Set<string>>(() => new Set());
+  // refs com ação em voo: mostram "processando" e botões desabilitados.
+  const [processing, setProcessing] = useState<Set<string>>(() => new Set());
   // nowMs sai de estado (lazy init, não Date.now() em render — regra
   // react-hooks/purity); o intervalo faz o "tempo parado" avançar.
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -106,10 +111,12 @@ export default function TasksPage(): React.ReactNode {
     return m;
   }, [prompts]);
 
-  const groups = useMemo(
-    () => groupAndSortTasks(data?.tasks ?? [], prompts),
-    [data, prompts],
-  );
+  const groups = useMemo(() => {
+    const g = groupAndSortTasks(data?.tasks ?? [], prompts);
+    // Aprovadas nesta sessão somem de "Precisa de você" mesmo antes do coletor
+    // re-sincronizar o label (evita o delay de a linha continuar lá).
+    return { ...g, need_you: g.need_you.filter((t) => !resolved.has(t.source_ref)) };
+  }, [data, prompts, resolved]);
 
   // Prompts sem task casada na lista atual — não podem sumir (brecha HITL).
   const orphanPrompts = useMemo(() => {
@@ -123,36 +130,76 @@ export default function TasksPage(): React.ReactNode {
     await refetch();
   };
 
-  const onSkip = async (ref: string) => {
-    await setTaskPriority(ref, "bottom");
-    setFeedback(`${ref} → fim da fila`);
-    await refetch();
-  };
-  const onRetry = async (ref: string) => {
-    await setTaskPriority(ref, "top");
-    setFeedback(`${ref} → topo da fila (retry)`);
-    await refetch();
+  const markProcessing = (ref: string, on: boolean) =>
+    setProcessing((s) => {
+      const n = new Set(s);
+      if (on) n.add(ref);
+      else n.delete(ref);
+      return n;
+    });
+
+  const withProcessing = async (
+    ref: string,
+    fn: () => Promise<void>,
+    msg: string,
+  ) => {
+    markProcessing(ref, true);
+    try {
+      await fn();
+      setFeedback(msg);
+      void refetch(); // background, não bloqueia a UI
+    } catch (e) {
+      setFeedback(`${ref} falhou: ${e instanceof Error ? e.message : "erro"}`);
+    } finally {
+      markProcessing(ref, false);
+    }
   };
 
-  // Aprovação direta (1 clique): responde o prompt do banco OU libera o label hitl.
+  const onSkip = (ref: string) =>
+    void withProcessing(
+      ref,
+      async () => {
+        await setTaskPriority(ref, "bottom");
+      },
+      `${ref} → fim da fila`,
+    );
+  const onRetry = (ref: string) =>
+    void withProcessing(
+      ref,
+      async () => {
+        await setTaskPriority(ref, "top");
+      },
+      `${ref} → topo da fila (retry)`,
+    );
+
+  // Aprovação direta (1 clique): responde o prompt do banco OU libera o label
+  // hitl. Hide otimista: a task some de "Precisa de você" assim que o servidor
+  // confirma, sem esperar o coletor re-sincronizar (refetch roda em background).
   const onApproveRow = async (t: CoordTask) => {
-    const prompt = promptsByRef.get(t.source_ref)?.[0];
+    const ref = t.source_ref;
+    const prompt = promptsByRef.get(ref)?.[0];
     const act = approveAction(t, prompt);
-    if (act.kind === "answer" && prompt) {
-      await answerHitl(prompt.id, act.value);
-      setFeedback(`#${t.number} aprovada`);
-    } else if (act.kind === "relabel") {
-      await approveTask(t.source_ref);
-      setFeedback(`#${t.number} liberada pro agente (hitl→afk)`);
-    } else if (act.kind === "modal" && prompt) {
+    if (act.kind === "modal" && prompt) {
       setSelectedPrompt(prompt); // precisa de escolha → abre o modal
       return;
-    } else {
+    }
+    if (act.kind === "none") {
       setFeedback(`#${t.number} não é aprovável`);
       return;
     }
-    await refetchHitl();
-    await refetch();
+    markProcessing(ref, true);
+    try {
+      if (act.kind === "answer" && prompt) await answerHitl(prompt.id, act.value);
+      else if (act.kind === "relabel") await approveTask(ref);
+      setResolved((s) => new Set(s).add(ref)); // some da lista AGORA
+      setFeedback(`#${t.number} aprovada`);
+      void refetchHitl();
+      void refetch();
+    } catch (e) {
+      setFeedback(`#${t.number} falhou: ${e instanceof Error ? e.message : "erro"}`);
+    } finally {
+      markProcessing(ref, false);
+    }
   };
 
   // Clique no título/código → detalhes (prompt do banco abre o modal HITL).
@@ -180,29 +227,52 @@ export default function TasksPage(): React.ReactNode {
     });
   const onBatchApprove = async () => {
     const sel = (data?.tasks ?? []).filter((t) => selected.has(t.source_ref));
+    const refs = sel.map((t) => t.source_ref);
+    setProcessing((s) => {
+      const n = new Set(s);
+      refs.forEach((r) => n.add(r));
+      return n;
+    });
+    setSelected(new Set());
     let answered = 0;
     let relabeled = 0;
     let manual = 0;
+    const done: string[] = [];
     for (const t of sel) {
       const prompt = promptsByRef.get(t.source_ref)?.[0];
       const act = approveAction(t, prompt);
-      if (act.kind === "answer" && prompt) {
-        await answerHitl(prompt.id, act.value);
-        answered++;
-      } else if (act.kind === "relabel") {
-        await approveTask(t.source_ref);
-        relabeled++;
-      } else if (act.kind === "modal") {
+      try {
+        if (act.kind === "answer" && prompt) {
+          await answerHitl(prompt.id, act.value);
+          answered++;
+          done.push(t.source_ref);
+        } else if (act.kind === "relabel") {
+          await approveTask(t.source_ref);
+          relabeled++;
+          done.push(t.source_ref);
+        } else if (act.kind === "modal") {
+          manual++;
+        }
+      } catch {
         manual++;
       }
     }
+    setResolved((s) => {
+      const n = new Set(s);
+      done.forEach((r) => n.add(r));
+      return n;
+    });
+    setProcessing((s) => {
+      const n = new Set(s);
+      refs.forEach((r) => n.delete(r));
+      return n;
+    });
     setFeedback(
       `Aprovadas: ${answered + relabeled} (${relabeled} liberadas, ${answered} respondidas)` +
         (manual ? ` · ${manual} precisam de decisão individual (abra os detalhes)` : ""),
     );
-    setSelected(new Set());
-    await refetchHitl();
-    await refetch();
+    void refetchHitl();
+    void refetch();
   };
   const onBatchSkip = async () => {
     const n = selected.size;
@@ -223,6 +293,7 @@ export default function TasksPage(): React.ReactNode {
     const status = deriveStatus(t, prompts);
     const stuck = formatStuckTime(stuckSince(t, status), nowMs, DEFAULT_SLA_MS);
     const am = agentModel(t, status);
+    const busy = processing.has(t.source_ref);
     return (
       <div
         key={t.source_ref}
@@ -270,29 +341,37 @@ export default function TasksPage(): React.ReactNode {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {status === "pending" && (
+          {busy ? (
+            <span className="text-sm font-bold text-sky-300 animate-pulse px-2">
+              ⏳ {tr("tasks.processing")}
+            </span>
+          ) : (
             <>
-              <button
-                onClick={() => void onApproveRow(t)}
-                className="px-3 py-1.5 rounded text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-500"
-              >
-                ✓ {tr("tasks.approve")}
-              </button>
-              <button
-                onClick={() => void onSkip(t.source_ref)}
-                className="px-3 py-1.5 rounded text-sm font-bold bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700"
-              >
-                ⤓ {tr("tasks.skip")}
-              </button>
+              {status === "pending" && (
+                <>
+                  <button
+                    onClick={() => void onApproveRow(t)}
+                    className="px-3 py-1.5 rounded text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-500"
+                  >
+                    ✓ {tr("tasks.approve")}
+                  </button>
+                  <button
+                    onClick={() => onSkip(t.source_ref)}
+                    className="px-3 py-1.5 rounded text-sm font-bold bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700"
+                  >
+                    ⤓ {tr("tasks.skip")}
+                  </button>
+                </>
+              )}
+              {status === "error" && (
+                <button
+                  onClick={() => onRetry(t.source_ref)}
+                  className="px-3 py-1.5 rounded text-sm font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40 hover:bg-sky-500/30"
+                >
+                  ↻ {tr("tasks.retry")}
+                </button>
+              )}
             </>
-          )}
-          {status === "error" && (
-            <button
-              onClick={() => void onRetry(t.source_ref)}
-              className="px-3 py-1.5 rounded text-sm font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40 hover:bg-sky-500/30"
-            >
-              ↻ {tr("tasks.retry")}
-            </button>
           )}
           {t.url && (
             <a

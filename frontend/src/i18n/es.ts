@@ -285,6 +285,7 @@ const es: Record<TranslationKey, string> = {
   "tasks.selectAll": "Seleccionar todas",
   "tasks.batchApprove": "Aprobar seleccionadas",
   "tasks.batchSkip": "Saltar seleccionadas",
+  "tasks.processing": "procesando…",
 };
 
 export default es;
