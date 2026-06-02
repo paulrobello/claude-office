@@ -490,3 +490,20 @@ def test_hitl_exposes_recommended_key() -> None:
     if not prompts:
         pytest.skip("sem prompts HITL pendentes para inspecionar o shape")
     assert "recommended_key" in prompts[0]
+
+
+def test_ref_to_issue_number_parsing() -> None:
+    from app.api.routes.coordination import _ref_to_issue_number
+
+    assert _ref_to_issue_number("agents-ia#294") == 294
+    assert _ref_to_issue_number("294") is None
+    assert _ref_to_issue_number("agents-ia#abc") is None
+    assert _ref_to_issue_number("") is None
+
+
+def test_priority_rejects_bad_rank() -> None:
+    client = TestClient(app)
+    r = client.post(
+        "/api/v1/coordination/tasks/agents-ia%23294/priority", json={"rank": "x"}
+    )
+    assert r.status_code == 422

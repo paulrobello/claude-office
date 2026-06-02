@@ -132,6 +132,53 @@ async def list_tasks(
 _AGENTS_IA_REPO = "IsakielSouza/agents-ia"
 
 
+def _ref_to_issue_number(source_ref: str) -> int | None:
+    """'agents-ia#294' -> 294; formatos inesperados -> None."""
+    if "#" not in source_ref:
+        return None
+    tail = source_ref.rsplit("#", 1)[1]
+    return int(tail) if tail.isdigit() else None
+
+
+class PriorityBody(BaseModel):
+    rank: str  # "top" | "bottom"
+
+
+# Skip/Retry do cockpit: aplica label de prioridade que o triador honra ao montar
+# a queue.md (fila:topo = topo/Retry; fila:fim = fim/Skip). Sem requests (não
+# consumida) nem work_claims (sem grant cockpit_rw); via gh, igual ao POST /tasks.
+_PRIORITY_LABELS = {"top": "fila:topo", "bottom": "fila:fim"}
+
+
+@router.post(
+    "/tasks/{source_ref}/priority", dependencies=[Depends(enforce_write_rate_limit)]
+)
+async def set_task_priority(source_ref: str, body: PriorityBody) -> dict[str, Any]:
+    if body.rank not in _PRIORITY_LABELS:
+        raise HTTPException(
+            status_code=422, detail={"error": "rank inválido (top|bottom)"}
+        )
+    num = _ref_to_issue_number(source_ref)
+    if num is None:
+        raise HTTPException(
+            status_code=400, detail={"error": "source_ref sem número de issue"}
+        )
+    add = _PRIORITY_LABELS[body.rank]
+    remove = _PRIORITY_LABELS["bottom" if body.rank == "top" else "top"]
+    proc = await asyncio.create_subprocess_exec(
+        "gh", "issue", "edit", str(num), "--repo", _AGENTS_IA_REPO,
+        "--add-label", add, "--remove-label", remove,
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+    )
+    _, err = await proc.communicate()
+    if proc.returncode != 0:
+        raise HTTPException(
+            status_code=502,
+            detail={"error": "gh falhou", "stderr": err.decode()[:300]},
+        )
+    return {"source_ref": source_ref, "label": add}
+
+
 class CreateTaskBody(BaseModel):
     title: str
     body: str = ""
