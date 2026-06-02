@@ -576,6 +576,49 @@ async def list_agent_runs(
         raise HTTPException(status_code=503, detail=_DOWN_DETAIL) from exc
 
 
+# ── /agents/metrics (#382 passo 2) ─────────────────────────────────────────────
+# Métricas de performance derivadas de agent_runs, agregadas POR PROJETO (a ponte
+# roster↔runs é o projeto; resolvida no frontend). Conta runs TERMINADOS para
+# taxa/duração (exclui 'running', sem ended_at); 'running' só na contagem bruta.
+_AGENT_METRICS_SQL = text("""
+SELECT
+  project,
+  COUNT(*)                                          AS total,
+  COUNT(*) FILTER (WHERE status = 'success')        AS success,
+  COUNT(*) FILTER (WHERE status = 'error')          AS error,
+  COUNT(*) FILTER (WHERE status = 'timeout')        AS timeout,
+  COUNT(*) FILTER (WHERE status = 'running')        AS running,
+  ROUND(
+    COUNT(*) FILTER (WHERE status = 'success')::numeric
+    / NULLIF(COUNT(*) FILTER (WHERE status IN ('success','error','timeout')), 0),
+  4)                                                AS success_rate,
+  ROUND(AVG(EXTRACT(EPOCH FROM (ended_at - started_at)))
+        FILTER (WHERE ended_at IS NOT NULL))        AS avg_duration_seconds,
+  ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (
+        ORDER BY EXTRACT(EPOCH FROM (ended_at - started_at)))
+        FILTER (WHERE ended_at IS NOT NULL))        AS p50_duration_seconds,
+  MAX(started_at)                                   AS last_run_at
+FROM agent_runs
+WHERE project IS NOT NULL
+  AND (CAST(:since AS text) IS NULL OR started_at >= CAST(:since AS text)::timestamptz)
+GROUP BY project
+ORDER BY total DESC
+""")
+
+
+@router.get("/agents/metrics")
+async def agent_metrics(
+    db: Annotated[AsyncSession, Depends(get_coordination_db)],
+    since: str | None = None,
+) -> dict[str, Any]:
+    try:
+        result = await db.execute(_AGENT_METRICS_SQL, {"since": since})
+        return {"metrics": _row_dicts(result)}
+    except (OperationalError, InterfaceError, DBAPIError) as exc:
+        logger.warning("coordination /agents/metrics unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail=_DOWN_DETAIL) from exc
+
+
 # ── /dashboard ────────────────────────────────────────────────────────────────
 _DASH_ISSUES_SQL = text("""
 SELECT

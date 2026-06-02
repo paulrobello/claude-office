@@ -128,6 +128,28 @@ class TestCoordinationLive:
         assert r.status_code == 200
         assert "runs" in r.json()
 
+    def test_agent_metrics_shape(self) -> None:
+        client = TestClient(app)
+        r = client.get("/api/v1/coordination/agents/metrics")
+        assert r.status_code == 200
+        body = r.json()
+        assert "metrics" in body
+        if body["metrics"]:
+            row = body["metrics"][0]
+            assert {
+                "project", "total", "success", "error", "timeout",
+                "success_rate", "avg_duration_seconds", "last_run_at",
+            } <= row.keys()
+            assert row["success_rate"] is None or 0 <= float(row["success_rate"]) <= 1
+
+    def test_agent_metrics_since_filter(self) -> None:
+        client = TestClient(app)
+        r = client.get(
+            "/api/v1/coordination/agents/metrics?since=2099-01-01T00:00:00Z"
+        )
+        assert r.status_code == 200
+        assert r.json()["metrics"] == []
+
     def test_dashboard_shape(self) -> None:
         client = TestClient(app)
         r = client.get("/api/v1/coordination/dashboard?period=week")
@@ -570,3 +592,16 @@ def test_note_roundtrip_and_detail() -> None:
     assert "body" in d and "notes" in d
     assert any(n["note"] == "teste F-notas" for n in d["notes"])
     _admin_exec("DELETE FROM task_notes WHERE source_ref = :r", {"r": "agents-ia#999999"})
+
+
+def test_agent_metrics_degrade_503_when_db_down() -> None:
+    async def _boom():  # type: ignore[no-untyped-def]
+        yield _BoomSession()
+
+    app.dependency_overrides[get_coordination_db] = _boom
+    try:
+        client = TestClient(app)
+        r = client.get("/api/v1/coordination/agents/metrics")
+        assert r.status_code == 503
+    finally:
+        app.dependency_overrides.pop(get_coordination_db, None)
