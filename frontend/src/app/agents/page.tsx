@@ -10,11 +10,14 @@ import { EditAgentForm } from "@/components/coordination/EditAgentForm";
 import { useCoordinationPoll } from "@/components/coordination/useCoordinationPoll";
 import {
   fetchAgents,
+  fetchAgentMetrics,
   archiveAgent,
   restoreAgent,
   deleteAgent,
   type CoordAgent,
+  type CoordAgentMetrics,
 } from "@/components/coordination/coordinationApi";
+import { AgentTimelineModal } from "@/components/coordination/AgentTimelineModal";
 
 // status derivado pelo backend (busy = tem claim ativo; senão idle/offline do roster)
 const STATUS_COLORS: Record<string, string> = {
@@ -28,6 +31,19 @@ function fmtTime(s: string | null): string {
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
 }
+
+function fmtPct(r: number | null): string {
+  return r === null ? "—" : `${(r * 100).toFixed(0)}%`;
+}
+function fmtDuration(sec: number | null): string {
+  if (sec === null) return "—";
+  const s = Math.round(sec);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  return `${m}m ${s % 60}s`;
+}
+
+const STATUS_ORDER: Record<string, number> = { busy: 0, idle: 1, offline: 2 };
 
 export default function AgentsPage(): React.ReactNode {
   const [role, setRole] = useState("");
@@ -43,6 +59,88 @@ export default function AgentsPage(): React.ReactNode {
     () => fetchAgents(qs),
     [qs],
   );
+
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sortBy, setSortBy] = useState<
+    "role" | "status" | "nome" | "last" | "claims"
+  >("role");
+  const [timelineAgent, setTimelineAgent] = useState<CoordAgent | null>(null);
+
+  const [sevenDaysAgo] = useState(() =>
+    new Date(Date.now() - 7 * 864e5).toISOString(),
+  );
+  const { data: metricsData } = useCoordinationPoll(
+    () => fetchAgentMetrics(`?since=${encodeURIComponent(sevenDaysAgo)}`),
+    [sevenDaysAgo],
+  );
+  const metricsByProject = useMemo(() => {
+    const m = new Map<string, CoordAgentMetrics>();
+    for (const row of metricsData?.metrics ?? []) m.set(row.project, row);
+    return m;
+  }, [metricsData]);
+
+  const metricsForAgent = (a: CoordAgent): CoordAgentMetrics | null => {
+    const rows = a.projetos
+      .map((p) => metricsByProject.get(p))
+      .filter((x): x is CoordAgentMetrics => !!x);
+    if (rows.length === 0) return null;
+    const agg = rows.reduce(
+      (acc, r) => {
+        acc.total += r.total;
+        acc.success += r.success;
+        acc.error += r.error;
+        acc.timeout += r.timeout;
+        return acc;
+      },
+      { total: 0, success: 0, error: 0, timeout: 0 },
+    );
+    const finished = agg.success + agg.error + agg.timeout;
+    return {
+      project: a.projetos.join("+"),
+      total: agg.total,
+      success: agg.success,
+      error: agg.error,
+      timeout: agg.timeout,
+      running: 0,
+      success_rate: finished ? agg.success / finished : null,
+      avg_duration_seconds: rows[0].avg_duration_seconds,
+      p50_duration_seconds: rows[0].p50_duration_seconds,
+      last_run_at:
+        rows
+          .map((r) => r.last_run_at)
+          .filter(Boolean)
+          .sort()
+          .reverse()[0] ?? null,
+    };
+  };
+
+  const visibleAgents = useMemo(() => {
+    const list = (data?.agents ?? []).filter(
+      (a) => !statusFilter || a.status === statusFilter,
+    );
+    return [...list].sort((a, b) => {
+      switch (sortBy) {
+        case "status":
+          return (
+            (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9) ||
+            a.nome.localeCompare(b.nome)
+          );
+        case "nome":
+          return a.nome.localeCompare(b.nome);
+        case "claims":
+          return (
+            b.active_claims - a.active_claims || a.nome.localeCompare(b.nome)
+          );
+        case "last":
+          return (
+            new Date(b.last_active_at ?? 0).getTime() -
+            new Date(a.last_active_at ?? 0).getTime()
+          );
+        default:
+          return a.role.localeCompare(b.role) || a.nome.localeCompare(b.nome);
+      }
+    });
+  }, [data, statusFilter, sortBy]);
 
   const loadArchived = useCallback(async () => {
     try {
@@ -88,6 +186,27 @@ export default function AgentsPage(): React.ReactNode {
           onChange={(e) => setRole(e.target.value)}
           className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm w-56"
         />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm"
+        >
+          <option value="">Todos status</option>
+          <option value="busy">busy</option>
+          <option value="idle">idle</option>
+          <option value="offline">offline</option>
+        </select>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+          className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm"
+        >
+          <option value="role">Ordenar: Função</option>
+          <option value="status">Ordenar: Status</option>
+          <option value="nome">Ordenar: Nome</option>
+          <option value="last">Ordenar: Último ativo</option>
+          <option value="claims">Ordenar: Claims</option>
+        </select>
         <button
           onClick={() => void refetch()}
           className="flex items-center gap-1 px-3 py-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded text-sm font-bold transition-colors"
@@ -96,7 +215,7 @@ export default function AgentsPage(): React.ReactNode {
         </button>
         {data && (
           <span className="text-xs text-slate-500">
-            {data.agents.length} agentes ·{" "}
+            {visibleAgents.length}/{data.agents.length} agentes ·{" "}
             {data.agents.filter((a) => a.status === "busy").length} ocupados
           </span>
         )}
@@ -142,11 +261,12 @@ export default function AgentsPage(): React.ReactNode {
                 <th className="px-3 py-2 font-bold">Fila</th>
                 <th className="px-3 py-2 font-bold">Projetos</th>
                 <th className="px-3 py-2 font-bold">Último ativo</th>
+                <th className="px-3 py-2 font-bold">Performance (7d)</th>
                 <th className="px-3 py-2 font-bold">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {data.agents.map((a) => (
+              {visibleAgents.map((a) => (
                 <tr
                   key={a.nome}
                   className="border-t border-slate-900 hover:bg-slate-900/40"
@@ -215,9 +335,34 @@ export default function AgentsPage(): React.ReactNode {
                   <td className="px-3 py-2 text-slate-400 whitespace-nowrap">
                     {fmtTime(a.last_active_at)}
                   </td>
+                  <td className="px-3 py-2 text-xs whitespace-nowrap">
+                    {(() => {
+                      const m = metricsForAgent(a);
+                      if (!m) return <span className="text-slate-600">—</span>;
+                      return (
+                        <span
+                          title={`${m.success}✓ / ${m.error}✕ / ${m.timeout}⧖ · média ${fmtDuration(m.avg_duration_seconds)} · por projeto`}
+                        >
+                          <span className="text-emerald-400">
+                            {fmtPct(m.success_rate)}
+                          </span>
+                          <span className="text-slate-500">
+                            {" "}
+                            · {m.total} runs · {fmtDuration(m.avg_duration_seconds)}
+                          </span>
+                        </span>
+                      );
+                    })()}
+                  </td>
                   <td className="px-3 py-2">
                     <div className="flex flex-col gap-1">
                       <EditAgentForm agent={a} onSaved={() => void reload()} />
+                      <button
+                        className="text-sm text-sky-400 text-left"
+                        onClick={() => setTimelineAgent(a)}
+                      >
+                        histórico
+                      </button>
                       <button
                         className="text-sm text-amber-400 text-left"
                         onClick={async () => {
@@ -236,13 +381,13 @@ export default function AgentsPage(): React.ReactNode {
                   </td>
                 </tr>
               ))}
-              {data.agents.length === 0 && (
+              {visibleAgents.length === 0 && (
                 <tr>
                   <td
-                    colSpan={10}
+                    colSpan={11}
                     className="px-3 py-6 text-center text-slate-600"
                   >
-                    Roster vazio — contrate agentes (INSERT em agents).
+                    Nenhum agente para o filtro atual.
                   </td>
                 </tr>
               )}
@@ -334,6 +479,12 @@ export default function AgentsPage(): React.ReactNode {
             </table>
           </div>
         </div>
+      )}
+      {timelineAgent && (
+        <AgentTimelineModal
+          agent={timelineAgent}
+          onClose={() => setTimelineAgent(null)}
+        />
       )}
     </main>
   );

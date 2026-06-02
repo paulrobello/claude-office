@@ -63,6 +63,19 @@ export interface CoordAgent {
   recent_done: { ref: string | null; at: string | null }[];
 }
 
+export interface CoordAgentMetrics {
+  project: string;
+  total: number;
+  success: number;
+  error: number;
+  timeout: number;
+  running: number;
+  success_rate: number | null; // fração 0..1
+  avg_duration_seconds: number | null;
+  p50_duration_seconds: number | null;
+  last_run_at: string | null;
+}
+
 export interface CoordDashboard {
   github: { open: number; closed: number; total: number };
   database: { activeClaims: number; runsByStatus: Record<string, number> };
@@ -211,6 +224,12 @@ export const fetchDashboard = (qs = ""): Promise<CoordDashboard> =>
 
 export const fetchAgents = (qs = ""): Promise<{ agents: CoordAgent[] }> =>
   getJson<{ agents: CoordAgent[] }>(`/agents${qs}`);
+
+/** Métricas de performance agregadas por projeto (#382 passo 2). */
+export const fetchAgentMetrics = (
+  qs = "",
+): Promise<{ metrics: CoordAgentMetrics[] }> =>
+  getJson<{ metrics: CoordAgentMetrics[] }>(`/agents/metrics${qs}`);
 
 // ── HITL (human-in-the-loop): prompts que aguardam resposta do usuário ──────
 export type HitlKind = "yesno" | "choice" | "multi" | "text";
