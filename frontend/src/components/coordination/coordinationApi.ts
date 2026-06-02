@@ -312,3 +312,9 @@ export const setTaskPriority = (
   rank: "top" | "bottom",
 ): Promise<{ source_ref: string; label: string }> =>
   mutate(`/tasks/${encodeURIComponent(sourceRef)}/priority`, "POST", { rank });
+
+/** Aprovar pendência label `hitl`: libera pro agente (hitl→afk) via backend. */
+export const approveTask = (
+  sourceRef: string,
+): Promise<{ source_ref: string; action: string }> =>
+  mutate(`/tasks/${encodeURIComponent(sourceRef)}/approve`, "POST");

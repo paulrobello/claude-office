@@ -1,30 +1,38 @@
-import type { HitlPrompt, HitlAnswerValue } from "./coordinationApi";
+import type { CoordTask, HitlPrompt, HitlAnswerValue } from "./coordinationApi";
 
-export interface BatchPlan {
-  approvable: { id: number; answer: HitlAnswerValue }[];
-  manual: number[]; // ids que precisam de decisão individual
-}
+/**
+ * O que "Aprovar" faz pra uma task pendente:
+ * - answer  → responder o prompt HITL do banco (yesno→true; choice/multi→recomendada)
+ * - relabel → pendência é label `hitl` no GitHub (sem prompt): liberar pro agente (hitl→afk)
+ * - modal   → prompt do banco que precisa de escolha (choice/multi sem recomendada, ou text)
+ * - none    → não aprovável (não é pendente)
+ */
+export type ApproveAction =
+  | { kind: "answer"; value: HitlAnswerValue }
+  | { kind: "relabel" }
+  | { kind: "modal" }
+  | { kind: "none" };
 
-/** Quais prompts dá pra aprovar em lote (yesno→true; choice/multi→recomendada). */
-export function batchApprovals(prompts: HitlPrompt[]): BatchPlan {
-  const approvable: BatchPlan["approvable"] = [];
-  const manual: number[] = [];
-  for (const p of prompts) {
-    if (p.kind === "yesno") {
-      approvable.push({ id: p.id, answer: true });
-    } else if ((p.kind === "choice" || p.kind === "multi") && p.recommended_key) {
-      const keys = new Set((p.options ?? []).map((o) => o.key));
-      if (keys.has(p.recommended_key)) {
-        approvable.push({
-          id: p.id,
-          answer: p.kind === "multi" ? [p.recommended_key] : p.recommended_key,
-        });
-        continue;
+export function approveAction(
+  task: CoordTask,
+  prompt: HitlPrompt | undefined,
+): ApproveAction {
+  if (prompt) {
+    if (prompt.kind === "yesno") return { kind: "answer", value: true };
+    if (prompt.kind === "choice" || prompt.kind === "multi") {
+      const keys = new Set((prompt.options ?? []).map((o) => o.key));
+      if (prompt.recommended_key && keys.has(prompt.recommended_key)) {
+        return {
+          kind: "answer",
+          value:
+            prompt.kind === "multi"
+              ? [prompt.recommended_key]
+              : prompt.recommended_key,
+        };
       }
-      manual.push(p.id);
-    } else {
-      manual.push(p.id);
     }
+    return { kind: "modal" };
   }
-  return { approvable, manual };
+  if (task.labels.includes("hitl")) return { kind: "relabel" };
+  return { kind: "none" };
 }

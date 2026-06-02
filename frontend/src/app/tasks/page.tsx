@@ -11,11 +11,13 @@ import {
   fetchHitlPending,
   answerHitl,
   setTaskPriority,
+  approveTask,
   type CoordTask,
   type HitlPrompt,
   type HitlAnswerValue,
 } from "@/components/coordination/coordinationApi";
-import { batchApprovals } from "@/components/coordination/taskBatch";
+import { approveAction } from "@/components/coordination/taskBatch";
+import TaskDetailModal from "@/components/coordination/TaskDetailModal";
 import HitlAnswerModal from "@/components/coordination/HitlAnswerModal";
 import { CreateTaskForm } from "@/components/coordination/CreateTaskForm";
 import {
@@ -72,6 +74,9 @@ export default function TasksPage(): React.ReactNode {
   const { t: tr } = useTranslation();
   const [selectedPrompt, setSelectedPrompt] = useState<HitlPrompt | null>(null);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [detailTask, setDetailTask] = useState<CoordTask | null>(null);
+  const [feedback, setFeedback] = useState<string>("");
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
   // nowMs sai de estado (lazy init, não Date.now() em render — regra
   // react-hooks/purity); o intervalo faz o "tempo parado" avançar.
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -118,19 +123,45 @@ export default function TasksPage(): React.ReactNode {
     await refetch();
   };
 
-  const openPrompt = (t: CoordTask) => {
-    const p0 = promptsByRef.get(t.source_ref)?.[0];
-    if (p0) setSelectedPrompt(p0);
-  };
-
   const onSkip = async (ref: string) => {
     await setTaskPriority(ref, "bottom");
+    setFeedback(`${ref} → fim da fila`);
     await refetch();
   };
   const onRetry = async (ref: string) => {
     await setTaskPriority(ref, "top");
+    setFeedback(`${ref} → topo da fila (retry)`);
     await refetch();
   };
+
+  // Aprovação direta (1 clique): responde o prompt do banco OU libera o label hitl.
+  const onApproveRow = async (t: CoordTask) => {
+    const prompt = promptsByRef.get(t.source_ref)?.[0];
+    const act = approveAction(t, prompt);
+    if (act.kind === "answer" && prompt) {
+      await answerHitl(prompt.id, act.value);
+      setFeedback(`#${t.number} aprovada`);
+    } else if (act.kind === "relabel") {
+      await approveTask(t.source_ref);
+      setFeedback(`#${t.number} liberada pro agente (hitl→afk)`);
+    } else if (act.kind === "modal" && prompt) {
+      setSelectedPrompt(prompt); // precisa de escolha → abre o modal
+      return;
+    } else {
+      setFeedback(`#${t.number} não é aprovável`);
+      return;
+    }
+    await refetchHitl();
+    await refetch();
+  };
+
+  // Clique no título/código → detalhes (prompt do banco abre o modal HITL).
+  const openDetail = (t: CoordTask) => {
+    const prompt = promptsByRef.get(t.source_ref)?.[0];
+    if (prompt) setSelectedPrompt(prompt);
+    else setDetailTask(t);
+  };
+
   const toggleSel = (ref: string) =>
     setSelected((s) => {
       const n = new Set(s);
@@ -149,24 +180,49 @@ export default function TasksPage(): React.ReactNode {
     });
   const onBatchApprove = async () => {
     const sel = (data?.tasks ?? []).filter((t) => selected.has(t.source_ref));
-    const ps = sel.flatMap((t) => promptsByRef.get(t.source_ref) ?? []);
-    const plan = batchApprovals(ps);
-    for (const a of plan.approvable) await answerHitl(a.id, a.answer);
+    let answered = 0;
+    let relabeled = 0;
+    let manual = 0;
+    for (const t of sel) {
+      const prompt = promptsByRef.get(t.source_ref)?.[0];
+      const act = approveAction(t, prompt);
+      if (act.kind === "answer" && prompt) {
+        await answerHitl(prompt.id, act.value);
+        answered++;
+      } else if (act.kind === "relabel") {
+        await approveTask(t.source_ref);
+        relabeled++;
+      } else if (act.kind === "modal") {
+        manual++;
+      }
+    }
+    setFeedback(
+      `Aprovadas: ${answered + relabeled} (${relabeled} liberadas, ${answered} respondidas)` +
+        (manual ? ` · ${manual} precisam de decisão individual (abra os detalhes)` : ""),
+    );
     setSelected(new Set());
     await refetchHitl();
     await refetch();
   };
   const onBatchSkip = async () => {
+    const n = selected.size;
     for (const ref of Array.from(selected)) await setTaskPriority(ref, "bottom");
+    setFeedback(`${n} despriorizada(s)`);
     setSelected(new Set());
     await refetch();
   };
+  const toggleGroup = (key: string) =>
+    setHidden((s) => {
+      const n = new Set(s);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
 
   const renderRow = (t: CoordTask) => {
     const status = deriveStatus(t, prompts);
     const stuck = formatStuckTime(stuckSince(t, status), nowMs, DEFAULT_SLA_MS);
     const am = agentModel(t, status);
-    const hasPrompt = (promptsByRef.get(t.source_ref)?.length ?? 0) > 0;
     return (
       <div
         key={t.source_ref}
@@ -180,11 +236,19 @@ export default function TasksPage(): React.ReactNode {
             onChange={() => toggleSel(t.source_ref)}
           />
         )}
-        <div className="font-mono font-bold text-base w-16 shrink-0">
+        <button
+          onClick={() => openDetail(t)}
+          className="font-mono font-bold text-base w-16 shrink-0 text-left hover:text-sky-400"
+        >
           #{t.number}
-        </div>
+        </button>
         <div className="flex-1 min-w-0">
-          <div className="truncate">{t.title ?? "—"}</div>
+          <button
+            onClick={() => openDetail(t)}
+            className="truncate block text-left w-full hover:text-sky-400"
+          >
+            {t.title ?? "—"}
+          </button>
           <div className="text-xs text-slate-500 mt-0.5">
             {t.project ?? "—"}
             {am && <span> · {am}</span>}
@@ -206,21 +270,21 @@ export default function TasksPage(): React.ReactNode {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {status === "pending" && hasPrompt && (
-            <button
-              onClick={() => openPrompt(t)}
-              className="px-3 py-1.5 rounded text-sm font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30"
-            >
-              {tr("tasks.see")}
-            </button>
-          )}
           {status === "pending" && (
-            <button
-              onClick={() => void onSkip(t.source_ref)}
-              className="px-3 py-1.5 rounded text-sm font-bold bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700"
-            >
-              ⤓ {tr("tasks.skip")}
-            </button>
+            <>
+              <button
+                onClick={() => void onApproveRow(t)}
+                className="px-3 py-1.5 rounded text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-500"
+              >
+                ✓ {tr("tasks.approve")}
+              </button>
+              <button
+                onClick={() => void onSkip(t.source_ref)}
+                className="px-3 py-1.5 rounded text-sm font-bold bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700"
+              >
+                ⤓ {tr("tasks.skip")}
+              </button>
+            </>
           )}
           {status === "error" && (
             <button
@@ -343,15 +407,57 @@ export default function TasksPage(): React.ReactNode {
       )}
       {loading && !data && <p className="text-slate-500 text-sm">Carregando…</p>}
 
+      {feedback && (
+        <div className="mb-3 px-3 py-2 rounded bg-sky-500/10 border border-sky-500/30 text-sky-200 text-sm flex items-center justify-between">
+          <span>{feedback}</span>
+          <button
+            onClick={() => setFeedback("")}
+            className="text-slate-400 hover:text-white ml-3"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {data && !unavailable && (
         <>
-          {renderGroup("tasks.group.needYou", groups.need_you, "text-amber-400", true)}
-          {renderGroup(
-            "tasks.group.inProgress",
-            groups.in_progress,
-            "text-sky-400",
-          )}
-          {renderGroup("tasks.group.queue", groups.queue, "text-slate-400")}
+          <div className="flex flex-wrap gap-2 mb-3">
+            {(
+              [
+                ["need_you", "tasks.group.needYou"],
+                ["in_progress", "tasks.group.inProgress"],
+                ["queue", "tasks.group.queue"],
+              ] as const
+            ).map(([key, labelKey]) => (
+              <button
+                key={key}
+                onClick={() => toggleGroup(key)}
+                aria-pressed={!hidden.has(key)}
+                className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+                  hidden.has(key)
+                    ? "bg-slate-900 text-slate-600 border-slate-800"
+                    : "bg-slate-800 text-slate-200 border-slate-600"
+                }`}
+              >
+                {tr(labelKey)} ({groups[key].length})
+              </button>
+            ))}
+          </div>
+          {!hidden.has("need_you") &&
+            renderGroup(
+              "tasks.group.needYou",
+              groups.need_you,
+              "text-amber-400",
+              true,
+            )}
+          {!hidden.has("in_progress") &&
+            renderGroup(
+              "tasks.group.inProgress",
+              groups.in_progress,
+              "text-sky-400",
+            )}
+          {!hidden.has("queue") &&
+            renderGroup("tasks.group.queue", groups.queue, "text-slate-400")}
         </>
       )}
 
@@ -391,6 +497,22 @@ export default function TasksPage(): React.ReactNode {
         prompt={selectedPrompt}
         onClose={() => setSelectedPrompt(null)}
         onSubmit={handleAnswer}
+      />
+
+      <TaskDetailModal
+        task={detailTask}
+        status={detailTask ? deriveStatus(detailTask, prompts) : "unknown"}
+        agentModel={
+          detailTask
+            ? agentModel(detailTask, deriveStatus(detailTask, prompts))
+            : ""
+        }
+        onClose={() => setDetailTask(null)}
+        onApprove={() => {
+          if (detailTask) void onApproveRow(detailTask);
+        }}
+        onSkip={(ref) => void onSkip(ref)}
+        onRetry={(ref) => void onRetry(ref)}
       />
     </main>
   );

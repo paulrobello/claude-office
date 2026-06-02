@@ -1,10 +1,35 @@
 import { describe, it, expect } from "vitest";
-import type { HitlPrompt } from "../src/components/coordination/coordinationApi";
-import { batchApprovals } from "../src/components/coordination/taskBatch";
+import type {
+  CoordTask,
+  HitlPrompt,
+} from "../src/components/coordination/coordinationApi";
+import { approveAction } from "../src/components/coordination/taskBatch";
 
-const p = (over: Partial<HitlPrompt>): HitlPrompt => ({
+const task = (over: Partial<CoordTask>): CoordTask => ({
+  number: 1,
+  title: "t",
+  state: "OPEN",
+  labels: [],
+  project: "p",
+  url: null,
+  source_ref: "agents-ia#1",
+  source_updated_at: null,
+  claim_status: null,
+  claim_agent: null,
+  claim_mechanism: null,
+  claimed_at: null,
+  claim_model: null,
+  run_status: null,
+  run_started_at: null,
+  run_ended_at: null,
+  run_agent: null,
+  run_model: null,
+  ...over,
+});
+
+const prompt = (over: Partial<HitlPrompt>): HitlPrompt => ({
   id: 1,
-  source_ref: null,
+  source_ref: "agents-ia#1",
   session_id: null,
   agent: null,
   project: null,
@@ -22,45 +47,43 @@ const p = (over: Partial<HitlPrompt>): HitlPrompt => ({
   ...over,
 });
 
-describe("batchApprovals", () => {
-  it("yesno → answer true", () => {
-    const r = batchApprovals([p({ id: 1, kind: "yesno" })]);
-    expect(r.approvable).toEqual([{ id: 1, answer: true }]);
-    expect(r.manual).toEqual([]);
+describe("approveAction", () => {
+  it("prompt yesno → answer true", () => {
+    expect(approveAction(task({}), prompt({ kind: "yesno" }))).toEqual({
+      kind: "answer",
+      value: true,
+    });
   });
-  it("choice com recomendada → answer a recomendada", () => {
-    const r = batchApprovals([
-      p({
-        id: 2,
-        kind: "choice",
-        options: [{ key: "A", label: "x" }],
-        recommended_key: "A",
-      }),
-    ]);
-    expect(r.approvable).toEqual([{ id: 2, answer: "A" }]);
+  it("prompt choice c/ recomendada → answer a recomendada", () => {
+    const r = approveAction(
+      task({}),
+      prompt({ kind: "choice", options: [{ key: "A", label: "x" }], recommended_key: "A" }),
+    );
+    expect(r).toEqual({ kind: "answer", value: "A" });
   });
-  it("multi com recomendada → answer [recomendada]", () => {
-    const r = batchApprovals([
-      p({
-        id: 3,
-        kind: "multi",
-        options: [{ key: "A", label: "x" }],
-        recommended_key: "A",
-      }),
-    ]);
-    expect(r.approvable).toEqual([{ id: 3, answer: ["A"] }]);
+  it("prompt multi c/ recomendada → answer [recomendada]", () => {
+    const r = approveAction(
+      task({}),
+      prompt({ kind: "multi", options: [{ key: "A", label: "x" }], recommended_key: "A" }),
+    );
+    expect(r).toEqual({ kind: "answer", value: ["A"] });
   });
-  it("choice sem recomendada / text → manual (não auto-aprova)", () => {
-    const r = batchApprovals([
-      p({
-        id: 4,
-        kind: "choice",
-        options: [{ key: "A", label: "x" }],
-        recommended_key: null,
-      }),
-      p({ id: 5, kind: "text" }),
-    ]);
-    expect(r.approvable).toEqual([]);
-    expect(r.manual).toEqual([4, 5]);
+  it("prompt choice sem recomendada → modal", () => {
+    expect(
+      approveAction(task({}), prompt({ kind: "choice", options: [{ key: "A", label: "x" }] })),
+    ).toEqual({ kind: "modal" });
+  });
+  it("prompt text → modal", () => {
+    expect(approveAction(task({}), prompt({ kind: "text", options: null }))).toEqual({
+      kind: "modal",
+    });
+  });
+  it("sem prompt mas label hitl → relabel", () => {
+    expect(approveAction(task({ labels: ["hitl", "area:front"] }), undefined)).toEqual({
+      kind: "relabel",
+    });
+  });
+  it("sem prompt e sem hitl → none", () => {
+    expect(approveAction(task({ labels: ["afk"] }), undefined)).toEqual({ kind: "none" });
   });
 });
