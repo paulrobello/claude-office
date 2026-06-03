@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NeedYouIndicator } from "./NeedYouIndicator";
+import { PausedAgentsIndicator } from "./PausedAgentsIndicator";
 
 const TABS = [
   { href: "/console", label: "Console" },
@@ -33,6 +34,7 @@ export function CoordinationNav(): React.ReactNode {
         </Link>
       ))}
       <NeedYouIndicator />
+      <PausedAgentsIndicator />
     </nav>
   );
 }
