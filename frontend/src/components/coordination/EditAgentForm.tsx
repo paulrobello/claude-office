@@ -11,6 +11,15 @@ const MODEL_OPTIONS = [
   { value: "haiku", label: "Haiku" },
 ];
 
+const EFFORT_OPTIONS = [
+  { value: "", label: "Effort: default" },
+  { value: "low", label: "low (mín)" },
+  { value: "medium", label: "medium" },
+  { value: "high", label: "high" },
+  { value: "xhigh", label: "xhigh (Opus)" },
+  { value: "max", label: "max (Opus)" },
+];
+
 export function EditAgentForm({
   agent,
   onSaved,
@@ -25,6 +34,8 @@ export function EditAgentForm({
     agent.mode === "persistent-24-7" ? "persistent-24-7" : "on-demand",
   );
   const [model, setModel] = useState(agent.model ?? "");
+  const [effort, setEffort] = useState(agent.effort_level ?? "");
+  const [thinking, setThinking] = useState(agent.thinking_enabled ?? true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -40,6 +51,8 @@ export function EditAgentForm({
           .filter(Boolean),
         mode,
         model: model || null,
+        effort_level: effort || null,
+        thinking_enabled: thinking,
       });
       setOpen(false);
       onSaved?.();
@@ -99,6 +112,26 @@ export function EditAgentForm({
           </option>
         ))}
       </select>
+      <select
+        value={effort}
+        onChange={(e) => setEffort(e.target.value)}
+        className="bg-neutral-900 rounded px-2 py-1 text-sm"
+      >
+        {EFFORT_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <label className="flex items-center gap-1 text-sm text-neutral-300">
+        <input
+          type="checkbox"
+          checked={thinking}
+          onChange={(e) => setThinking(e.target.checked)}
+        />
+        thinking
+      </label>
+      <p className="text-[11px] text-neutral-500">xhigh/max só Opus.</p>
       {err && <div className="text-xs text-red-400">{err}</div>}
       <button
         onClick={save}

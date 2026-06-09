@@ -11,6 +11,15 @@ const MODEL_OPTIONS = [
   { value: "haiku", label: "Haiku" },
 ];
 
+const EFFORT_OPTIONS = [
+  { value: "", label: "Effort: default" },
+  { value: "low", label: "low (mín)" },
+  { value: "medium", label: "medium" },
+  { value: "high", label: "high" },
+  { value: "xhigh", label: "xhigh (Opus)" },
+  { value: "max", label: "max (Opus)" },
+];
+
 /**
  * Contratar agente (#408 / EPIC #395). Faz upsert no roster (`agents`) via
  * POST /coordination/agents. Caminho do cockpit pra contratação manual pelo CEO —
@@ -29,6 +38,8 @@ export function HireAgentForm({
     "on-demand",
   );
   const [model, setModel] = useState("");
+  const [effort, setEffort] = useState("");
+  const [thinking, setThinking] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +62,8 @@ export function HireAgentForm({
           .filter(Boolean),
         mode,
         model: model || null,
+        effort_level: effort || null,
+        thinking_enabled: thinking,
       });
       setOkMsg(`${r.agent.nome} no roster (${r.agent.mode})`);
       setNome("");
@@ -127,7 +140,29 @@ export function HireAgentForm({
             </option>
           ))}
         </select>
+        <select
+          value={effort}
+          onChange={(e) => setEffort(e.target.value)}
+          className="bg-neutral-900 rounded px-2 py-1 text-sm"
+        >
+          {EFFORT_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <label className="flex items-center gap-1 text-sm text-slate-300">
+          <input
+            type="checkbox"
+            checked={thinking}
+            onChange={(e) => setThinking(e.target.checked)}
+          />
+          thinking
+        </label>
       </div>
+      <p className="text-[11px] text-slate-500">
+        xhigh/max só valem em modelos Opus.
+      </p>
       <div className="flex items-center gap-3">
         <button
           onClick={() => void submit()}

@@ -58,6 +58,8 @@ export interface CoordAgent {
   enabled: boolean;
   archived_at: string | null;
   model: string | null;
+  effort_level: string | null;
+  thinking_enabled: boolean | null;
   current_ref: string | null;
   current_title: string | null;
   recent_done: { ref: string | null; at: string | null }[];
@@ -194,6 +196,8 @@ export async function createAgent(input: {
   projetos?: string[];
   mode?: "on-demand" | "persistent-24-7";
   model?: string | null;
+  effort_level?: string | null;
+  thinking_enabled?: boolean | null;
 }): Promise<{ agent: CoordAgent }> {
   const res = await fetch(`${BASE}/agents`, {
     method: "POST",
@@ -315,6 +319,8 @@ export const patchAgent = (
     cron_expr: string | null;
     enabled: boolean;
     model: string | null;
+    effort_level: string | null;
+    thinking_enabled: boolean | null;
   }>,
 ): Promise<{ agent: CoordAgent }> =>
   mutate(`/agents/${encodeURIComponent(nome)}`, "PATCH", patch);

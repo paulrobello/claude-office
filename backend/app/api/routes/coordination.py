@@ -469,6 +469,7 @@ async def create_request(
 # (agents-ia#417, lado coletor) faz o mesmo via decisão HITL. (EPIC #395)
 _AGENT_MODES = ("on-demand", "persistent-24-7")
 _VALID_MODELS = {"opus", "sonnet", "haiku"}
+_VALID_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 
 
 class CreateAgentBody(BaseModel):
@@ -477,15 +478,20 @@ class CreateAgentBody(BaseModel):
     projetos: list[str] = []
     mode: str = "on-demand"
     model: str | None = None
+    effort_level: str | None = None
+    thinking_enabled: bool | None = None
 
 
 _INSERT_AGENT_SQL = text("""
-INSERT INTO agents (nome, role, projetos, mode, model, status)
-VALUES (:nome, :role, :projetos, :mode, :model, 'offline')
+INSERT INTO agents (nome, role, projetos, mode, model, effort_level, thinking_enabled, status)
+VALUES (:nome, :role, :projetos, :mode, :model, :effort_level,
+        COALESCE(:thinking_enabled, true), 'offline')
 ON CONFLICT (nome) DO UPDATE
    SET role = EXCLUDED.role, projetos = EXCLUDED.projetos, mode = EXCLUDED.mode,
-       model = EXCLUDED.model
-RETURNING nome, role, projetos, mode, model, status, contratado_em, last_active_at
+       model = EXCLUDED.model, effort_level = EXCLUDED.effort_level,
+       thinking_enabled = EXCLUDED.thinking_enabled
+RETURNING nome, role, projetos, mode, model, effort_level, thinking_enabled,
+          status, contratado_em, last_active_at
 """).bindparams(bindparam("projetos", type_=ARRAY(Text)))
 
 
@@ -508,6 +514,11 @@ async def create_agent(
             status_code=422,
             detail={"error": "invalid_model", "allowed": list(_VALID_MODELS)},
         )
+    if body.effort_level and body.effort_level not in _VALID_EFFORTS:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "invalid_effort", "allowed": list(_VALID_EFFORTS)},
+        )
     projetos = [p.strip() for p in body.projetos if p.strip()]
     try:
         result = await db.execute(
@@ -518,6 +529,8 @@ async def create_agent(
                 "projetos": projetos,
                 "mode": body.mode,
                 "model": body.model or None,
+                "effort_level": body.effort_level or None,
+                "thinking_enabled": body.thinking_enabled,
             },
         )
         row = result.mappings().one()
@@ -701,7 +714,7 @@ async def dashboard(
 # NB: o join active_work.agent = agents.nome depende da padronização do nome de
 # mesa (follow-up); claim com nome divergente não conta como 'busy'.
 _AGENTS_SQL = text("""
-SELECT a.nome, a.role, a.projetos, a.mode, a.model,
+SELECT a.nome, a.role, a.projetos, a.mode, a.model, a.effort_level, a.thinking_enabled,
        a.contratado_em, a.last_active_at,
        a.cron_expr, a.enabled, a.archived_at,
        CASE WHEN COALESCE(aw.cnt, 0) > 0 THEN 'busy'
@@ -766,6 +779,8 @@ class PatchAgentBody(BaseModel):
     cron_expr: str | None = None
     enabled: bool | None = None
     model: str | None = None
+    effort_level: str | None = None
+    thinking_enabled: bool | None = None
 
 
 @router.patch("/agents/{nome}", dependencies=[Depends(enforce_write_rate_limit)])
@@ -804,19 +819,29 @@ async def patch_agent(
             )
         sets.append("model = :model")
         params["model"] = body.model or None
+    if "effort_level" in body.model_fields_set:
+        if body.effort_level and body.effort_level not in _VALID_EFFORTS:
+            raise HTTPException(
+                status_code=422, detail={"error": "invalid_effort", "allowed": list(_VALID_EFFORTS)}
+            )
+        sets.append("effort_level = :effort_level")
+        params["effort_level"] = body.effort_level or None
+    if body.thinking_enabled is not None:
+        sets.append("thinking_enabled = :thinking_enabled")
+        params["thinking_enabled"] = body.thinking_enabled
     if not sets:
         raise HTTPException(status_code=422, detail={"error": "empty_patch"})
     if body.projetos is not None:
         sql = text(
             f"UPDATE agents SET {', '.join(sets)} WHERE nome = :nome "
-            "RETURNING nome, role, projetos, mode, model, status, cron_expr, enabled, "
-            "archived_at, contratado_em, last_active_at"
+            "RETURNING nome, role, projetos, mode, model, effort_level, thinking_enabled, "
+            "status, cron_expr, enabled, archived_at, contratado_em, last_active_at"
         ).bindparams(bindparam("projetos", type_=ARRAY(Text)))
     else:
         sql = text(
             f"UPDATE agents SET {', '.join(sets)} WHERE nome = :nome "
-            "RETURNING nome, role, projetos, mode, model, status, cron_expr, enabled, "
-            "archived_at, contratado_em, last_active_at"
+            "RETURNING nome, role, projetos, mode, model, effort_level, thinking_enabled, "
+            "status, cron_expr, enabled, archived_at, contratado_em, last_active_at"
         )
     try:
         result = await db.execute(sql, params)
