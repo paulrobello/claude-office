@@ -64,10 +64,13 @@ _NO_AUTH_PATHS = frozenset({"/health", "/docs", "/redoc"})
 def _is_state_changing(path: str, method: str) -> bool:
     """Return True if the request targets a state-changing endpoint."""
     prefix = settings.API_V1_STR + "/sessions"
+    prefs_prefix = settings.API_V1_STR + "/preferences"
     return (
         (path == prefix and method == "DELETE")
         or (path == f"{prefix}/simulate" and method == "POST")
         or (path.startswith(f"{prefix}/") and path.endswith("/focus") and method == "POST")
+        or (path.startswith(f"{prefix}/") and method in ("DELETE", "PATCH"))
+        or (path.startswith(f"{prefs_prefix}/") and method in ("PUT", "DELETE"))
     )
 
 
@@ -82,6 +85,9 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         # Skip auth for public paths and WebSocket handshakes
         if (
             request.url.path in _NO_AUTH_PATHS
@@ -284,6 +290,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
             await websocket.receive_text()
     except WebSocketDisconnect:
         await manager.disconnect(websocket, session_id)
+        git_service.remove_session(session_id)
 
 
 @app.websocket("/ws/room/{room_id}")

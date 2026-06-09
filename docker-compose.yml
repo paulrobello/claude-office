@@ -32,6 +32,7 @@ services:
       # Claude API settings (optional - enables AI summaries)
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
       - SUMMARY_ENABLED=${SUMMARY_ENABLED:-true}
+      - SERVE_STATIC=1
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]

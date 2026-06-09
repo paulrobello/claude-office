@@ -121,8 +121,8 @@ try:
                 raw_input = real_stdin.read()
                 if raw_input.strip():
                     raw_data = cast(dict[str, Any], json.loads(raw_input))
-        except Exception:
-            pass
+        except Exception as exc:
+            log_error(exc, "stdin read skipped")
 
         session_id = os.environ.get("CLAUDE_SESSION_ID", "default")
         payload = map_event(args.event_type, raw_data, session_id, strip_prefixes)

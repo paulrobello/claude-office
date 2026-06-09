@@ -7,7 +7,7 @@ drives the whiteboard display in the frontend.
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import cast
 
 from app.models.events import Event
@@ -122,7 +122,7 @@ class WhiteboardTracker:
         news_item = NewsItem(
             category=category,
             headline=headline,
-            timestamp=datetime.now().isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
         self.news_items.insert(0, news_item)
         if len(self.news_items) > MAX_NEWS_ITEMS:
@@ -152,7 +152,7 @@ class WhiteboardTracker:
         if success is False or error_type:
             self.recent_error_count += 1
             self.consecutive_successes = 0
-            self.last_incident_time = datetime.now().isoformat()
+            self.last_incident_time = datetime.now(UTC).isoformat()
             error_msg = error_type or "unknown error"
             self.add_news_item("error", f"Warning: {tool_name} failed: {error_msg}")
         else:
@@ -192,7 +192,7 @@ class WhiteboardTracker:
                 agent_id=agent_id,
                 agent_name=agent_name,
                 color=color,
-                start_time=datetime.now().isoformat(),
+                start_time=datetime.now(UTC).isoformat(),
                 end_time=None,
             )
         )
@@ -203,7 +203,7 @@ class WhiteboardTracker:
         """Mark a lifespan entry as complete when an agent stops."""
         for lifespan in self.agent_lifespans:
             if lifespan.agent_id == agent_id and lifespan.end_time is None:
-                lifespan.end_time = datetime.now().isoformat()
+                lifespan.end_time = datetime.now(UTC).isoformat()
                 break
 
     # ------------------------------------------------------------------
@@ -221,14 +221,14 @@ class WhiteboardTracker:
         if existing_task:
             existing_task.status = status
             existing_task.summary = summary
-            existing_task.completed_at = datetime.now().isoformat()
+            existing_task.completed_at = datetime.now(UTC).isoformat()
         else:
             new_task = BackgroundTask(
                 task_id=task_id,
                 status=status,
                 summary=summary,
-                started_at=datetime.now().isoformat(),
-                completed_at=datetime.now().isoformat() if status != "running" else None,
+                started_at=datetime.now(UTC).isoformat(),
+                completed_at=datetime.now(UTC).isoformat() if status != "running" else None,
             )
             self.background_tasks.insert(0, new_task)
 

@@ -129,7 +129,6 @@ def _handle_pre_tool_use(
                 data["agent_type"] = agent_type
         else:
             data["task_description"] = str(tool_input_raw) if tool_input_raw else ""
-        # Remove raw tool_input — we've extracted what we need
         del data["tool_input"]
     else:
         data["agent_id"] = "main"
@@ -361,9 +360,6 @@ def map_event(
         "data": data,
     }
 
-    if "tool_use_id" in raw_data:
-        data["tool_use_id"] = raw_data["tool_use_id"]
-
     # ------------------------------------------------------------------
     # Event-specific mapping
     # ------------------------------------------------------------------
@@ -403,5 +399,8 @@ def map_event(
 
     elif event_type == "session_end":
         _handle_session_end(raw_data, data)
+
+    else:
+        return None
 
     return payload

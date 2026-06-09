@@ -2,7 +2,7 @@ import logging
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum, auto
 from typing import Any, cast
 
@@ -735,7 +735,7 @@ class StateMachine:
             boss=boss,
             agents=agents_list,
             office=office,
-            last_updated=datetime.now(),
+            last_updated=datetime.now(UTC),
             history=self.history,
             todos=self.todos,
             arrival_queue=self.arrival_queue.copy(),

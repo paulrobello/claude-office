@@ -29,7 +29,7 @@ export function HeatMapMode({ data }: HeatMapModeProps): ReactNode {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
 
-  const maxEdits = entries.length > 0 ? entries[0][1] : 1;
+  const maxEdits = entries.length > 0 ? Math.max(1, entries[0][1]) : 1;
 
   if (entries.length === 0) {
     return (

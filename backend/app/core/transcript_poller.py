@@ -94,11 +94,11 @@ class TranscriptPoller:
         """Stop polling a subagent's transcript file."""
         async with self._lock:
             agent = self._agents.pop(agent_id, None)
-            if agent and agent.poll_task:
-                agent.poll_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await agent.poll_task
-                logger.info(f"Stopped polling agent {agent_id}")
+        if agent and agent.poll_task:
+            agent.poll_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await agent.poll_task
+            logger.info(f"Stopped polling agent {agent_id}")
 
     async def stop_all(self) -> None:
         """Stop all polling tasks."""
@@ -198,14 +198,24 @@ class TranscriptPoller:
             return events
 
         try:
-            current_size = agent.transcript_path.stat().st_size
-            if current_size <= agent.file_position:
+            path = agent.transcript_path
+            position = agent.file_position
+
+            def _read_sync() -> tuple[str, int] | None:
+                current_size = path.stat().st_size
+                if current_size <= position:
+                    return None
+                with open(path, encoding="utf-8") as f:
+                    f.seek(position)
+                    data = f.read()
+                    return data, f.tell()
+
+            result = await asyncio.to_thread(_read_sync)
+            if result is None:
                 return events
 
-            with open(agent.transcript_path, encoding="utf-8") as f:
-                f.seek(agent.file_position)
-                new_content = f.read()
-                agent.file_position = f.tell()
+            new_content, new_position = result
+            agent.file_position = new_position
 
             if new_content.strip():
                 agent.last_activity = datetime.now(UTC)

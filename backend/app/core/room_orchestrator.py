@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from app.models.agents import Agent, AgentState, BossState, OfficeState
@@ -237,7 +237,7 @@ class RoomOrchestrator:
                 tool_uses_since_compaction=lead_state.office.tool_uses_since_compaction,
                 print_report=lead_state.office.print_report,
             ),
-            last_updated=datetime.now(),
+            last_updated=datetime.now(UTC),
             history=lead_state.history,
             todos=lead_state.todos,
             arrival_queue=lead_state.arrival_queue,
