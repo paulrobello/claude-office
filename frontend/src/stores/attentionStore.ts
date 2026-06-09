@@ -183,10 +183,16 @@ export const useAttentionStore = create<AttentionState>()((set, get) => ({
         body: JSON.stringify({}),
       });
       if (!res.ok) {
-        console.error("Focus terminal failed:", res.statusText);
+        get().processEvent({
+          type: "error",
+          message: `Focus terminal failed: ${res.statusText}`,
+        });
       }
-    } catch (err) {
-      console.error("Focus terminal error:", err);
+    } catch {
+      get().processEvent({
+        type: "error",
+        message: "Cannot reach backend — is the server running?",
+      });
     }
     get().closeFocusPopup();
   },

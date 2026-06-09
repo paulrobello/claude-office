@@ -3,9 +3,8 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { useNavigationStore } from "@/stores/navigationStore";
 import { useTranslation } from "@/hooks/useTranslation";
+import { apiFetch } from "@/utils/api";
 import type { FloorConfig, RoomConfig } from "@/types/navigation";
-
-const API_URL = "http://localhost:8000/api/v1/preferences/building_config";
 
 // ============================================================================
 // ICON PICKER
@@ -152,6 +151,7 @@ export function BuildingTab({
   const [floors, setFloors] = useState<FloorFormData[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [initialData, setInitialData] = useState<{
     buildingName: string;
     floors: FloorFormData[];
@@ -219,6 +219,7 @@ export function BuildingTab({
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
+    setSaveError(null);
 
     const config = {
       building_name: buildingName || "Building",
@@ -226,14 +227,13 @@ export function BuildingTab({
     };
 
     try {
-      const res = await fetch(API_URL, {
+      const res = await apiFetch("/api/v1/preferences/building_config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value: JSON.stringify(config) }),
       });
 
       if (res.ok) {
-        // Update local navigation store (no view switch)
         updateBuildingConfig({
           buildingName: config.building_name,
           floors: config.floors,
@@ -241,9 +241,11 @@ export function BuildingTab({
         setInitialData({ buildingName: config.building_name, floors });
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
+      } else {
+        setSaveError(`Save failed: ${res.status} ${res.statusText}`);
       }
-    } catch (err) {
-      console.warn("[BuildingTab] Failed to save config:", err);
+    } catch {
+      setSaveError("Cannot reach backend — is the server running?");
     } finally {
       setSaving(false);
     }
@@ -384,7 +386,10 @@ export function BuildingTab({
       </div>
 
       {/* Save button */}
-      <div className="pt-4 border-t border-slate-800">
+      <div className="pt-4 border-t border-slate-800 space-y-2">
+        {saveError && (
+          <p className="text-xs font-mono text-rose-400 text-center">{saveError}</p>
+        )}
         <button
           type="button"
           onClick={handleSave}

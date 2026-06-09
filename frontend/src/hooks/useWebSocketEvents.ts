@@ -491,12 +491,11 @@ export function useWebSocketEvents({
       handleMessage(event);
     };
 
-    ws.onerror = (error) => {
-      // Check if this connection is still current
+    ws.onerror = () => {
       if (connectionIdRef.current !== thisConnectionId) {
         return;
       }
-      console.error("[WS] Error:", error);
+      console.warn("[WS] Connection error — will retry");
     };
 
     ws.onclose = (event) => {
