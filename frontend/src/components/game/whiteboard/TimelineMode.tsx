@@ -65,7 +65,7 @@ export function TimelineMode({ data }: TimelineModeProps): ReactNode {
 
         // Bar
         g.roundRect(startX, y, width, 14, 2);
-        g.fill(parseInt(lifespan.color.replace("#", "0x")));
+        g.fill(parseInt(lifespan.color.replace('#', ''), 16) || 0x6b7280);
 
         // Active indicator (no end cap)
         if (!lifespan.endTime) {

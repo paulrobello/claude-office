@@ -126,16 +126,9 @@ export function MarqueeText({
   }, []);
 
   // Callback ref for text container
-  const textContainerRefCallback = useCallback(
-    (ref: Container | null) => {
-      textContainerRef.current = ref;
-      // Apply mask immediately if mask graphics already exists
-      if (ref && maskGraphics) {
-        ref.mask = maskGraphics;
-      }
-    },
-    [maskGraphics],
-  );
+  const textContainerRefCallback = useCallback((ref: Container | null) => {
+    textContainerRef.current = ref;
+  }, []);
 
   return (
     <pixiContainer>

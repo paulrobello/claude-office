@@ -424,8 +424,17 @@ async def get_session_replay(
         replay_data: list[ReplayEntry] = []
 
         for rec in events:
+            try:
+                event_type = EventType(rec.event_type)
+            except ValueError:
+                logger.warning(
+                    "Skipping unknown event_type %r in replay (session=%s)",
+                    rec.event_type,
+                    session_id,
+                )
+                continue
             evt = Event(
-                event_type=EventType(rec.event_type),
+                event_type=event_type,
                 session_id=rec.session_id,
                 timestamp=rec.timestamp,
                 data=EventData.model_validate(rec.data),

@@ -142,10 +142,11 @@ export const useAttentionStore = create<AttentionState>()((set, get) => ({
         const activeSorted = queue
           .filter((t) => !t.dismissed)
           .sort((a, b) => a.urgency - b.urgency);
-        const toDismiss = activeSorted[0];
-        if (toDismiss) {
-          toDismiss.dismissed = true;
-        }
+        const toastId = activeSorted[0]?.id;
+        const finalQueue = queue.map((t) =>
+          t.id === toastId ? { ...t, dismissed: true } : t,
+        );
+        return { toastQueue: finalQueue };
       }
       return { toastQueue: queue };
     });

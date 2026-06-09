@@ -162,7 +162,7 @@ async function sendEvent(event: BackendEvent): Promise<void> {
     clearTimeout(timer);
 
     if (!resp.ok) {
-      debug("Backend responded", resp.status, await resp.text());
+      debug("Backend responded", resp.status);
     }
   } catch (err: unknown) {
     if (err instanceof Error && err.name === "AbortError") {
@@ -422,7 +422,6 @@ const plugin: Plugin = async (ctx: PluginInput): Promise<Hooks> => {
                   })
                 );
               }
-              childStopped.delete(session.id);
             } else {
               await sendEvent(
                 makeEvent("session_end", session.id, {

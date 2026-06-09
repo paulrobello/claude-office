@@ -56,7 +56,7 @@ export function NewsTickerMode({ data }: NewsTickerModeProps): ReactNode {
     );
   }
 
-  const currentNews = newsItems[currentIndex];
+  const currentNews = newsItems[currentIndex % newsItems.length];
 
   return (
     <pixiContainer>
@@ -112,7 +112,7 @@ export function NewsTickerMode({ data }: NewsTickerModeProps): ReactNode {
 
       {/* News index indicator */}
       <pixiText
-        text={`${currentIndex + 1}/${newsItems.length}`}
+        text={`${(currentIndex % newsItems.length) + 1}/${newsItems.length}`}
         x={165}
         y={100}
         anchor={0.5}

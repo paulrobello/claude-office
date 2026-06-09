@@ -6,7 +6,8 @@
  * This module caches that key after the first status fetch.
  */
 
-const API_BASE = "http://localhost:8000";
+export const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 let _apiKey: string | null = null;
 

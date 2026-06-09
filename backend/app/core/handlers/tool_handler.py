@@ -52,6 +52,8 @@ async def handle_pre_tool_use(
             "timestamp": ts,
         }
         sm.conversation.append(thinking_entry)
+        if len(sm.conversation) > 500:
+            sm.conversation = sm.conversation[-500:]
 
     # Capture the tool call itself.
     if event.data.tool_name:
@@ -64,5 +66,7 @@ async def handle_pre_tool_use(
             "toolName": event.data.tool_name,
         }
         sm.conversation.append(tool_entry)
+        if len(sm.conversation) > 500:
+            sm.conversation = sm.conversation[-500:]
 
     await broadcast_state(event.session_id, sm)

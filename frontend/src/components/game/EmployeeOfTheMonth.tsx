@@ -13,9 +13,11 @@ export function EmployeeOfTheMonth(): ReactNode {
   const [photoTexture, setPhotoTexture] = useState<Texture | null>(null);
 
   useEffect(() => {
-    Assets.load("/sprites/employee-of-month.png").then((texture) => {
-      setPhotoTexture(texture as Texture);
-    });
+    Assets.load("/sprites/employee-of-month.png")
+      .then((texture) => {
+        setPhotoTexture(texture as Texture);
+      })
+      .catch(() => {});
   }, []);
 
   const drawFrame = useCallback((g: Graphics) => {

@@ -8,6 +8,7 @@ import {
   usePreferencesStore,
   selectAutoFollowNewSessions,
 } from "@/stores/preferencesStore";
+import { apiFetch } from "@/utils/api";
 
 // ============================================================================
 // TYPES
@@ -48,7 +49,7 @@ interface UseSessionsResult {
 export function useSessions(
   showStatus: (text: string, type?: "info" | "error" | "success") => void,
 ): UseSessionsResult {
-  const [sessionId, setSessionId] = useState("sim_session_123");
+  const [sessionId, setSessionId] = useState("");
   const [sessions, setSessions] = useState<Session[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
 
@@ -66,7 +67,7 @@ export function useSessions(
   const fetchSessions = useCallback(async (): Promise<Session[] | null> => {
     setSessionsLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/api/v1/sessions");
+      const res = await apiFetch("/api/v1/sessions");
       if (res.ok) {
         const data = (await res.json()) as Session[];
         setSessions(data);
@@ -130,7 +131,7 @@ export function useSessions(
     if (
       !hasAutoSelected.current &&
       sessions.length > 0 &&
-      sessionId === "sim_session_123"
+      sessionId === ""
     ) {
       hasAutoSelected.current = true;
       // Pick the active session with the most events — this is always the long-running

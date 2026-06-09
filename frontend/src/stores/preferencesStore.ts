@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { isLocale, type Locale } from "@/i18n";
+import { apiFetch } from "@/utils/api";
 
 // ============================================================================
 // TYPES
@@ -48,7 +49,7 @@ interface PreferencesState {
 // CONSTANTS
 // ============================================================================
 
-const API_BASE = "http://localhost:8000/api/v1/preferences";
+const PREFS_PATH = "/api/v1/preferences";
 
 const DEFAULT_CLOCK_TYPE: ClockType = "analog";
 const DEFAULT_CLOCK_FORMAT: ClockFormat = "12h";
@@ -69,7 +70,7 @@ const DEFAULT_TOAST_AUTO_DISMISS_INFO = 3000;
 
 async function fetchPreferences(): Promise<Record<string, string>> {
   try {
-    const res = await fetch(API_BASE);
+    const res = await apiFetch(PREFS_PATH);
     if (res.ok) {
       return (await res.json()) as Record<string, string>;
     }
@@ -81,7 +82,7 @@ async function fetchPreferences(): Promise<Record<string, string>> {
 
 async function setPreference(key: string, value: string): Promise<void> {
   try {
-    await fetch(`${API_BASE}/${key}`, {
+    await apiFetch(`${PREFS_PATH}/${key}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ value }),

@@ -28,7 +28,7 @@ import {
 import { useNavigationStore } from "@/stores/navigationStore";
 import { useTourStore } from "@/stores/tourStore";
 import { useShallow } from "zustand/react/shallow";
-import { setApiKey } from "@/utils/api";
+import { setApiKey, apiFetch } from "@/utils/api";
 import { Menu, X } from "lucide-react";
 import { SessionSidebar } from "@/components/layout/SessionSidebar";
 import { MobileDrawer } from "@/components/layout/MobileDrawer";
@@ -158,16 +158,15 @@ export default function V2TestPage(): React.ReactNode {
   useFloorConfig();
 
   // Watch for edit-building requests from BuildingView
+  const pendingEditBuilding = useNavigationStore((s) => s.pendingEditBuilding);
   const consumeEditBuilding = useNavigationStore((s) => s.consumeEditBuilding);
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (consumeEditBuilding()) {
-        setSettingsInitialTab("building");
-        setIsSettingsModalOpen(true);
-      }
-    }, 100);
-    return () => clearInterval(interval);
-  }, [consumeEditBuilding]);
+    if (pendingEditBuilding) {
+      consumeEditBuilding();
+      setSettingsInitialTab("building");
+      setIsSettingsModalOpen(true);
+    }
+  }, [pendingEditBuilding, consumeEditBuilding]);
 
   const loadTourSeen = useTourStore((s) => s.loadTourSeen);
   useEffect(() => {
@@ -183,7 +182,7 @@ export default function V2TestPage(): React.ReactNode {
   // One-time initialization effects
   // ------------------------------------------------------------------
   useEffect(() => {
-    fetch("http://localhost:8000/api/v1/status")
+    apiFetch("/api/v1/status")
       .then((res) => res.json())
       .then((data: { aiSummaryEnabled: boolean; apiKey?: string }) => {
         setAiSummaryEnabled(data.aiSummaryEnabled);

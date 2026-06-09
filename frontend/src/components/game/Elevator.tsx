@@ -55,6 +55,7 @@ function useDoorAnimation(isOpen: boolean): number {
     const duration = 500; // 0.5 seconds
     const startScale = doorScaleRef.current;
     const startTime = performance.now();
+    let animId: number;
 
     const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime;
@@ -67,11 +68,12 @@ function useDoorAnimation(isOpen: boolean): number {
       setDoorScale(newScale);
 
       if (progress < 1) {
-        requestAnimationFrame(animate);
+        animId = requestAnimationFrame(animate);
       }
     };
 
-    requestAnimationFrame(animate);
+    animId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animId);
   }, [isOpen]);
 
   return doorScale;

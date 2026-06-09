@@ -114,7 +114,7 @@ export function OrgChartMode({
                   g.fill(0xffffff);
                   g.stroke({
                     width: 2,
-                    color: parseInt(agent.color.replace("#", "0x")),
+                    color: parseInt(agent.color.replace('#', ''), 16) || 0xff6b6b,
                   });
                 }}
               />

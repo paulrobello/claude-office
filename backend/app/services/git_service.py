@@ -22,8 +22,9 @@ class GitService:
         self._task: asyncio.Task[None] | None = None
         self._running = False
         self._last_status: GitStatus | None = None
-        self._session_id = session_id
-        self._project_root = project_root
+        self._sessions: dict[str, str | None] = {}
+        if session_id is not None:
+            self._sessions[session_id] = project_root
 
     def _run_git(self, args: list[str], cwd: Path) -> str:
         """Run a git command and return stdout."""
@@ -117,7 +118,12 @@ class GitService:
 
     def get_status(self, repo_path: str | Path | None = None) -> GitStatus | None:
         """Get current git status synchronously."""
-        path_str = repo_path or self._project_root
+        if repo_path is None:
+            path_str = next(
+                (v for v in self._sessions.values() if v is not None), None
+            )
+        else:
+            path_str = repo_path
         if not path_str:
             logger.debug("No git repository path configured")
             return None
@@ -165,12 +171,18 @@ class GitService:
 
         while self._running:
             try:
-                loop = asyncio.get_event_loop()
-                status = await loop.run_in_executor(None, self.get_status)
+                loop = asyncio.get_running_loop()
+                # Collect unique project roots and their associated sessions
+                root_to_sessions: dict[str, list[str]] = {}
+                for sid, root in list(self._sessions.items()):
+                    if root:
+                        root_to_sessions.setdefault(root, []).append(sid)
 
-                if status and self._status_changed(status):
-                    self._last_status = status
-                    await self._broadcast_status(status)
+                for root, session_ids in root_to_sessions.items():
+                    status = await loop.run_in_executor(None, self.get_status, root)
+                    if status and self._status_changed(status):
+                        self._last_status = status
+                        await self._broadcast_status(status, session_ids)
 
             except Exception as e:
                 logger.error(f"Git poll error: {e}")
@@ -203,17 +215,21 @@ class GitService:
         old_paths = {f.path for f in self._last_status.changed_files}
         return new_paths != old_paths
 
-    async def _broadcast_status(self, status: GitStatus) -> None:
+    async def _broadcast_status(
+        self, status: GitStatus, session_ids: list[str] | None = None
+    ) -> None:
         """Broadcast git status to WebSocket clients."""
         message = {
             "type": "git_status",
             "timestamp": status.last_updated.isoformat(),
             "gitStatus": status.model_dump(mode="json"),
         }
-        if self._session_id:
-            await manager.broadcast(message, self._session_id)
+        active_ids = session_ids if session_ids is not None else list(self._sessions.keys())
+        if active_ids:
+            for sid in active_ids:
+                await manager.broadcast(message, sid)
             logger.debug(
-                f"Broadcast git status to session {self._session_id}: "
+                f"Broadcast git status to sessions {active_ids}: "
                 f"{status.branch}, {len(status.commits)} commits"
             )
         else:
@@ -221,16 +237,20 @@ class GitService:
             logger.debug(f"Broadcast git status: {status.branch}, {len(status.commits)} commits")
 
     def configure(self, session_id: str | None = None, project_root: str | None = None) -> None:
-        """Update the service configuration for a specific session and project."""
-        self._session_id = session_id
-        self._project_root = project_root
+        """Add or update a session and its project root."""
+        if session_id is not None:
+            self._sessions[session_id] = project_root
         self._last_status = None  # Reset to force fresh broadcast
         logger.info(f"GitService configured: session={session_id}, project_root={project_root}")
 
+    def remove_session(self, session_id: str) -> None:
+        """Remove a session when its WebSocket disconnects."""
+        self._sessions.pop(session_id, None)
+        logger.info(f"GitService removed session: {session_id}")
+
     def clear(self) -> None:
         """Clear all cached state to prevent stale data."""
-        self._session_id = None
-        self._project_root = None
+        self._sessions.clear()
         self._last_status = None
         logger.info("GitService cache cleared")
 
@@ -239,14 +259,15 @@ class GitService:
         if self._task is not None:
             return
 
-        if not self._project_root:
+        if not any(self._sessions.values()):
             logger.warning(
                 "GitService started without project_root - git status will be unavailable"
             )
 
         self._running = True
         self._task = asyncio.create_task(self._poll_loop())
-        logger.info(f"Git status polling started for: {self._project_root or 'no repo configured'}")
+        roots = [r for r in self._sessions.values() if r]
+        logger.info(f"Git status polling started for: {roots or 'no repo configured'}")
 
     async def stop(self) -> None:
         """Stop the polling background task."""
