@@ -47,10 +47,16 @@ export type {
   EventType,
   EventData,
   Event,
+  // Overview (Command Center)
+  OverviewEntry,
+  OverviewState,
 } from "./generated";
 
 // Re-export Commit with the legacy GitCommit alias for backward compatibility
 export type { Commit, Commit as GitCommit } from "./generated";
+
+// Re-export the overview status bucket under a descriptive name
+export type { Bucket as OverviewBucket } from "./generated";
 
 // ============================================================================
 // FRONTEND-ONLY TYPES — not derived from backend models

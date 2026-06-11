@@ -20,6 +20,19 @@ const es: Record<TranslationKey, string> = {
   "header.aiOff": "OFF",
   "header.agents": "agentes",
   "header.tour": "TOUR",
+  "header.commandCenter": "MANDO",
+
+  // Command Center
+  "commandCenter.title": "Centro de Mando",
+  "commandCenter.zone.needsYou": "Te necesita",
+  "commandCenter.zone.working": "Trabajando",
+  "commandCenter.zone.done": "Hecho",
+  "commandCenter.zone.ended": "Finalizado",
+  "commandCenter.moreCount": "+{count} más",
+  "commandCenter.popup.todos": "Tareas",
+  "commandCenter.popup.employees": "Empleados",
+  "commandCenter.popup.terminal": "Terminal",
+  "commandCenter.popup.drillIn": "Abrir",
 
   // Modals
   "modal.confirmDbWipe": "Confirmar borrado de base de datos",

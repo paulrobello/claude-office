@@ -245,6 +245,43 @@ async def get_status() -> dict[str, bool | str | None]:
     }
 
 
+@app.websocket("/ws/overview")
+async def websocket_overview(websocket: WebSocket) -> None:
+    """Overview WebSocket: boss status of every live session (Command Center).
+
+    Declared BEFORE ``/ws/{session_id}`` so the single-segment path ``/ws/overview``
+    isn't captured by the session route (which would treat "overview" as a session
+    id, accept, find no state, and silently idle).
+    """
+    from app.api.websocket import validate_websocket_origin
+    from app.core.room_orchestrator import build_overview
+
+    if not validate_websocket_origin(websocket):
+        await websocket.close(code=4003, reason="Origin not allowed")
+        return
+
+    await manager.connect_overview(websocket)
+    try:
+        # Send the current overview snapshot on connect.
+        overview = build_overview(event_processor.sessions)
+        await websocket.send_json(
+            {
+                "type": "state_update",
+                "timestamp": overview.last_updated.isoformat(),
+                "state": overview.model_dump(mode="json", by_alias=True),
+            }
+        )
+        # Keep alive -- discard incoming messages
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        logger.warning("Overview WebSocket error", exc_info=True)
+    finally:
+        await manager.disconnect_overview(websocket)
+
+
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
     from app.api.websocket import validate_session_id, validate_websocket_origin

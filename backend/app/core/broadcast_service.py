@@ -22,6 +22,7 @@ __all__ = [
     "broadcast_event",
     "broadcast_error",
     "broadcast_room_state",
+    "broadcast_overview_state",
 ]
 
 
@@ -91,4 +92,25 @@ async def broadcast_room_state(room_id: str, orchestrator: RoomOrchestrator) -> 
             "state": merged_state.model_dump(mode="json", by_alias=True),
         },
         room_id,
+    )
+
+
+async def broadcast_overview_state(sessions: dict[str, StateMachine]) -> None:
+    """Broadcast the cross-session overview to all ``/ws/overview`` clients.
+
+    Skips building the payload entirely when nobody is watching the Command
+    Center, so the per-event hook stays cheap in the common case.
+    """
+    if not manager.overview_connections:
+        return
+    # Local import avoids any import-order coupling at module load.
+    from app.core.room_orchestrator import build_overview
+
+    overview = build_overview(sessions)
+    await manager.broadcast_overview(
+        {
+            "type": "state_update",
+            "timestamp": overview.last_updated.isoformat(),
+            "state": overview.model_dump(mode="json", by_alias=True),
+        }
     )

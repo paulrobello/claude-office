@@ -101,7 +101,13 @@ export interface BuildingViewProps {
 export function BuildingView({ sessions }: BuildingViewProps): React.ReactNode {
   const buildingConfig = useNavigationStore((s) => s.buildingConfig);
   const goToFloor = useNavigationStore((s) => s.goToFloor);
+  const goToCommand = useNavigationStore((s) => s.goToCommand);
   const requestEditBuilding = useNavigationStore((s) => s.requestEditBuilding);
+
+  // Active sessions across the whole building feed the Command Center tile.
+  const activeSessionCount = sessions.filter(
+    (s) => s.status === "active",
+  ).length;
 
   // Active sessions that don't match any floor
   const unmatchedSessions = useMemo(
@@ -123,9 +129,12 @@ export function BuildingView({ sessions }: BuildingViewProps): React.ReactNode {
   );
 
   return (
-    <div className="flex flex-col items-center justify-center h-full p-8">
-      {/* Building header */}
-      <div className="text-center mb-8">
+    <div className="flex flex-col items-center h-full overflow-y-auto p-8">
+      {/* m-auto centres the building when it fits, and lets it scroll when the
+          floor list is taller than the viewport. */}
+      <div className="m-auto w-full max-w-2xl flex flex-col">
+        {/* Building header */}
+        <div className="text-center mb-8">
         <h2 className="text-3xl font-bold text-white tracking-tight mb-1">
           {buildingConfig.buildingName}
         </h2>
@@ -148,6 +157,42 @@ export function BuildingView({ sessions }: BuildingViewProps): React.ReactNode {
       <div className="w-full max-w-2xl flex flex-col gap-2">
         {/* Roof */}
         <div className="h-2 bg-slate-800 rounded-t-lg mx-4" />
+
+        {/* Command Center — penthouse tile gathering every terminal's boss */}
+        <button
+          onClick={(e) => {
+            useNavigationStore
+              .getState()
+              .setTransitionOrigin({ x: e.clientX, y: e.clientY });
+            goToCommand();
+          }}
+          data-tour-id="command-center-tile"
+          className="group flex items-stretch w-full rounded-lg border border-sky-700/60 bg-sky-950/40 hover:border-sky-500 hover:bg-sky-900/40 transition-all duration-200"
+        >
+          {/* Badge */}
+          <div className="flex items-center justify-center w-16 rounded-l-lg text-2xl">
+            {"\u{1F6F0}\u{FE0F}"}
+          </div>
+
+          {/* Info */}
+          <div className="flex-grow flex items-center gap-4 px-5 py-3">
+            <div className="flex flex-col items-start">
+              <span className="text-sm font-bold text-sky-300 group-hover:text-sky-200 transition-colors">
+                Command Center
+              </span>
+              <span className="text-xs text-slate-500 font-mono">
+                {activeSessionCount > 0
+                  ? `${activeSessionCount} active terminal${activeSessionCount !== 1 ? "s" : ""}`
+                  : "Overview of every terminal"}
+              </span>
+            </div>
+          </div>
+
+          {/* Arrow */}
+          <div className="flex items-center px-4 text-sky-700 group-hover:text-sky-400 transition-colors">
+            &rarr;
+          </div>
+        </button>
 
         {/* Floors sorted top-down by floor number (highest first) */}
         {sortedFloors.map((floor) => {
@@ -207,6 +252,7 @@ export function BuildingView({ sessions }: BuildingViewProps): React.ReactNode {
 
         {/* Foundation */}
         <div className="h-2 bg-slate-800 rounded-b-lg mx-4" />
+        </div>
       </div>
     </div>
   );

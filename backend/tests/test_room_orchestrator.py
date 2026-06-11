@@ -1,9 +1,10 @@
 # backend/tests/test_room_orchestrator.py
 """Tests for RoomOrchestrator: session merging, character types, kanban aggregation."""
 
-from app.core.room_orchestrator import RoomOrchestrator
+from app.core.room_orchestrator import RoomOrchestrator, build_overview
 from app.core.state_machine import StateMachine
-from app.models.agents import AgentState, BossState
+from app.models.agents import Agent, AgentState, BossState
+from app.models.common import TodoItem, TodoStatus
 from app.models.events import Event, EventData, EventType
 
 
@@ -171,3 +172,52 @@ class TestSessionLifecycle:
         state = orch.merge()
         assert state is not None
         assert state.boss.state == BossState.WORKING
+
+
+class TestBuildOverview:
+    def test_empty(self) -> None:
+        ov = build_overview({})
+        assert ov.entries == []
+
+    def test_one_peer_per_session(self) -> None:
+        a, b = _make_sm(), _make_sm()
+        a.boss_state = BossState.WORKING
+        b.boss_state = BossState.IDLE
+        ov = build_overview({"s-a": a, "s-b": b})
+        by_id = {e.session_id: e for e in ov.entries}
+        assert set(by_id) == {"s-a", "s-b"}
+
+    def test_bucket_mapping(self) -> None:
+        cases = {
+            BossState.WAITING_PERMISSION: "needs_you",
+            BossState.PHONE_RINGING: "needs_you",
+            BossState.WORKING: "working",
+            BossState.DELEGATING: "working",
+            BossState.REVIEWING: "working",
+            BossState.IDLE: "done",
+            BossState.COMPLETING: "done",
+        }
+        for state, expected in cases.items():
+            sm = _make_sm()
+            sm.boss_state = state
+            ov = build_overview({"s": sm})
+            assert ov.entries[0].bucket == expected
+            assert ov.entries[0].state == state
+
+    def test_todo_counts_and_subagents(self) -> None:
+        sm = _make_sm()
+        sm.boss_state = BossState.WORKING
+        sm.boss_current_task = "refactor auth"
+        sm.todos = [
+            TodoItem(content="a", status=TodoStatus.COMPLETED),
+            TodoItem(content="b", status=TodoStatus.IN_PROGRESS),
+            TodoItem(content="c", status=TodoStatus.PENDING),
+        ]
+        sm.agents = {
+            "x": Agent(id="x", color="#fff", number=0, state=AgentState.WORKING),
+            "y": Agent(id="y", color="#fff", number=1, state=AgentState.WORKING),
+        }
+        entry = build_overview({"s": sm}).entries[0]
+        assert entry.current_task == "refactor auth"
+        assert (entry.todo_done, entry.todo_total) == (1, 3)
+        assert entry.subagent_count == 2

@@ -30,6 +30,7 @@ export interface OfficeTextures {
 
   // Wall items
   wallOutlet: Texture | null;
+  employeeOfMonth: Texture | null;
 
   // Agent accessories
   headset: Texture | null;
@@ -66,6 +67,7 @@ const TEXTURE_PATHS: Record<keyof OfficeTextures, string> = {
   elevatorFrame: "/sprites/elevator_frame.png",
   elevatorDoor: "/sprites/elevator_door.png",
   wallOutlet: "/sprites/wall-outlet.png",
+  employeeOfMonth: "/sprites/employee-of-month.png",
   headset: "/sprites/headset_small.png",
   sunglasses: "/sprites/sunglasses.png",
   coffeeMug: "/sprites/coffee-mug.png",
@@ -93,6 +95,7 @@ const EMPTY_TEXTURES: OfficeTextures = {
   elevatorFrame: null,
   elevatorDoor: null,
   wallOutlet: null,
+  employeeOfMonth: null,
   headset: null,
   sunglasses: null,
   coffeeMug: null,

@@ -20,6 +20,19 @@ const ptBR: Record<TranslationKey, string> = {
   "header.aiOff": "DESLIGADO",
   "header.agents": "agentes",
   "header.tour": "TUR",
+  "header.commandCenter": "COMANDO",
+
+  // Command Center
+  "commandCenter.title": "Central de Comando",
+  "commandCenter.zone.needsYou": "Precisa de você",
+  "commandCenter.zone.working": "Trabalhando",
+  "commandCenter.zone.done": "Concluído",
+  "commandCenter.zone.ended": "Encerrado",
+  "commandCenter.moreCount": "+{count} mais",
+  "commandCenter.popup.todos": "Tarefas",
+  "commandCenter.popup.employees": "Funcionários",
+  "commandCenter.popup.terminal": "Terminal",
+  "commandCenter.popup.drillIn": "Abrir",
 
   // Modals
   "modal.confirmDbWipe": "Confirmar Limpeza do Banco",

@@ -45,6 +45,7 @@ import { Breadcrumb } from "@/components/navigation/Breadcrumb";
 import { ViewTransition } from "@/components/navigation/ViewTransition";
 import { BuildingView } from "@/components/views/BuildingView";
 import { FloorView } from "@/components/views/FloorView";
+import { CommandCenterView } from "@/components/command/CommandCenterView";
 import { TourOverlay } from "@/components/tour/TourOverlay";
 import CommandBar from "@/components/attention/CommandBar";
 import AttentionToasts from "@/components/attention/AttentionToasts";
@@ -151,6 +152,11 @@ export default function V2TestPage(): React.ReactNode {
 
   // Navigation store
   const view = useNavigationStore((s) => s.view);
+
+  // Active session count gates the Command Center entry point (>= 2).
+  const activeSessionCount = sessions.filter(
+    (s) => s.status === "active",
+  ).length;
 
   // ------------------------------------------------------------------
   // Floor config + tour initialization
@@ -395,7 +401,7 @@ export default function V2TestPage(): React.ReactNode {
             {!isMobile && t("app.title")}
             {!isMobile && (
               <span className="text-xs font-mono font-normal px-2 py-0.5 bg-slate-800 rounded text-slate-400 border border-slate-700">
-                v0.19.0
+                v0.20.0
               </span>
             )}
           </h1>
@@ -414,6 +420,7 @@ export default function V2TestPage(): React.ReactNode {
             isConnected={isConnected}
             debugMode={debugMode}
             aiSummaryEnabled={aiSummaryEnabled}
+            activeSessionCount={activeSessionCount}
             onSimulate={handleSimulate}
             onReset={handleReset}
             onClearDB={() => setIsClearModalOpen(true)}
@@ -492,6 +499,22 @@ export default function V2TestPage(): React.ReactNode {
 
           <RightSidebar />
         </div>
+      ) : view === "command" ? (
+        /* ----------------------------------------------------------------
+            Command Center (cross-terminal overview)
+        ---------------------------------------------------------------- */
+        <CommandCenterView
+          sessions={sessions}
+          sessionsLoading={sessionsLoading}
+          sessionId={sessionId}
+          isCollapsed={leftSidebarCollapsed}
+          onToggleCollapsed={() =>
+            setLeftSidebarCollapsed(!leftSidebarCollapsed)
+          }
+          onSessionSelect={handleSessionSelect}
+          onDeleteSession={setSessionPendingDelete}
+          onRenameSession={handleRenameSession}
+        />
       ) : (
         /* ----------------------------------------------------------------
             Building / Floor View (animated transitions)

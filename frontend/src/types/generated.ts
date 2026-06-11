@@ -271,6 +271,14 @@ export type LastUpdated = string;
  * Path to the repository
  */
 export type RepoPath = string;
+export type Sessionid1 = string;
+export type Bucket = "needs_you" | "working" | "done";
+export type Currenttask2 = string | null;
+export type Tododone = number;
+export type Todototal = number;
+export type Subagentcount = number;
+export type Entries = OverviewEntry[];
+export type Lastupdated1 = string;
 /**
  * Visual states for the boss's phone.
  *
@@ -639,6 +647,33 @@ export interface GitStatus {
   commits?: Commits;
   last_updated?: LastUpdated;
   repo_path: RepoPath;
+  [k: string]: unknown;
+}
+/**
+ * A single session's boss snapshot for the Command Center.
+ *
+ * This interface was referenced by `ClaudeOfficeBackendTypes`'s JSON-Schema
+ * via the `definition` "OverviewEntry".
+ */
+export interface OverviewEntry {
+  sessionId: Sessionid1;
+  bucket: Bucket;
+  state: BossState;
+  currentTask?: Currenttask2;
+  todoDone?: Tododone;
+  todoTotal?: Todototal;
+  subagentCount?: Subagentcount;
+  [k: string]: unknown;
+}
+/**
+ * The full cross-session overview broadcast over ``/ws/overview``.
+ *
+ * This interface was referenced by `ClaudeOfficeBackendTypes`'s JSON-Schema
+ * via the `definition` "OverviewState".
+ */
+export interface OverviewState {
+  entries?: Entries;
+  lastUpdated: Lastupdated1;
   [k: string]: unknown;
 }
 /**

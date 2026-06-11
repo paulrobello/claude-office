@@ -2,6 +2,16 @@
 
 All notable changes to Claude Office Visualizer are documented here.
 
+## [0.20.0] - 2026-06-11
+
+### Added
+
+- **Command Center (cross-terminal overview)**: a new top-level view that gathers the boss (main agent) of every live session into a single pixel canvas, so you can see at a glance what's finished, what's still running, and what needs your attention. Reachable from a header button (when ≥2 active sessions) and a penthouse tile in the Building view
+  - **Open-plan layout** matching the main office: a decorated top wall (Employee-of-the-Month posters, outlets), a checkerboard tiled floor, and four status **columns** left→right by priority — Needs-you, Working, Done, Ended. Each agent appears as a character at a **fixed** spot in its column with its project nameplate, a `+N` active-subagent badge, and a todo progress bar. Agents **walk** to their seats (A* pathfinding **around** the furniture) and take any **free** seat — no reserved spots and no reshuffling when others come or go; furniture is static (never follows agents). Needs-you/Working are rows of **desks** (chair + desk + monitor, from the office sprites); **Done is a lounge** with couches; **Ended** is an **EXIT** — the office elevator doorway with an EXIT sign. When a session finishes (terminal closes) while you're watching, its agent walks to the elevator, the doors open, and it steps out and is gone (sessions already finished before the view opened are not shown). The top wall carries an **ALL SESSIONS board** with combined stats (terminal count, per-status counts, total employees, aggregate todo progress) and a **wall clock** (reused from the office); a row of reused furniture (plants, printer, water cooler, coffee machine) lines the bottom wall
+  - Backend: new `OverviewEntry`/`OverviewState` models, `build_overview()` peer merge in `room_orchestrator`, and a `/ws/overview` WebSocket broadcasting one boss snapshot per live session (rebuilt only when a client is watching)
+  - Frontend: `command` view mode, `overviewStore` + `useOverviewWebSocket`, and a sibling PixiJS canvas reusing the office sprites/textures. Clicking an agent opens a cross-session popover to **open that agent's terminal** or **drill in** to its office
+- **Scrollable Building view**: the building cross-section now scrolls when the floor list is taller than the viewport, while still centering when it fits
+
 ## [0.19.0] - 2026-06-02
 
 ### Security

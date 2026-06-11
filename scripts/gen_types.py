@@ -21,6 +21,7 @@ from app.models.agents import Agent, Boss, ElevatorState, OfficeState, PhoneStat
 from app.models.common import BubbleContent, BubbleType, SpeechContent, TodoItem, TodoStatus  # noqa: E402  # type: ignore[import]
 from app.models.events import Event, EventData, EventType  # noqa: E402  # type: ignore[import]
 from app.models.git import ChangedFile, Commit, FileStatus, GitStatus  # noqa: E402  # type: ignore[import]
+from app.models.overview import OverviewEntry, OverviewState  # noqa: E402  # type: ignore[import]
 from app.models.sessions import (  # noqa: E402  # type: ignore[import]
     AgentLifespan,
     BackgroundTask,
@@ -54,6 +55,8 @@ MODELS = [
     ChangedFile,
     Commit,
     GitStatus,
+    OverviewEntry,
+    OverviewState,
 ]
 
 # Generate combined JSON schema with camelCase field names (by_alias=True)

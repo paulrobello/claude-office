@@ -10,6 +10,7 @@ import {
   Settings,
   Map,
   Bell,
+  LayoutGrid,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useNavigationStore } from "@/stores/navigationStore";
@@ -24,6 +25,8 @@ interface HeaderControlsProps {
   isConnected: boolean;
   debugMode: boolean;
   aiSummaryEnabled: boolean | null;
+  /** Number of active sessions — gates the Command Center button (>= 2). */
+  activeSessionCount: number;
   onSimulate: () => Promise<void>;
   onReset: () => void;
   onClearDB: () => void;
@@ -46,6 +49,7 @@ export function HeaderControls({
   isConnected,
   debugMode,
   aiSummaryEnabled,
+  activeSessionCount,
   onSimulate,
   onReset,
   onClearDB,
@@ -55,6 +59,7 @@ export function HeaderControls({
 }: HeaderControlsProps): React.ReactNode {
   const { t } = useTranslation();
   const view = useNavigationStore((s) => s.view);
+  const goToCommand = useNavigationStore((s) => s.goToCommand);
   const buildingConfig = useNavigationStore((s) => s.buildingConfig);
   const hasSeenTour = useTourStore((s) => s.hasSeenTour);
   const startTour = useTourStore((s) => s.startTour); // (mode: "single" | "building") => void
@@ -127,6 +132,22 @@ export function HeaderControls({
         >
           <Map size={14} />
           {t("header.tour")}
+        </button>
+      )}
+
+      {/* Command Center — cross-terminal overview (>= 2 active sessions) */}
+      {activeSessionCount >= 2 && (
+        <button
+          onClick={goToCommand}
+          title={t("commandCenter.title")}
+          className={`flex items-center gap-2 px-3 py-1.5 border rounded text-xs font-bold transition-colors ${
+            view === "command"
+              ? "bg-sky-500/20 text-sky-400 border-sky-500/30"
+              : "bg-sky-500/10 text-sky-500 border-sky-500/30 hover:bg-sky-500/20"
+          }`}
+        >
+          <LayoutGrid size={14} />
+          {t("header.commandCenter")}
         </button>
       )}
 

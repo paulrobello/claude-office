@@ -18,6 +18,19 @@ const en = {
   "header.aiOff": "OFF",
   "header.agents": "agents",
   "header.tour": "TOUR",
+  "header.commandCenter": "COMMAND",
+
+  // Command Center
+  "commandCenter.title": "Command Center",
+  "commandCenter.zone.needsYou": "Needs you",
+  "commandCenter.zone.working": "Working",
+  "commandCenter.zone.done": "Done",
+  "commandCenter.zone.ended": "Ended",
+  "commandCenter.moreCount": "+{count} more",
+  "commandCenter.popup.todos": "Todos",
+  "commandCenter.popup.employees": "Employees",
+  "commandCenter.popup.terminal": "Terminal",
+  "commandCenter.popup.drillIn": "Open",
 
   // Modals
   "modal.confirmDbWipe": "Confirm Database Wipe",

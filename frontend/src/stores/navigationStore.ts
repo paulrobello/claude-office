@@ -36,6 +36,10 @@ interface NavigationActions {
   goToBuilding: () => void;
   /** Navigate to a specific floor */
   goToFloor: (floorId: string) => void;
+  /** Navigate to the Command Center (cross-terminal overview) */
+  goToCommand: () => void;
+  /** Navigate to the single office view (keeps building config for back-nav) */
+  goToSingle: () => void;
   /** Set building config from API (auto-switches to building view if floors exist) */
   setBuildingConfig: (config: BuildingConfig) => void;
   /** Update building config in-place without triggering a view change */
@@ -86,6 +90,27 @@ export const useNavigationStore = create<NavigationStore>()((set, get) => ({
       floorId,
       transitionDirection: "zoom-in",
       isTransitioning: true,
+    }),
+
+  // Command Center renders outside ViewTransition, so no transition flags.
+  goToCommand: () =>
+    set({
+      view: "command",
+      floorId: null,
+      transitionDirection: null,
+      isTransitioning: false,
+      transitionOrigin: null,
+    }),
+
+  // Drill from the Command Center into a single session's office. Keeps
+  // buildingConfig so the building/floor navigation remains available.
+  goToSingle: () =>
+    set({
+      view: "single",
+      floorId: null,
+      transitionDirection: null,
+      isTransitioning: false,
+      transitionOrigin: null,
     }),
 
   setBuildingConfig: (config) =>

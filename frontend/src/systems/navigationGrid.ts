@@ -81,6 +81,18 @@ export interface GridPosition {
   gy: number;
 }
 
+/**
+ * Minimal grid surface the A* pathfinder depends on. Implemented by the office
+ * {@link NavigationGrid} and by the Command Center grid, so A* can run on either.
+ */
+export interface PathGrid {
+  worldToGrid(x: number, y: number): GridPosition;
+  gridToWorld(gx: number, gy: number): Position;
+  isWalkable(gx: number, gy: number, ignoreAgentId?: string): boolean;
+  getCost(gx: number, gy: number, ignoreAgentId?: string): number;
+  getNeighbors(gx: number, gy: number): GridPosition[];
+}
+
 export interface DynamicObstacle {
   type: "agent" | "furniture";
   agentId?: string;

@@ -6,7 +6,7 @@
  */
 
 /** Current view mode */
-export type ViewMode = "single" | "building" | "floor";
+export type ViewMode = "single" | "building" | "floor" | "command";
 
 /** Sentinel floor ID for the lobby (unmatched sessions) */
 export const LOBBY_FLOOR_ID = "__lobby__";

@@ -56,6 +56,7 @@ class ConnectionManager:
     def __init__(self) -> None:
         self.active_connections: dict[str, list[WebSocket]] = {}
         self.room_connections: dict[str, list[WebSocket]] = {}
+        self.overview_connections: list[WebSocket] = []
         self._lock = asyncio.Lock()
 
     # ------------------------------------------------------------------
@@ -198,6 +199,45 @@ class ConnectionManager:
             return
 
         await self._broadcast_to_connections(message, connections, self.room_connections, room_id)
+
+    # ------------------------------------------------------------------
+    # Overview-level WebSocket support (Command Center — cross-session)
+    # ------------------------------------------------------------------
+
+    async def connect_overview(self, websocket: WebSocket) -> None:
+        """Accept a WebSocket connection and register it for the overview feed."""
+        await websocket.accept()
+        async with self._lock:
+            self.overview_connections.append(websocket)
+
+    async def disconnect_overview(self, websocket: WebSocket) -> None:
+        """Remove a WebSocket connection from the overview feed."""
+        async with self._lock:
+            if websocket in self.overview_connections:
+                self.overview_connections.remove(websocket)
+
+    async def broadcast_overview(self, message: dict[str, Any]) -> None:
+        """Send a message to all WebSocket clients on the overview feed."""
+        async with self._lock:
+            connections = self.overview_connections.copy()
+
+        if not connections:
+            return
+
+        failed: list[WebSocket] = []
+        for connection in connections:
+            try:
+                if connection.client_state == WebSocketState.CONNECTED:
+                    await connection.send_json(message)
+            except Exception as e:
+                logger.warning("Failed to send to overview WebSocket: %s", e)
+                failed.append(connection)
+
+        if failed:
+            async with self._lock:
+                for conn in failed:
+                    if conn in self.overview_connections:
+                        self.overview_connections.remove(conn)
 
 
 manager = ConnectionManager()

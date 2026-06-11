@@ -15,9 +15,15 @@ export function Breadcrumb(): React.ReactNode {
   const goToBuilding = useNavigationStore((s) => s.goToBuilding);
   const { t } = useTranslation();
 
-  // Only show when in building or floor view
+  // Hidden in the single office view.
   if (view === "single") return null;
 
+  const hasBuilding = (buildingConfig?.floors.length ?? 0) > 0;
+  // In the Command Center, only show the crumb when there's a building to
+  // return to (otherwise the header COMMAND button is the only entry point).
+  if (view === "command" && !hasBuilding) return null;
+
+  const isCommand = view === "command";
   const isLobby = floorId === LOBBY_FLOOR_ID;
   const floor = isLobby
     ? null
@@ -45,6 +51,16 @@ export function Breadcrumb(): React.ReactNode {
         <span>{"\u{1F3E2}"}</span>
         <span>{buildingConfig?.buildingName ?? t("navigation.building")}</span>
       </button>
+
+      {isCommand && (
+        <>
+          <span className="text-slate-600">/</span>
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded text-white bg-slate-800">
+            <span>{"\u{1F6F0}\u{FE0F}"}</span>
+            <span>{t("commandCenter.title")}</span>
+          </span>
+        </>
+      )}
 
       {isLobby && (
         <>

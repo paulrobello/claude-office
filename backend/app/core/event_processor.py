@@ -23,6 +23,7 @@ from app.core.beads_poller import get_beads_poller, has_beads, init_beads_poller
 from app.core.broadcast_service import (
     broadcast_error,
     broadcast_event,
+    broadcast_overview_state,
     broadcast_room_state,
     broadcast_state,
 )
@@ -467,6 +468,12 @@ class EventProcessor:
                 self.orchestrators[sm.room_id] = orchestrator
             orchestrator.update_session(event.session_id, sm)
             await broadcast_room_state(sm.room_id, orchestrator)
+
+        # ------------------------------------------------------------------
+        # Cross-session overview broadcast (Command Center). No-op when no one
+        # is watching /ws/overview.
+        # ------------------------------------------------------------------
+        await broadcast_overview_state(self.sessions)
 
         # ------------------------------------------------------------------
         # SUBAGENT_START

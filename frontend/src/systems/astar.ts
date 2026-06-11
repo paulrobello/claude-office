@@ -7,8 +7,8 @@
 
 import { Position } from "@/types";
 import {
-  NavigationGrid,
   GridPosition,
+  PathGrid,
   TILE_SIZE,
   getNavigationGrid,
 } from "./navigationGrid";
@@ -125,9 +125,8 @@ export function findPath(
   start: Position,
   end: Position,
   ignoreAgentId?: string,
+  grid: PathGrid = getNavigationGrid(),
 ): GridPosition[] {
-  const grid = getNavigationGrid();
-
   const startGrid = grid.worldToGrid(start.x, start.y);
   const endGrid = grid.worldToGrid(end.x, end.y);
 
@@ -231,7 +230,7 @@ export function findPath(
  * Find the nearest walkable tile to a position.
  */
 function findNearestWalkable(
-  grid: NavigationGrid,
+  grid: PathGrid,
   pos: GridPosition,
   ignoreAgentId?: string,
 ): GridPosition | null {
@@ -274,8 +273,10 @@ function reconstructPath(goalNode: AStarNode): GridPosition[] {
 /**
  * Convert grid path to world coordinates (pixel positions).
  */
-export function gridPathToWorld(gridPath: GridPosition[]): Position[] {
-  const grid = getNavigationGrid();
+export function gridPathToWorld(
+  gridPath: GridPosition[],
+  grid: PathGrid = getNavigationGrid(),
+): Position[] {
   return gridPath.map((gp) => grid.gridToWorld(gp.gx, gp.gy));
 }
 
@@ -291,8 +292,9 @@ export function findWorldPath(
   start: Position,
   end: Position,
   ignoreAgentId?: string,
+  grid: PathGrid = getNavigationGrid(),
 ): Position[] {
-  const gridPath = findPath(start, end, ignoreAgentId);
+  const gridPath = findPath(start, end, ignoreAgentId, grid);
 
   if (gridPath.length === 0) {
     // No valid path found - log warning and return empty
@@ -303,5 +305,5 @@ export function findWorldPath(
     return [];
   }
 
-  return gridPathToWorld(gridPath);
+  return gridPathToWorld(gridPath, grid);
 }
