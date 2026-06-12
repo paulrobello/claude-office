@@ -142,6 +142,36 @@ export async function createTask(input: {
   return (await res.json()) as { url: string };
 }
 
+/** Responde uma issue HITL (label-only) IN-SYSTEM: posta comentário + relabela
+ *  hitl→afk. O dev-loop lê os comentários, então a resposta chega na implementação. */
+export async function respondTask(
+  sourceRef: string,
+  response: string,
+): Promise<{ ok: boolean; issue: number }> {
+  const res = await fetch(
+    `${BASE}/tasks/${encodeURIComponent(sourceRef)}/respond`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ response }),
+    },
+  );
+  if (res.status === 503) throw new CoordUnavailableError();
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try {
+      const j = (await res.json()) as {
+        detail?: { message?: string; error?: string };
+      };
+      msg = j?.detail?.message ?? j?.detail?.error ?? msg;
+    } catch {
+      /* mantém msg padrão */
+    }
+    throw new Error(msg);
+  }
+  return (await res.json()) as { ok: boolean; issue: number };
+}
+
 /** Linha da caixa de pedidos (`requests` :5433) — alimenta o detector de gargalo. */
 export interface CoordRequest {
   id: number;

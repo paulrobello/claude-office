@@ -399,6 +399,56 @@ async def create_task(body: CreateTaskBody) -> dict[str, Any]:
     return {"url": out.decode().strip()}
 
 
+# ── POST /tasks/{ref}/respond — responder HITL IN-SYSTEM (sem abrir o GitHub) ──
+# Para issues com label `hitl` (sem prompt no DB hitl_prompts): o CEO responde no
+# cockpit → posta a resposta como COMENTÁRIO + relabela hitl→afk. O dev-loop lê os
+# comentários (--comments), então a resposta chega na implementação. Padroniza o
+# fluxo de resposta dentro do sistema (decisão CEO 2026-06-12).
+class RespondTaskBody(BaseModel):
+    response: str
+    relabel_afk: bool = True
+
+
+async def _run_gh(args: list[str]) -> str:
+    """Roda `gh <args>`; 502 se gh faltar ou falhar."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "gh", *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        out, err = await proc.communicate()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=502, detail={"error": "gh_not_found"}) from exc
+    if proc.returncode != 0:
+        raise HTTPException(
+            status_code=502,
+            detail={"error": "gh_failed", "message": err.decode()[:500]},
+        )
+    return out.decode().strip()
+
+
+@router.post("/tasks/{source_ref}/respond")
+async def respond_task(source_ref: str, body: RespondTaskBody) -> dict[str, Any]:
+    n = _ref_to_issue_number(source_ref)
+    if n is None:
+        raise HTTPException(status_code=422, detail={"error": "bad_source_ref"})
+    resp = body.response.strip()
+    if not resp:
+        raise HTTPException(status_code=422, detail={"error": "response_required"})
+    await _run_gh(
+        ["issue", "comment", str(n), "--repo", _AGENTS_IA_REPO,
+         "--body", f"💬 **Resposta do CEO (cockpit):**\n\n{resp}"]
+    )
+    if body.relabel_afk:
+        # volta pro fluxo: hitl→afk (o dev-loop lê o comentário com a resposta)
+        await _run_gh(
+            ["issue", "edit", str(n), "--repo", _AGENTS_IA_REPO,
+             "--remove-label", "hitl", "--add-label", "afk"]
+        )
+    return {"ok": True, "issue": n, "relabeled_afk": body.relabel_afk}
+
+
 # ── POST /requests (produtor da caixa, #407) ───────────────────────────────────
 # `requests` é tabela INTERNA de coordenação (a "caixa"/telemetria de demanda) —
 # NÃO vem do GitHub como as issues. Por isso o write é DIRETO no :5433 (diferente

@@ -21,6 +21,7 @@ import {
   fetchHitlPending,
   fetchFlowHealth,
   answerHitl,
+  respondTask,
   type CoordDashboard,
   type CoordTask,
   type CoordAgent,
@@ -144,6 +145,7 @@ export default function DashboardPage(): React.ReactNode {
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [selectedPrompt, setSelectedPrompt] = useState<HitlPrompt | null>(null);
+  const [respondingTask, setRespondingTask] = useState<CoordTask | null>(null);
 
   const qs = useMemo(() => `?period=${period}`, [period]);
 
@@ -323,8 +325,10 @@ export default function DashboardPage(): React.ReactNode {
     const p = data?.hitl.find(
       (h) => h.source_ref === t.source_ref && h.status === "pending",
     );
+    // pergunta gravada (DB) → modal de prompt; senão (label hitl só) → modal de
+    // resposta livre IN-SYSTEM (comenta + relabela afk). Nunca abre o GitHub.
     if (p) setSelectedPrompt(p);
-    else if (t.url) window.open(t.url, "_blank");
+    else setRespondingTask(t);
   };
 
   return (
@@ -750,6 +754,18 @@ export default function DashboardPage(): React.ReactNode {
           await refetch();
         }}
       />
+
+      {/* Modal de resposta IN-SYSTEM p/ issue hitl-label (sem prompt no DB):
+          posta comentário + relabela afk. Nunca abre o GitHub. */}
+      <TaskRespondModal
+        key={respondingTask?.source_ref ?? "none-resp"}
+        task={respondingTask}
+        onClose={() => setRespondingTask(null)}
+        onDone={async () => {
+          setRespondingTask(null);
+          await refetch();
+        }}
+      />
     </main>
   );
 }
@@ -1012,6 +1028,93 @@ function QueueColumn({
             onRespond={onRespond}
           />
         ))}
+      </div>
+    </div>
+  );
+}
+
+function TaskRespondModal({
+  task,
+  onClose,
+  onDone,
+}: {
+  task: CoordTask | null;
+  onClose: () => void;
+  onDone: () => Promise<void> | void;
+}): React.ReactNode {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  if (!task) return null;
+  const submit = async (): Promise<void> => {
+    if (!text.trim()) {
+      setErr("escreva uma resposta");
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      await respondTask(task.source_ref, text.trim());
+      await onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "erro");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl border border-[rgba(168,85,247,0.3)] bg-[#0d0a18] p-5 shadow-[0_0_40px_rgba(168,85,247,0.25)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm font-bold text-[#fbbf24]">
+            ⚠ Responder (HITL)
+          </span>
+          <button onClick={onClose} className="text-[#9a93b3] hover:text-white">
+            ✕
+          </button>
+        </div>
+        <div className="text-[13.5px] font-semibold mb-1">
+          {task.title ?? `#${task.number}`}
+        </div>
+        <div className="text-xs text-[#9a93b3] mb-3">
+          Sua resposta vira comentário na issue e ela volta pra <b>afk</b> — o
+          agente lê o comentário e prossegue. Tudo no sistema.
+        </div>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={5}
+          autoFocus
+          placeholder="Sua decisão / resposta / esclarecimento…"
+          className="w-full rounded-xl bg-white/5 border border-[rgba(168,85,247,0.25)] px-3 py-2 text-sm outline-none focus:border-[#a855f7]"
+        />
+        {err && <div className="text-xs text-[#ec4899] mt-2">{err}</div>}
+        <div className="flex items-center gap-3 mt-3">
+          <button
+            onClick={() => void submit()}
+            disabled={busy || !text.trim()}
+            className="rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-40 shadow-[0_0_18px_rgba(52,211,153,0.4)]"
+            style={{ background: "linear-gradient(135deg,#34d399,#10b981)" }}
+          >
+            {busy ? "enviando…" : "Responder + voltar pra afk"}
+          </button>
+          {task.url && (
+            <a
+              href={task.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-[#9a93b3] hover:text-white"
+            >
+              abrir issue ↗
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );
