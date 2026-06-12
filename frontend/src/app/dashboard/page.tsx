@@ -85,6 +85,21 @@ function taskAreas(t: CoordTask): string[] {
   return t.labels.filter((l) => l.startsWith("area:"));
 }
 
+function shortArea(area: string): string {
+  return area.replace(/^area:/, "");
+}
+
+/** Projetos do agente como nomes CURTOS de área (hmtrack-front → front), pra casar
+ *  com t.project que vem curto. Sem isto o filtro de projeto nunca casava agentes. */
+function agentProjectsShort(a: CoordAgent): string[] {
+  const s = new Set<string>();
+  for (const p of a.projetos) {
+    const area = PROJECT_TO_AREA[p];
+    if (area) s.add(shortArea(area));
+  }
+  return [...s];
+}
+
 function initials(name: string): string {
   const clean = name.replace(/^Agent[e]?\s*[·-]?\s*/i, "").replace(/^hmtrack-/i, "");
   const parts = clean.split(/[\s_-]+/).filter(Boolean);
@@ -168,11 +183,13 @@ export default function DashboardPage(): React.ReactNode {
     return { ...c, errors, pending };
   }, [data, statusByRef]);
 
+  // chips de projeto = nomes CURTOS canônicos vindos de t.project (db, front, ...).
+  // (Não misturar com a.projetos, que vem cheio — causava chips duplicados e filtro
+  // que não casava.)
   const projects = useMemo(() => {
     if (!data) return [] as string[];
     const set = new Set<string>();
     for (const t of data.tasks) if (t.project) set.add(t.project);
-    for (const a of data.agents) for (const p of a.projetos) set.add(p);
     return [...set].sort();
   }, [data]);
 
@@ -257,6 +274,40 @@ export default function DashboardPage(): React.ReactNode {
     }
     return [...m.entries()].sort((a, b) => b[1].length - a[1].length);
   }, [orphans]);
+
+  // board: colunas por agente (tasks atribuídas) + coluna FILA (visíveis SEM agente).
+  // A maioria das tasks não tem claim/run agent (ou tem 'cron:...'/nome divergente)
+  // → sem a fila, sumiam. Aqui toda task visível aparece em algum lugar.
+  const boardData = useMemo(() => {
+    const empty = {
+      columns: [] as { agent: CoordAgent; color: string; tasks: CoordTask[] }[],
+      queue: [] as CoordTask[],
+    };
+    if (!data) return empty;
+    const shown = new Set<string>();
+    const columns = data.agents
+      .filter((a) => !a.archived_at)
+      .filter(
+        (a) =>
+          projectFilter === "all" ||
+          agentProjectsShort(a).includes(projectFilter),
+      )
+      .filter(
+        (a) => !search || a.nome.toLowerCase().includes(search.toLowerCase()),
+      )
+      .map((a) => {
+        const tasks = data.tasks
+          .filter((t) => t.claim_agent === a.nome || t.run_agent === a.nome)
+          .filter(taskVisible);
+        for (const t of tasks) shown.add(t.source_ref);
+        return { agent: a, color: colorFor(a.nome), tasks };
+      })
+      .filter(({ tasks }) => !filterActive || tasks.length > 0);
+    const queue = data.tasks
+      .filter(taskVisible)
+      .filter((t) => !shown.has(t.source_ref));
+    return { columns, queue };
+  }, [data, projectFilter, search, taskVisible, filterActive]);
 
   return (
     <main
@@ -578,40 +629,26 @@ export default function DashboardPage(): React.ReactNode {
             </div>
           </section>
 
-          {/* Board de agentes */}
+          {/* Board de agentes + FILA (não atribuídas) */}
           <SectionTitle color="#a855f7">Agentes &amp; Filas</SectionTitle>
           <section className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
-            {data.agents
-              .filter((a) => !a.archived_at)
-              .filter(
-                (a) =>
-                  projectFilter === "all" || a.projetos.includes(projectFilter),
-              )
-              .filter(
-                (a) =>
-                  !search ||
-                  a.nome.toLowerCase().includes(search.toLowerCase()),
-              )
-              .map((a) => ({
-                a,
-                c: colorFor(a.nome),
-                myTasks: data.tasks
-                  .filter(
-                    (t) => t.claim_agent === a.nome || t.run_agent === a.nome,
-                  )
-                  .filter(taskVisible),
-              }))
-              // com filtro ativo, só mostra quem TEM fila (esconde colunas vazias)
-              .filter(({ myTasks }) => !filterActive || myTasks.length > 0)
-              .map(({ a, c, myTasks }) => (
-                <AgentColumn
-                  key={a.nome}
-                  agent={a}
-                  color={c}
-                  tasks={myTasks}
-                  statusByRef={statusByRef}
-                />
-              ))}
+            {boardData.columns.map(({ agent, color, tasks }) => (
+              <AgentColumn
+                key={agent.nome}
+                agent={agent}
+                color={color}
+                tasks={tasks}
+                statusByRef={statusByRef}
+              />
+            ))}
+            {boardData.queue.length > 0 && (
+              <QueueColumn tasks={boardData.queue} statusByRef={statusByRef} />
+            )}
+            {boardData.columns.length === 0 && boardData.queue.length === 0 && (
+              <div className="text-[#6b6485] text-sm">
+                Nenhuma task pra esse filtro.
+              </div>
+            )}
           </section>
         </>
       )}
@@ -712,6 +749,64 @@ function SectionTitle({
   );
 }
 
+function TaskCard({
+  task: t,
+  statusByRef,
+}: {
+  task: CoordTask;
+  statusByRef: Map<string, TaskStatus>;
+}): React.ReactNode {
+  const st = statusByRef.get(t.source_ref) ?? "unknown";
+  const border = GROUP_BORDER[statusGroup(st)];
+  const done = st === "done";
+  return (
+    <div
+      className="rounded-xl px-3.5 py-3 bg-white/5 border border-white/10 hover:bg-[rgba(168,85,247,0.06)] transition-colors"
+      style={{ borderLeft: `3px solid ${border}` }}
+    >
+      <div
+        className={`text-[13.5px] font-semibold mb-2 ${
+          done ? "line-through text-[#9a93b3]" : ""
+        }`}
+      >
+        {t.title ?? `#${t.number}`}
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        {t.project && (
+          <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-md text-[#38bdf8] bg-[rgba(56,189,248,0.12)]">
+            {t.project.replace(/^hmtrack-/, "")}
+          </span>
+        )}
+        <span
+          className="text-[10.5px] font-bold px-2 py-0.5 rounded-md"
+          style={{ color: border, background: `${border}1f` }}
+        >
+          {STATUS_LABEL[st]}
+        </span>
+        {/* HITL: task esperando sua decisão → atalho pra responder (modal vive em /tasks) */}
+        {st === "pending" && (
+          <Link
+            href="/tasks"
+            className="text-[10.5px] font-bold px-2 py-0.5 rounded-md text-[#fbbf24] bg-[rgba(251,191,36,0.16)] hover:brightness-125"
+          >
+            ⚠ responder
+          </Link>
+        )}
+        {t.url && (
+          <a
+            href={t.url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[10.5px] font-bold px-2 py-0.5 rounded-md text-[#9a93b3] bg-white/5 hover:text-white"
+          >
+            #{t.number}
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AgentColumn({
   agent,
   color,
@@ -750,6 +845,13 @@ function AgentColumn({
         <span
           className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-md"
           style={{ color: pill.color, background: `${pill.color}1f` }}
+          title={
+            !agent.enabled
+              ? "desativado na Agenda (enabled=false)"
+              : busy
+                ? "tem claim/dispatch ativo"
+                : "ativo e ocioso"
+          }
         >
           {pill.label}
         </span>
@@ -758,49 +860,44 @@ function AgentColumn({
         {tasks.length === 0 && (
           <div className="text-[#6b6485] text-xs px-1 py-2">Sem tasks ativas.</div>
         )}
-        {tasks.map((t) => {
-          const st = statusByRef.get(t.source_ref) ?? "unknown";
-          const border = GROUP_BORDER[statusGroup(st)];
-          const done = st === "done";
-          return (
-            <div
-              key={t.source_ref}
-              className="rounded-xl px-3.5 py-3 bg-white/5 border border-white/10 hover:bg-[rgba(168,85,247,0.06)] transition-colors"
-              style={{ borderLeft: `3px solid ${border}` }}
-            >
-              <div
-                className={`text-[13.5px] font-semibold mb-2 ${
-                  done ? "line-through text-[#9a93b3]" : ""
-                }`}
-              >
-                {t.title ?? `#${t.number}`}
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {t.project && (
-                  <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-md text-[#38bdf8] bg-[rgba(56,189,248,0.12)]">
-                    {t.project.replace(/^hmtrack-/, "")}
-                  </span>
-                )}
-                <span
-                  className="text-[10.5px] font-bold px-2 py-0.5 rounded-md"
-                  style={{ color: border, background: `${border}1f` }}
-                >
-                  {STATUS_LABEL[st]}
-                </span>
-                {t.url && (
-                  <a
-                    href={t.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10.5px] font-bold px-2 py-0.5 rounded-md text-[#9a93b3] bg-white/5 hover:text-white"
-                  >
-                    #{t.number}
-                  </a>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {tasks.map((t) => (
+          <TaskCard key={t.source_ref} task={t} statusByRef={statusByRef} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function QueueColumn({
+  tasks,
+  statusByRef,
+}: {
+  tasks: CoordTask[];
+  statusByRef: Map<string, TaskStatus>;
+}): React.ReactNode {
+  return (
+    <div className="rounded-2xl backdrop-blur-md border border-[rgba(56,189,248,0.35)] bg-[rgba(20,14,38,0.6)] overflow-hidden">
+      <div className="px-4 py-4 flex items-center gap-3 border-b border-[rgba(56,189,248,0.35)]">
+        <div
+          className="w-9 h-9 rounded-xl grid place-items-center text-base"
+          style={{ background: "rgba(56,189,248,0.15)" }}
+        >
+          📋
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-bold truncate">Fila — não atribuídas</div>
+          <div className="text-xs text-[#9a93b3] truncate">
+            tasks visíveis sem agente ativo
+          </div>
+        </div>
+        <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-md text-[#38bdf8] bg-[rgba(56,189,248,0.12)]">
+          {tasks.length}
+        </span>
+      </div>
+      <div className="p-3.5 flex flex-col gap-3 max-h-[640px] overflow-auto">
+        {tasks.map((t) => (
+          <TaskCard key={t.source_ref} task={t} statusByRef={statusByRef} />
+        ))}
       </div>
     </div>
   );
