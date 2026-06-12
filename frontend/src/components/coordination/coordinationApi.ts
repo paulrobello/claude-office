@@ -279,6 +279,12 @@ export interface CoordOpenPrsByProject {
   repo: string;
   project: string;
   count: number;
+  /** Agente QA que analisa o PR deste projeto (do roster). */
+  reviewer: string | null;
+  reviewer_cron: string | null;
+  /** Previsão do início da próxima análise (próximo tick do cron do QA), ISO. */
+  next_review_at: string | null;
+  next_review_in_min: number | null;
   prs: CoordOpenPr[];
 }
 export interface CoordOpenPrs {

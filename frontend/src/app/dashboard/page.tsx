@@ -804,6 +804,28 @@ export default function DashboardPage(): React.ReactNode {
 
 /* ---------------- subcomponentes ---------------- */
 
+/** "há 5min" / "há 2h" / "há 3d" a partir de um ISO. */
+function fmtAgo(iso: string): string {
+  if (!iso) return "";
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "";
+  const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (s < 60) return "agora";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `há ${m}min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `há ${h}h`;
+  return `há ${Math.floor(h / 24)}d`;
+}
+
+/** HH:MM local de um ISO (ou "—"). */
+function fmtClock(iso: string | null): string {
+  if (!iso) return "—";
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return "—";
+  return dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
 function PrModal({
   data,
   onClose,
@@ -850,12 +872,32 @@ function PrModal({
           <div className="space-y-4">
             {groups.map((g) => (
               <div key={g.repo}>
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-1">
                   <span className="text-[#e8e4f3] font-semibold">{g.project}</span>
                   <span className="text-[#6b6485] text-xs">{g.repo}</span>
                   <span className="ml-auto text-[#22d3ee] font-bold text-sm">
                     {g.count}
                   </span>
+                </div>
+                {/* QA reviewer + previsão da próxima análise (próximo tick do cron) */}
+                <div className="text-[11px] text-[#9a93b3] mb-2 flex items-center gap-1.5 flex-wrap">
+                  <span>
+                    🔍 análise:{" "}
+                    <span className="text-[#c4b5fd]">{g.reviewer ?? "—"}</span>
+                  </span>
+                  {g.reviewer && (
+                    <>
+                      <span className="text-[#6b6485]">·</span>
+                      <span>
+                        início ~
+                        <span className="text-[#34d399]">
+                          {fmtClock(g.next_review_at)}
+                        </span>
+                        {typeof g.next_review_in_min === "number" &&
+                          ` (em ${g.next_review_in_min}min)`}
+                      </span>
+                    </>
+                  )}
                 </div>
                 <ul className="space-y-1.5">
                   {g.prs.map((pr) => (
@@ -866,8 +908,20 @@ function PrModal({
                         rel="noopener noreferrer"
                         className="block rounded-lg px-3 py-2 bg-[rgba(34,211,238,0.06)] border border-[rgba(34,211,238,0.15)] hover:border-[rgba(34,211,238,0.45)] transition text-sm"
                       >
-                        <span className="text-[#22d3ee] font-mono">#{pr.number}</span>{" "}
-                        <span className="text-[#cfc9e0]">{pr.title}</span>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[#22d3ee] font-mono">
+                            #{pr.number}
+                          </span>
+                          <span className="text-[#cfc9e0] flex-1 truncate">
+                            {pr.title}
+                          </span>
+                          <span
+                            className="text-[10px] text-[#6b6485] whitespace-nowrap"
+                            title={pr.created_at}
+                          >
+                            aberto {fmtAgo(pr.created_at)}
+                          </span>
+                        </div>
                       </a>
                     </li>
                   ))}

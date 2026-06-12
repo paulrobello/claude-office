@@ -13,6 +13,7 @@ import os
 import re
 import time
 from collections import deque
+from datetime import datetime, timedelta
 from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -842,9 +843,87 @@ _PR_REPO_TO_PROJECT: dict[str, str] = {
 _PR_CACHE: dict[str, Any] = {"at": 0.0, "data": None}
 _PR_CACHE_TTL = 45.0  # s
 
+# QA reviewers (role='qa') por repo + cron — quem analisa o PR e quando. Lido do
+# roster (:5433) a cada refresh (best-effort), pra refletir mudanças de cobertura.
+_QA_ROSTER_SQL = text(
+    "SELECT nome, projetos, cron_expr FROM agents "
+    "WHERE role='qa' AND enabled=true AND archived_at IS NULL"
+)
 
-async def _fetch_open_prs() -> dict[str, Any]:
-    """gh search prs --owner hmtrack --state open, agrupado por repo→projeto."""
+
+def _next_cron_run(cron: str, now: datetime) -> datetime | None:
+    """Próximo disparo de um cron simples (campos minuto/hora; resto '*').
+
+    Suporta os padrões do roster QA/DevOps: 'M[,M...] H[,H...] * * *' com '*'
+    em minuto/hora. Varre minuto-a-minuto até 25h à frente. None se não parsear.
+    """
+    parts = cron.split()
+    if len(parts) != 5:
+        return None
+
+    def field(spec: str, lo: int, hi: int) -> list[int] | None:
+        if spec == "*":
+            return list(range(lo, hi + 1))
+        try:
+            vals = sorted(int(x) for x in spec.split(","))
+        except ValueError:
+            return None
+        return vals if all(lo <= v <= hi for v in vals) else None
+
+    mins = field(parts[0], 0, 59)
+    hours = field(parts[1], 0, 23)
+    if not mins or not hours:
+        return None
+    t = now.replace(second=0, microsecond=0) + timedelta(minutes=1)
+    for _ in range(60 * 25):
+        if t.minute in mins and t.hour in hours:
+            return t
+        t += timedelta(minutes=1)
+    return None
+
+
+def _pr_group(
+    repo: str,
+    prs: list[dict[str, Any]],
+    qa: dict[str, tuple[str, str]],
+    now: datetime,
+) -> dict[str, Any]:
+    """Monta o grupo por projeto com QA reviewer + previsão da próxima análise."""
+    reviewer, cron = qa.get(repo, (None, None))
+    nxt = _next_cron_run(cron, now) if cron else None
+    return {
+        "repo": repo,
+        "project": _PR_REPO_TO_PROJECT.get(repo, repo),
+        "count": len(prs),
+        "reviewer": reviewer,
+        "reviewer_cron": cron,
+        "next_review_at": nxt.isoformat() if nxt else None,
+        "next_review_in_min": (
+            int((nxt - now).total_seconds() // 60) if nxt else None
+        ),
+        "prs": sorted(prs, key=lambda p: str(p.get("created_at", ""))),
+    }
+
+
+async def _qa_reviewers(db: AsyncSession) -> dict[str, tuple[str, str]]:
+    """repo → (agente QA, cron). Best-effort: {} se o roster estiver fora."""
+    out: dict[str, tuple[str, str]] = {}
+    try:
+        res = await db.execute(_QA_ROSTER_SQL)
+        for row in res.mappings():
+            cron = str(row["cron_expr"] or "")
+            nome = str(row["nome"])
+            projetos = cast("list[str]", row["projetos"] or [])
+            for repo in projetos:
+                out[str(repo)] = (nome, cron)
+    except (OperationalError, InterfaceError, DBAPIError) as exc:
+        logger.warning("open-prs: roster QA indisponível: %s", exc)
+    return out
+
+
+async def _fetch_open_prs(db: AsyncSession) -> dict[str, Any]:
+    """gh search prs --owner hmtrack --state open, agrupado por repo→projeto,
+    enriquecido com o QA reviewer + previsão da próxima análise (cron)."""
     proc = await asyncio.create_subprocess_exec(
         "gh", "search", "prs", "--owner", "hmtrack", "--state", "open",
         "--limit", "100",
@@ -868,27 +947,23 @@ async def _fetch_open_prs() -> dict[str, Any]:
                 "created_at": str(r.get("createdAt", "")),
             }
         )
+    qa = await _qa_reviewers(db)
+    now = datetime.now()
     ordered = sorted(groups.items(), key=lambda kv: (-len(kv[1]), kv[0]))
-    by_project: list[dict[str, Any]] = [
-        {
-            "repo": repo,
-            "project": _PR_REPO_TO_PROJECT.get(repo, repo),
-            "count": len(prs),
-            "prs": sorted(prs, key=lambda p: str(p.get("created_at", ""))),
-        }
-        for repo, prs in ordered
-    ]
+    by_project = [_pr_group(repo, prs, qa, now) for repo, prs in ordered]
     return {"total": len(rows), "by_project": by_project, "stale": False}
 
 
 @router.get("/open-prs")
-async def open_prs() -> dict[str, Any]:
+async def open_prs(
+    db: Annotated[AsyncSession, Depends(get_coordination_db)],
+) -> dict[str, Any]:
     now = time.monotonic()
     cached = _PR_CACHE["data"]
     if cached is not None and (now - _PR_CACHE["at"]) < _PR_CACHE_TTL:
         return {**cached, "stale": True}
     try:
-        data = await _fetch_open_prs()
+        data = await _fetch_open_prs(db)
         _PR_CACHE["data"] = data
         _PR_CACHE["at"] = now
         return data
