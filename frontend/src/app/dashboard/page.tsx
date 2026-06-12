@@ -19,11 +19,13 @@ import {
   fetchTasks,
   fetchAgents,
   fetchHitlPending,
+  fetchFlowHealth,
   answerHitl,
   type CoordDashboard,
   type CoordTask,
   type CoordAgent,
   type HitlPrompt,
+  type CoordFlowHealth,
 } from "@/components/coordination/coordinationApi";
 import {
   deriveStatus,
@@ -40,6 +42,7 @@ interface DashboardBundle {
   tasks: CoordTask[];
   agents: CoordAgent[];
   hitl: HitlPrompt[];
+  flow: CoordFlowHealth;
 }
 
 const STATUS_FILTERS = [
@@ -147,17 +150,19 @@ export default function DashboardPage(): React.ReactNode {
   const { data, loading, unavailable, error, refetch } =
     useCoordinationPoll<DashboardBundle>(
       async () => {
-        const [dashboard, tasksRes, agentsRes, hitlRes] = await Promise.all([
+        const [dashboard, tasksRes, agentsRes, hitlRes, flow] = await Promise.all([
           fetchDashboard(qs),
           fetchTasks(),
           fetchAgents(),
           fetchHitlPending(),
+          fetchFlowHealth(24),
         ]);
         return {
           dashboard,
           tasks: tasksRes.tasks,
           agents: agentsRes.agents,
           hitl: hitlRes.prompts,
+          flow,
         };
       },
       [qs],
@@ -440,6 +445,70 @@ export default function DashboardPage(): React.ReactNode {
                 ✕ Erros — {groupCounts.errors}
               </SummaryPill>
             </div>
+          </section>
+
+          {/* Saúde do fluxo autônomo (24h) */}
+          <section className="rounded-2xl p-5 mb-7 backdrop-blur-md border border-[rgba(56,189,248,0.3)] bg-[rgba(20,14,38,0.6)]">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[15px] font-bold text-[#38bdf8]">
+                ⚙ Saúde do fluxo (24h)
+              </span>
+              <span className="text-[#9a93b3] text-[12px]">
+                custo aparece quando o dispatch captura tokens (migration 014)
+              </span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div>
+                <div className="text-[#9a93b3] text-[12px]">Dispatches</div>
+                <div className="text-2xl font-bold">{data.flow.runs}</div>
+              </div>
+              <div>
+                <div className="text-[#9a93b3] text-[12px]">Sucesso</div>
+                <div className="text-2xl font-bold text-[#34d399]">
+                  {data.flow.by_status.success ?? 0}
+                </div>
+              </div>
+              <div>
+                <div className="text-[#9a93b3] text-[12px]">Erro/timeout</div>
+                <div className="text-2xl font-bold text-[#ec4899]">
+                  {(data.flow.by_status.error ?? 0) +
+                    (data.flow.by_status.timeout ?? 0)}
+                </div>
+              </div>
+              <div>
+                <div className="text-[#9a93b3] text-[12px]">Slots ativos</div>
+                <div className="text-2xl font-bold text-[#fbbf24]">
+                  {data.flow.slots_active}/3
+                </div>
+              </div>
+              <div>
+                <div className="text-[#9a93b3] text-[12px]">Custo 24h</div>
+                <div className="text-2xl font-bold text-[#a855f7]">
+                  ${data.flow.tokens.cost_usd.toFixed(2)}
+                </div>
+              </div>
+            </div>
+            {data.flow.by_agent.length > 0 && (
+              <div className="mt-4 flex flex-col gap-1">
+                <div className="text-[12px] text-[#9a93b3] mb-1">
+                  Atividade por agente
+                </div>
+                {data.flow.by_agent.slice(0, 8).map((a) => (
+                  <div
+                    key={a.agent}
+                    className="flex items-center gap-2 text-[13px]"
+                  >
+                    <span className="w-48 truncate text-[#ece9f5]">
+                      {a.agent}
+                    </span>
+                    <span className="text-[#9a93b3]">{a.runs} runs</span>
+                    <span className="ml-auto text-[#a855f7] font-mono">
+                      ${a.cost_usd.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* Alerta: tasks SEM DONO (órfãs — área sem agente executor ou sem area:*) */}

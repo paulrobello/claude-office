@@ -226,6 +226,18 @@ export const fetchRuns = (qs = ""): Promise<{ runs: CoordRun[] }> =>
 export const fetchDashboard = (qs = ""): Promise<CoordDashboard> =>
   getJson<CoordDashboard>(`/dashboard${qs}`);
 
+export interface CoordFlowHealth {
+  hours: number;
+  runs: number;
+  by_status: Record<string, number>;
+  tokens: { input: number; output: number; cost_usd: number };
+  slots_active: number;
+  by_agent: { agent: string; runs: number; cost_usd: number }[];
+}
+
+export const fetchFlowHealth = (hours = 24): Promise<CoordFlowHealth> =>
+  getJson<CoordFlowHealth>(`/flow-health?hours=${hours}`);
+
 export const fetchAgents = (qs = ""): Promise<{ agents: CoordAgent[] }> =>
   getJson<{ agents: CoordAgent[] }>(`/agents${qs}`);
 
