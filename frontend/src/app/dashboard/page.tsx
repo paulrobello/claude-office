@@ -19,6 +19,7 @@ import {
   fetchTasks,
   fetchAgents,
   fetchHitlPending,
+  answerHitl,
   type CoordDashboard,
   type CoordTask,
   type CoordAgent,
@@ -30,6 +31,7 @@ import {
   type TaskStatus,
   type TaskGroup,
 } from "@/components/coordination/taskStatus";
+import HitlAnswerModal from "@/components/coordination/HitlAnswerModal";
 
 type Period = "day" | "week" | "month";
 
@@ -138,6 +140,7 @@ export default function DashboardPage(): React.ReactNode {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [selectedPrompt, setSelectedPrompt] = useState<HitlPrompt | null>(null);
 
   const qs = useMemo(() => `?period=${period}`, [period]);
 
@@ -308,6 +311,16 @@ export default function DashboardPage(): React.ReactNode {
       .filter((t) => !shown.has(t.source_ref));
     return { columns, queue };
   }, [data, projectFilter, search, taskVisible, filterActive]);
+
+  // clicar "responder" numa task pending: abre o modal HITL se houver prompt no DB
+  // (canal hitl_prompts → web); senão (label hitl sem prompt) cai na issue.
+  const onRespond = (t: CoordTask): void => {
+    const p = data?.hitl.find(
+      (h) => h.source_ref === t.source_ref && h.status === "pending",
+    );
+    if (p) setSelectedPrompt(p);
+    else if (t.url) window.open(t.url, "_blank");
+  };
 
   return (
     <main
@@ -639,10 +652,15 @@ export default function DashboardPage(): React.ReactNode {
                 color={color}
                 tasks={tasks}
                 statusByRef={statusByRef}
+                onRespond={onRespond}
               />
             ))}
             {boardData.queue.length > 0 && (
-              <QueueColumn tasks={boardData.queue} statusByRef={statusByRef} />
+              <QueueColumn
+                tasks={boardData.queue}
+                statusByRef={statusByRef}
+                onRespond={onRespond}
+              />
             )}
             {boardData.columns.length === 0 && boardData.queue.length === 0 && (
               <div className="text-[#6b6485] text-sm">
@@ -652,6 +670,17 @@ export default function DashboardPage(): React.ReactNode {
           </section>
         </>
       )}
+
+      {/* Modal HITL inline (mesmo do /tasks): responder/aprovar sem sair do dashboard */}
+      <HitlAnswerModal
+        key={selectedPrompt?.id ?? "none"}
+        prompt={selectedPrompt}
+        onClose={() => setSelectedPrompt(null)}
+        onSubmit={async (id, answer) => {
+          await answerHitl(id, answer);
+          await refetch();
+        }}
+      />
     </main>
   );
 }
@@ -752,9 +781,11 @@ function SectionTitle({
 function TaskCard({
   task: t,
   statusByRef,
+  onRespond,
 }: {
   task: CoordTask;
   statusByRef: Map<string, TaskStatus>;
+  onRespond: (t: CoordTask) => void;
 }): React.ReactNode {
   const st = statusByRef.get(t.source_ref) ?? "unknown";
   const border = GROUP_BORDER[statusGroup(st)];
@@ -783,14 +814,14 @@ function TaskCard({
         >
           {STATUS_LABEL[st]}
         </span>
-        {/* HITL: task esperando sua decisão → atalho pra responder (modal vive em /tasks) */}
+        {/* HITL: task esperando sua decisão → abre o modal de resposta inline */}
         {st === "pending" && (
-          <Link
-            href="/tasks"
+          <button
+            onClick={() => onRespond(t)}
             className="text-[10.5px] font-bold px-2 py-0.5 rounded-md text-[#fbbf24] bg-[rgba(251,191,36,0.16)] hover:brightness-125"
           >
             ⚠ responder
-          </Link>
+          </button>
         )}
         {t.url && (
           <a
@@ -812,11 +843,13 @@ function AgentColumn({
   color,
   tasks,
   statusByRef,
+  onRespond,
 }: {
   agent: CoordAgent;
   color: string;
   tasks: CoordTask[];
   statusByRef: Map<string, TaskStatus>;
+  onRespond: (t: CoordTask) => void;
 }): React.ReactNode {
   const busy = agent.active_claims > 0 || Boolean(agent.current_ref);
   const pill = !agent.enabled
@@ -861,7 +894,12 @@ function AgentColumn({
           <div className="text-[#6b6485] text-xs px-1 py-2">Sem tasks ativas.</div>
         )}
         {tasks.map((t) => (
-          <TaskCard key={t.source_ref} task={t} statusByRef={statusByRef} />
+          <TaskCard
+            key={t.source_ref}
+            task={t}
+            statusByRef={statusByRef}
+            onRespond={onRespond}
+          />
         ))}
       </div>
     </div>
@@ -871,9 +909,11 @@ function AgentColumn({
 function QueueColumn({
   tasks,
   statusByRef,
+  onRespond,
 }: {
   tasks: CoordTask[];
   statusByRef: Map<string, TaskStatus>;
+  onRespond: (t: CoordTask) => void;
 }): React.ReactNode {
   return (
     <div className="rounded-2xl backdrop-blur-md border border-[rgba(56,189,248,0.35)] bg-[rgba(20,14,38,0.6)] overflow-hidden">
@@ -896,7 +936,12 @@ function QueueColumn({
       </div>
       <div className="p-3.5 flex flex-col gap-3 max-h-[640px] overflow-auto">
         {tasks.map((t) => (
-          <TaskCard key={t.source_ref} task={t} statusByRef={statusByRef} />
+          <TaskCard
+            key={t.source_ref}
+            task={t}
+            statusByRef={statusByRef}
+            onRespond={onRespond}
+          />
         ))}
       </div>
     </div>
