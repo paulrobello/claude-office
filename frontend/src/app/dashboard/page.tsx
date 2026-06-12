@@ -58,6 +58,33 @@ function colorFor(name: string): string {
   return NEON[Math.abs(h) % NEON.length];
 }
 
+/** Projeto (em agent.projetos) → label area:*. Espelha o mapa do dev-loop. */
+const PROJECT_TO_AREA: Record<string, string> = {
+  "hmtrack-front": "area:front",
+  "hmtrack-api-py": "area:api",
+  "hmtrack-trackers": "area:trackers",
+  "hmtrack-alert-system": "area:alert-system",
+  "hmtrack-app": "area:mobile",
+  HMTrackApp: "area:mobile",
+  "banco-dados": "area:db",
+  "hmtrack-documentacao": "area:db",
+  "hmtrack-whatsapp": "area:whatsapp",
+  "claude-office": "area:office",
+};
+
+/** Papéis que NÃO executam (coordenam) — não contam como "dono" de uma área. */
+const COORDINATION_ROLES = new Set([
+  "office-manager",
+  "triador",
+  "qa",
+  "devops",
+]);
+
+/** Labels area:* de uma task (pode ter mais de uma). */
+function taskAreas(t: CoordTask): string[] {
+  return t.labels.filter((l) => l.startsWith("area:"));
+}
+
 function initials(name: string): string {
   const clean = name.replace(/^Agent[e]?\s*[·-]?\s*/i, "").replace(/^hmtrack-/i, "");
   const parts = clean.split(/[\s_-]+/).filter(Boolean);
@@ -186,6 +213,51 @@ export default function DashboardPage(): React.ReactNode {
     };
   }, [statusByRef, statusFilter, projectFilter, search]);
 
+  // há filtro ativo? (esconde colunas de agente sem fila quando sim)
+  const filterActive =
+    statusFilter !== "all" || projectFilter !== "all" || search.trim() !== "";
+
+  // áreas COBERTAS = têm agente executor ativo (papel não-coordenação).
+  const coveredAreas = useMemo(() => {
+    const s = new Set<string>();
+    if (!data) return s;
+    for (const a of data.agents) {
+      if (!a.enabled || a.archived_at) continue;
+      if (COORDINATION_ROLES.has(a.role)) continue;
+      for (const p of a.projetos) {
+        const area = PROJECT_TO_AREA[p];
+        if (area) s.add(area);
+      }
+    }
+    return s;
+  }, [data]);
+
+  // órfãs = task sem agente executor: sem area:* OU área não-coberta.
+  // (issues fechadas/parked/epic não contam — só trabalho vivo.)
+  const orphans = useMemo(() => {
+    if (!data) return [] as CoordTask[];
+    return data.tasks.filter((t) => {
+      const st = statusByRef.get(t.source_ref) ?? "unknown";
+      if (st === "done") return false;
+      if (t.labels.includes("epic")) return false;
+      const areas = taskAreas(t);
+      if (areas.length === 0) return true; // sem area:* nenhuma
+      return !areas.some((a) => coveredAreas.has(a)); // nenhuma área coberta
+    });
+  }, [data, statusByRef, coveredAreas]);
+
+  const orphansByArea = useMemo(() => {
+    const m = new Map<string, CoordTask[]>();
+    for (const t of orphans) {
+      const areas = taskAreas(t);
+      const key = areas[0] ?? "(sem área)";
+      const arr = m.get(key);
+      if (arr) arr.push(t);
+      else m.set(key, [t]);
+    }
+    return [...m.entries()].sort((a, b) => b[1].length - a[1].length);
+  }, [orphans]);
+
   return (
     <main
       className="min-h-screen text-[#ece9f5] px-6 pb-16 pt-6"
@@ -305,6 +377,52 @@ export default function DashboardPage(): React.ReactNode {
               </SummaryPill>
             </div>
           </section>
+
+          {/* Alerta: tasks SEM DONO (órfãs — área sem agente executor ou sem area:*) */}
+          {orphans.length > 0 && (
+            <section className="rounded-2xl p-5 mb-7 backdrop-blur-md border bg-[rgba(251,191,36,0.06)] border-[rgba(251,191,36,0.4)]">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-[#fbbf24] text-lg">⚠</span>
+                <span className="text-[15px] font-bold text-[#fbbf24]">
+                  {orphans.length} task(s) sem dono
+                </span>
+                <span className="text-[#9a93b3] text-[13px]">
+                  — área sem agente executor (ninguém puxa) ou sem `area:*`. Precisa
+                  re-triagem ou agente.
+                </span>
+              </div>
+              <div className="flex flex-col gap-2">
+                {orphansByArea.map(([area, list]) => (
+                  <div key={area} className="flex items-start gap-2.5 flex-wrap">
+                    <span
+                      className="text-[11px] font-bold px-2 py-1 rounded-md shrink-0 text-[#fbbf24] bg-[rgba(251,191,36,0.14)]"
+                    >
+                      {area} · {list.length}
+                    </span>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {list.slice(0, 12).map((t) => (
+                        <a
+                          key={t.source_ref}
+                          href={t.url ?? "#"}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={t.title ?? ""}
+                          className="text-[11px] px-2 py-1 rounded-md bg-white/5 text-[#9a93b3] hover:text-white border border-white/10"
+                        >
+                          #{t.number}
+                        </a>
+                      ))}
+                      {list.length > 12 && (
+                        <span className="text-[11px] text-[#9a93b3] px-1 py-1">
+                          +{list.length - 12}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Toolbar */}
           <section className="flex items-center gap-3.5 mb-6 flex-wrap">
@@ -474,23 +592,26 @@ export default function DashboardPage(): React.ReactNode {
                   !search ||
                   a.nome.toLowerCase().includes(search.toLowerCase()),
               )
-              .map((a) => {
-                const c = colorFor(a.nome);
-                const myTasks = data.tasks
+              .map((a) => ({
+                a,
+                c: colorFor(a.nome),
+                myTasks: data.tasks
                   .filter(
                     (t) => t.claim_agent === a.nome || t.run_agent === a.nome,
                   )
-                  .filter(taskVisible);
-                return (
-                  <AgentColumn
-                    key={a.nome}
-                    agent={a}
-                    color={c}
-                    tasks={myTasks}
-                    statusByRef={statusByRef}
-                  />
-                );
-              })}
+                  .filter(taskVisible),
+              }))
+              // com filtro ativo, só mostra quem TEM fila (esconde colunas vazias)
+              .filter(({ myTasks }) => !filterActive || myTasks.length > 0)
+              .map(({ a, c, myTasks }) => (
+                <AgentColumn
+                  key={a.nome}
+                  agent={a}
+                  color={c}
+                  tasks={myTasks}
+                  statusByRef={statusByRef}
+                />
+              ))}
           </section>
         </>
       )}
