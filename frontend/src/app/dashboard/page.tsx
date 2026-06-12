@@ -478,7 +478,7 @@ export default function DashboardPage(): React.ReactNode {
               <div>
                 <div className="text-[#9a93b3] text-[12px]">Slots ativos</div>
                 <div className="text-2xl font-bold text-[#fbbf24]">
-                  {data.flow.slots_active}/3
+                  {data.flow.slots_active}/6
                 </div>
               </div>
               <div>
