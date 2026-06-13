@@ -33,7 +33,6 @@ import {
   type TaskStatus,
 } from "@/components/coordination/taskStatus";
 import {
-  STATUS_FACET_ORDER,
   areaKeysOf,
   agentKeysOf,
   buildAreaToAgents,
@@ -47,6 +46,7 @@ import {
   type TaskFilters,
   type FacetName,
 } from "@/components/coordination/taskFilters";
+import { TaskFilterBar } from "@/components/coordination/TaskFilterBar";
 
 /** Mark do GitHub inline (lucide removeu ícones de marca nesta versão). */
 function GithubMark({ size = 18 }: { size?: number }): React.ReactNode {
@@ -664,49 +664,6 @@ export default function TasksPage(): React.ReactNode {
     );
   };
 
-  // Uma faceta = um bloco de checkboxes (OR dentro; AND entre facetas).
-  const renderFacet = (
-    facet: FacetName,
-    titleKey: TranslationKey,
-    options: { value: string; label: string }[],
-    selectedSet: Set<string>,
-    countMap: Record<string, number>,
-  ) => {
-    if (options.length === 0) return null;
-    return (
-      <div className="flex flex-col gap-1">
-        <span className="text-[11px] uppercase tracking-wide font-bold text-slate-500">
-          {tr(titleKey)}
-        </span>
-        <div className="flex flex-wrap gap-1.5">
-          {options.map(({ value, label }) => {
-            const on = selectedSet.has(value);
-            const n = countMap[value] ?? 0;
-            return (
-              <label
-                key={value}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-bold border cursor-pointer transition-colors ${
-                  on
-                    ? "bg-sky-500/20 text-sky-200 border-sky-500/50"
-                    : "bg-slate-800 text-slate-300 border-slate-700 hover:border-slate-500"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  className="w-3.5 h-3.5"
-                  checked={on}
-                  onChange={() => onToggleFacet(facet, value)}
-                />
-                {label}
-                <span className="text-slate-500">{n}</span>
-              </label>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <main className="min-h-screen bg-neutral-950 text-slate-200 p-4">
       <div className="flex items-center justify-between mb-3">
@@ -785,50 +742,15 @@ export default function TasksPage(): React.ReactNode {
             {" · "}
             <span>{groups.queue.length} na fila</span>
           </div>
-          <div className="flex flex-col gap-2 mb-3 p-3 rounded-lg border border-slate-800 bg-slate-900/40">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-extrabold text-slate-300">
-                {tr("tasks.filter.title")}
-              </span>
-              {filterCount > 0 && (
-                <button
-                  onClick={clearFilters}
-                  className="text-xs font-bold text-slate-400 hover:text-white"
-                >
-                  ✕ {tr("tasks.filter.clear")} ({filterCount})
-                </button>
-              )}
-            </div>
-            {renderFacet(
-              "status",
-              "tasks.filter.status",
-              STATUS_FACET_ORDER.map((k) => ({
-                value: k,
-                label: tr(`tasks.facet.${k}` as TranslationKey),
-              })),
-              filters.status,
-              counts.status,
-            )}
-            {renderFacet(
-              "area",
-              "tasks.filter.area",
-              areaOptions.map((a) => ({ value: a, label: a })),
-              filters.area,
-              counts.area,
-            )}
-            {renderFacet(
-              "agent",
-              "tasks.filter.agent",
-              agentOptions.map((a) => ({ value: a, label: a })),
-              filters.agent,
-              counts.agent,
-            )}
-            {!showClosed && (
-              <p className="text-[11px] text-slate-500">
-                {tr("tasks.filter.noClosedHint")}
-              </p>
-            )}
-          </div>
+          <TaskFilterBar
+            filters={filters}
+            onToggle={onToggleFacet}
+            onClear={clearFilters}
+            areaOptions={areaOptions}
+            agentOptions={agentOptions}
+            counts={counts}
+            className="mb-3"
+          />
           {errorTasks.length > 0 &&
             renderGroup("tasks.group.errors", errorTasks, "text-rose-400")}
           {(pendingTasks.length > 0 || filterCount === 0) &&

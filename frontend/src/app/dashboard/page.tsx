@@ -40,6 +40,22 @@ import {
   type TaskGroup,
 } from "@/components/coordination/taskStatus";
 import HitlAnswerModal from "@/components/coordination/HitlAnswerModal";
+import { TaskFilterBar } from "@/components/coordination/TaskFilterBar";
+import {
+  areaKeysOf,
+  agentKeysOf,
+  buildAreaToAgents,
+  matchesFilters,
+  toggleFacet,
+  emptyFilters,
+  showsClosed,
+  facetCounts,
+  filtersToQuery,
+  filtersFromQuery,
+  type TaskFilters,
+  type FacetName,
+  type StatusFacetKey,
+} from "@/components/coordination/taskFilters";
 
 type Period = "day" | "week" | "month";
 
@@ -52,14 +68,14 @@ interface DashboardBundle {
   prs: CoordOpenPrs;
 }
 
-const STATUS_FILTERS = [
-  { key: "all", label: "Todos" },
-  { key: "queue", label: "Fila" },
-  { key: "in_progress", label: "Em progresso" },
-  { key: "history", label: "Concluído" },
-  { key: "need_you", label: "Precisa de você" },
-] as const;
-type StatusFilter = (typeof STATUS_FILTERS)[number]["key"];
+/** Pills de resumo de grupo → facetas Status que cada uma liga/desliga (#828).
+ *  Clicar um pill marca/desmarca as caixas Status correspondentes na barra
+ *  (queue agrupa sem_agente/backlog/sem_dono; need_you = aguardando; etc.). */
+const PILL_STATUS_FACETS: Record<string, StatusFacetKey[]> = {
+  need_you: ["aguardando"],
+  in_progress: ["em_execucao"],
+  queue: ["sem_agente", "backlog", "sem_dono"],
+};
 
 /** Limite de "ocioso demais" pro afk sem virar wip (alerta de dev-loop travado).
  *  Configurável por NEXT_PUBLIC_IDLE_ALERT_MIN (minutos); default ~90min. */
@@ -108,17 +124,6 @@ function shortArea(area: string): string {
   return area.replace(/^area:/, "");
 }
 
-/** Projetos do agente como nomes CURTOS de área (hmtrack-front → front), pra casar
- *  com t.project que vem curto. Sem isto o filtro de projeto nunca casava agentes. */
-function agentProjectsShort(a: CoordAgent): string[] {
-  const s = new Set<string>();
-  for (const p of a.projetos) {
-    const area = PROJECT_TO_AREA[p];
-    if (area) s.add(shortArea(area));
-  }
-  return [...s];
-}
-
 function initials(name: string): string {
   const clean = name
     .replace(/^Agent[e]?\s*[·-]?\s*/i, "")
@@ -158,8 +163,15 @@ const GROUP_BORDER: Record<TaskGroup, string> = {
 
 export default function DashboardPage(): React.ReactNode {
   const [period, setPeriod] = useState<Period>("day");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [projectFilter, setProjectFilter] = useState<string>("all");
+  // Filtros multi-seleção (#818, reusados no board via #828): Status / Área /
+  // Agente. Hidrata da querystring no lazy init (client-only; SSR cai no vazio)
+  // — compartilhável + sobrevive reload. Default vazio = todo trabalho vivo,
+  // fechadas ESCONDIDAS (done não vem marcado).
+  const [filters, setFilters] = useState<TaskFilters>(() =>
+    typeof window === "undefined"
+      ? emptyFilters()
+      : filtersFromQuery(window.location.search),
+  );
   const [search, setSearch] = useState("");
   const [selectedPrompt, setSelectedPrompt] = useState<HitlPrompt | null>(null);
   const [respondingTask, setRespondingTask] = useState<CoordTask | null>(null);
@@ -177,6 +189,16 @@ export default function DashboardPage(): React.ReactNode {
     const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
     return () => window.clearInterval(id);
   }, []);
+
+  // Espelha os filtros na URL sem navegar (replaceState) — igual /tasks.
+  useEffect(() => {
+    const qs = filtersToQuery(filters);
+    window.history.replaceState(null, "", qs || window.location.pathname);
+  }, [filters]);
+
+  // Só busca as CLOSED quando "Concluída" está marcada (mesma brecha do /tasks:
+  // puxar todas as fechadas estoura o LIMIT e expulsa OPEN antigas).
+  const showClosed = showsClosed(filters);
 
   const qs = useMemo(() => `?period=${period}`, [period]);
 
@@ -204,43 +226,102 @@ export default function DashboardPage(): React.ReactNode {
       };
     }, [qs]);
 
-  // status derivado por task (uma vez)
+  // CLOSED só quando "Concluída" marcada (limite 200 nas mais recentes).
+  const { data: closedData } = useCoordinationPoll(
+    () =>
+      showClosed
+        ? fetchTasks("?state=CLOSED&limit=200")
+        : Promise.resolve({ tasks: [] as CoordTask[] }),
+    [showClosed],
+  );
+
+  const hitl = useMemo(() => data?.hitl ?? [], [data]);
+
+  // Mapa área → agentes do roster (faceta Agente: deriva "dono" pela área).
+  const areaToAgents = useMemo(
+    () => buildAreaToAgents(data?.agents ?? []),
+    [data],
+  );
+
+  // Universo: OPEN sempre + CLOSED só com "Concluída" marcada.
+  const allTasks = useMemo(
+    () => [
+      ...(data?.tasks ?? []),
+      ...(showClosed ? (closedData?.tasks ?? []) : []),
+    ],
+    [data, closedData, showClosed],
+  );
+
+  // status derivado por task (uma vez), sobre TODO o universo (inclui closed).
   const statusByRef = useMemo(() => {
     const m = new Map<string, TaskStatus>();
-    if (!data) return m;
-    for (const t of data.tasks) {
-      let st = deriveStatus(t, data.hitl);
+    for (const t of allTasks) {
+      let st = deriveStatus(t, hitl);
       // override otimista: já respondida no cockpit, mirror ainda sincronizando.
       if (st === "pending" && respondedRefs.has(t.source_ref)) st = "todo";
       m.set(t.source_ref, st);
     }
     return m;
-  }, [data, respondedRefs]);
+  }, [allTasks, hitl, respondedRefs]);
 
+  // Busca livre (complementa as facetas; some texto não casado do board/fila).
+  const searchMatch = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return (t: CoordTask): boolean => {
+      if (!q) return true;
+      const hay =
+        `${t.title ?? ""} ${t.project ?? ""} #${t.number}`.toLowerCase();
+      return hay.includes(q);
+    };
+  }, [search]);
+
+  // Aplica as 3 facetas (AND entre facetas, OR dentro) + busca. Alimenta board,
+  // fila e contadores — stats/saúde/PRs do topo seguem sendo agregados de período.
+  const filtered = useMemo(
+    () =>
+      allTasks.filter(
+        (t) => matchesFilters(t, hitl, filters, areaToAgents) && searchMatch(t),
+      ),
+    [allTasks, hitl, filters, areaToAgents, searchMatch],
+  );
+
+  // Opções das facetas Projeto/Área e Agente, derivadas dos dados (data-driven).
+  const areaOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const t of allTasks) for (const a of areaKeysOf(t)) s.add(a);
+    return [...s].sort();
+  }, [allTasks]);
+  const agentOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const t of allTasks)
+      for (const a of agentKeysOf(t, areaToAgents)) s.add(a);
+    return [...s].sort();
+  }, [allTasks, areaToAgents]);
+
+  // Contadores por opção (respeitam as OUTRAS facetas marcadas).
+  const counts = useMemo(
+    () => ({
+      status: facetCounts("status", allTasks, hitl, filters, areaToAgents),
+      area: facetCounts("area", allTasks, hitl, filters, areaToAgents),
+      agent: facetCounts("agent", allTasks, hitl, filters, areaToAgents),
+    }),
+    [allTasks, hitl, filters, areaToAgents],
+  );
+
+  // Contadores de grupo dos pills de resumo — sobre o conjunto FILTRADO, pra
+  // pills e board baterem (issue #828: "pills de resumo respeitam os filtros").
   const groupCounts = useMemo(() => {
     const c = { need_you: 0, in_progress: 0, queue: 0, history: 0 };
     let errors = 0;
     let pending = 0;
-    if (data) {
-      for (const t of data.tasks) {
-        const st = statusByRef.get(t.source_ref) ?? "unknown";
-        c[statusGroup(st)] += 1;
-        if (st === "error") errors += 1;
-        if (st === "pending") pending += 1;
-      }
+    for (const t of filtered) {
+      const st = statusByRef.get(t.source_ref) ?? "unknown";
+      c[statusGroup(st)] += 1;
+      if (st === "error") errors += 1;
+      if (st === "pending") pending += 1;
     }
     return { ...c, errors, pending };
-  }, [data, statusByRef]);
-
-  // chips de projeto = nomes CURTOS canônicos vindos de t.project (db, front, ...).
-  // (Não misturar com a.projetos, que vem cheio — causava chips duplicados e filtro
-  // que não casava.)
-  const projects = useMemo(() => {
-    if (!data) return [] as string[];
-    const set = new Set<string>();
-    for (const t of data.tasks) if (t.project) set.add(t.project);
-    return [...set].sort();
-  }, [data]);
+  }, [filtered, statusByRef]);
 
   const agentsActive = useMemo(
     () =>
@@ -265,26 +346,32 @@ export default function DashboardPage(): React.ReactNode {
     [data],
   );
 
-  // tasks visíveis dado o filtro de status/projeto/busca
-  const taskVisible = useMemo(() => {
-    return (t: CoordTask): boolean => {
-      const st = statusByRef.get(t.source_ref) ?? "unknown";
-      if (statusFilter !== "all" && statusGroup(st) !== statusFilter)
-        return false;
-      if (projectFilter !== "all" && t.project !== projectFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        const hay =
-          `${t.title ?? ""} ${t.project ?? ""} #${t.number}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    };
-  }, [statusByRef, statusFilter, projectFilter, search]);
-
   // há filtro ativo? (esconde colunas de agente sem fila quando sim)
   const filterActive =
-    statusFilter !== "all" || projectFilter !== "all" || search.trim() !== "";
+    filters.status.size > 0 ||
+    filters.area.size > 0 ||
+    filters.agent.size > 0 ||
+    search.trim() !== "";
+
+  // Toggle de uma caixa de faceta (#818) → re-renderiza board/fila/contadores.
+  const onToggleFacet = (facet: FacetName, value: string): void =>
+    setFilters((f) => toggleFacet(f, facet, value));
+  const clearFilters = (): void => setFilters(emptyFilters());
+  // Pill de grupo (Precisa de você / Em andamento / Fila): liga/desliga as
+  // facetas Status mapeadas. Ativo = todas as caixas do grupo marcadas.
+  const pillActive = (group: keyof typeof PILL_STATUS_FACETS): boolean =>
+    PILL_STATUS_FACETS[group].every((k) => filters.status.has(k));
+  const togglePill = (group: keyof typeof PILL_STATUS_FACETS): void =>
+    setFilters((f) => {
+      const keys = PILL_STATUS_FACETS[group];
+      const allOn = keys.every((k) => f.status.has(k));
+      const status = new Set(f.status);
+      for (const k of keys) {
+        if (allOn) status.delete(k);
+        else status.add(k);
+      }
+      return { ...f, status, area: new Set(f.area), agent: new Set(f.agent) };
+    });
 
   // áreas COBERTAS = têm agente executor ativo (papel não-coordenação).
   const coveredAreas = useMemo(() => {
@@ -304,8 +391,7 @@ export default function DashboardPage(): React.ReactNode {
   // órfãs = task sem agente executor: sem area:* OU área não-coberta.
   // (issues fechadas/parked/epic não contam — só trabalho vivo.)
   const orphans = useMemo(() => {
-    if (!data) return [] as CoordTask[];
-    return data.tasks.filter((t) => {
+    return filtered.filter((t) => {
       const st = statusByRef.get(t.source_ref) ?? "unknown";
       if (st === "done") return false;
       if (t.labels.includes("epic")) return false;
@@ -313,7 +399,7 @@ export default function DashboardPage(): React.ReactNode {
       if (areas.length === 0) return true; // sem area:* nenhuma
       return !areas.some((a) => coveredAreas.has(a)); // nenhuma área coberta
     });
-  }, [data, statusByRef, coveredAreas]);
+  }, [filtered, statusByRef, coveredAreas]);
 
   const orphansByArea = useMemo(() => {
     const m = new Map<string, CoordTask[]>();
@@ -329,20 +415,17 @@ export default function DashboardPage(): React.ReactNode {
 
   // Backlog (someday/longo prazo): tasks com label `backlogs` — fora da fila ativa.
   const backlogTasks = useMemo(() => {
-    if (!data) return [] as CoordTask[];
-    return data.tasks
+    return filtered
       .filter((t) => statusByRef.get(t.source_ref) === "backlog")
       .sort((a, b) => a.number - b.number);
-  }, [data, statusByRef]);
+  }, [filtered, statusByRef]);
 
   // Sem agente (afk ocioso): OPEN ∧ afk ∧ sem wip/claim ∧ sem parked/backlogs/epic
   // — pronto pro dispatch, só esperando o próximo ciclo do cron do dev-loop.
   // (deriveStatus já aplica a regra; aqui só filtra status === sem_agente.)
   // Os mais ociosos (overdue) vão pro topo; depois por tempo ocioso desc.
   const semAgenteTasks = useMemo(() => {
-    if (!data)
-      return [] as { task: CoordTask; idleMs: number; overdue: boolean }[];
-    const rows = data.tasks
+    const rows = filtered
       .filter((t) => statusByRef.get(t.source_ref) === "sem_agente")
       .map((t) => {
         const iso = idleSince(t);
@@ -354,7 +437,7 @@ export default function DashboardPage(): React.ReactNode {
       (a, b) => Number(b.overdue) - Number(a.overdue) || b.idleMs - a.idleMs,
     );
     return rows;
-  }, [data, statusByRef, nowMs]);
+  }, [filtered, statusByRef, nowMs]);
 
   const semAgenteOverdue = useMemo(
     () => semAgenteTasks.filter((r) => r.overdue).length,
@@ -364,6 +447,8 @@ export default function DashboardPage(): React.ReactNode {
   // board: colunas por agente (tasks atribuídas) + coluna FILA (visíveis SEM agente).
   // A maioria das tasks não tem claim/run agent (ou tem 'cron:...'/nome divergente)
   // → sem a fila, sumiam. Aqui toda task visível aparece em algum lugar.
+  // A faceta Agente filtra as COLUNAS (marcar agentes esconde os demais); Status/
+  // Área filtram as tasks DENTRO (via `filtered`).
   const boardData = useMemo(() => {
     const empty = {
       columns: [] as { agent: CoordAgent; color: string; tasks: CoordTask[] }[],
@@ -373,27 +458,21 @@ export default function DashboardPage(): React.ReactNode {
     const shown = new Set<string>();
     const columns = data.agents
       .filter((a) => !a.archived_at)
-      .filter(
-        (a) =>
-          projectFilter === "all" ||
-          agentProjectsShort(a).includes(projectFilter),
-      )
+      .filter((a) => filters.agent.size === 0 || filters.agent.has(a.nome))
       .filter(
         (a) => !search || a.nome.toLowerCase().includes(search.toLowerCase()),
       )
       .map((a) => {
-        const tasks = data.tasks
-          .filter((t) => t.claim_agent === a.nome || t.run_agent === a.nome)
-          .filter(taskVisible);
+        const tasks = filtered.filter(
+          (t) => t.claim_agent === a.nome || t.run_agent === a.nome,
+        );
         for (const t of tasks) shown.add(t.source_ref);
         return { agent: a, color: colorFor(a.nome), tasks };
       })
       .filter(({ tasks }) => !filterActive || tasks.length > 0);
-    const queue = data.tasks
-      .filter(taskVisible)
-      .filter((t) => !shown.has(t.source_ref));
+    const queue = filtered.filter((t) => !shown.has(t.source_ref));
     return { columns, queue };
-  }, [data, projectFilter, search, taskVisible, filterActive]);
+  }, [data, filtered, filters.agent, search, filterActive]);
 
   // clicar "responder" numa task pending: abre o modal HITL se houver prompt no DB
   // (canal hitl_prompts → web); senão (label hitl sem prompt) cai na issue.
@@ -536,32 +615,22 @@ export default function DashboardPage(): React.ReactNode {
             </div>
             <div className="flex gap-2.5 flex-wrap">
               <SummaryPill
-                active={statusFilter === "need_you"}
-                onClick={() =>
-                  setStatusFilter((s) =>
-                    s === "need_you" ? "all" : "need_you",
-                  )
-                }
+                active={pillActive("need_you")}
+                onClick={() => togglePill("need_you")}
                 color="#fbbf24"
               >
                 ⚠ Precisa de você ({groupCounts.need_you})
               </SummaryPill>
               <SummaryPill
-                active={statusFilter === "in_progress"}
-                onClick={() =>
-                  setStatusFilter((s) =>
-                    s === "in_progress" ? "all" : "in_progress",
-                  )
-                }
+                active={pillActive("in_progress")}
+                onClick={() => togglePill("in_progress")}
                 color="#38bdf8"
               >
                 ⚙ Em andamento ({groupCounts.in_progress})
               </SummaryPill>
               <SummaryPill
-                active={statusFilter === "queue"}
-                onClick={() =>
-                  setStatusFilter((s) => (s === "queue" ? "all" : "queue"))
-                }
+                active={pillActive("queue")}
+                onClick={() => togglePill("queue")}
                 color="#9a93b3"
               >
                 🧱 Fila ({groupCounts.queue})
@@ -664,9 +733,10 @@ export default function DashboardPage(): React.ReactNode {
             )}
           </section>
 
-          {/* Toolbar */}
-          <section className="flex items-center gap-3.5 mb-6 flex-wrap">
-            <div className="flex items-center gap-2 flex-1 min-w-[220px] max-w-[360px] rounded-xl px-4 py-2.5 border border-[rgba(168,85,247,0.25)] bg-white/5">
+          {/* Toolbar: busca livre + barra de filtros multi-seleção (#828, reusa
+              TaskFilterBar do /tasks → Status/Área/Agente, OR-intra/AND-entre). */}
+          <section className="flex flex-col gap-3.5 mb-6">
+            <div className="flex items-center gap-2 max-w-[360px] rounded-xl px-4 py-2.5 border border-[rgba(168,85,247,0.25)] bg-white/5">
               <Search size={15} className="text-[#9a93b3]" />
               <input
                 value={search}
@@ -675,36 +745,14 @@ export default function DashboardPage(): React.ReactNode {
                 className="bg-transparent outline-none text-sm w-full placeholder:text-[#9a93b3]"
               />
             </div>
-            <div className="flex gap-2 items-center">
-              <span className="text-[#9a93b3] text-[13px]">Status:</span>
-              {STATUS_FILTERS.map((f) => (
-                <Chip
-                  key={f.key}
-                  active={statusFilter === f.key}
-                  onClick={() => setStatusFilter(f.key)}
-                >
-                  {f.label}
-                </Chip>
-              ))}
-            </div>
-            <div className="flex gap-2 items-center">
-              <span className="text-[#9a93b3] text-[13px]">Projeto:</span>
-              <Chip
-                active={projectFilter === "all"}
-                onClick={() => setProjectFilter("all")}
-              >
-                Todos
-              </Chip>
-              {projects.map((p) => (
-                <Chip
-                  key={p}
-                  active={projectFilter === p}
-                  onClick={() => setProjectFilter(p)}
-                >
-                  {p.replace(/^hmtrack-/, "")}
-                </Chip>
-              ))}
-            </div>
+            <TaskFilterBar
+              filters={filters}
+              onToggle={onToggleFacet}
+              onClear={clearFilters}
+              areaOptions={areaOptions}
+              agentOptions={agentOptions}
+              counts={counts}
+            />
           </section>
 
           {/* Projetos */}
@@ -1420,29 +1468,6 @@ function SummaryPill({
         borderColor: active ? color : "rgba(168,85,247,0.25)",
         boxShadow: active ? `0 0 14px ${color}55` : undefined,
       }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Chip({
-  children,
-  active,
-  onClick,
-}: {
-  children: React.ReactNode;
-  active: boolean;
-  onClick: () => void;
-}): React.ReactNode {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-lg px-3.5 py-2 text-[13px] font-semibold border transition-colors ${
-        active
-          ? "text-white bg-[rgba(168,85,247,0.15)] border-[#a855f7] shadow-[0_0_14px_rgba(168,85,247,0.4)]"
-          : "text-[#9a93b3] bg-white/5 border-[rgba(168,85,247,0.25)] hover:text-white hover:border-[#a855f7]"
-      }`}
     >
       {children}
     </button>
