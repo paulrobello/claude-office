@@ -9,7 +9,7 @@
  * (board por agente) num único poll combinado.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, RefreshCw, Search, Building2 } from "lucide-react";
 import { CoordinationNav } from "@/components/coordination/CoordinationNav";
@@ -33,6 +33,9 @@ import {
 import {
   deriveStatus,
   statusGroup,
+  idleSince,
+  formatStuckTime,
+  DEFAULT_IDLE_ALERT_MS,
   type TaskStatus,
   type TaskGroup,
 } from "@/components/coordination/taskStatus";
@@ -57,6 +60,13 @@ const STATUS_FILTERS = [
   { key: "need_you", label: "Precisa de você" },
 ] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number]["key"];
+
+/** Limite de "ocioso demais" pro afk sem virar wip (alerta de dev-loop travado).
+ *  Configurável por NEXT_PUBLIC_IDLE_ALERT_MIN (minutos); default ~90min. */
+const IDLE_ALERT_MS = (() => {
+  const min = Number(process.env.NEXT_PUBLIC_IDLE_ALERT_MIN);
+  return min > 0 ? min * 60_000 : DEFAULT_IDLE_ALERT_MS;
+})();
 
 /** Paleta neon (espelha as --neon-* do mockup). */
 const NEON = ["#a855f7", "#38bdf8", "#ec4899", "#34d399", "#fbbf24"];
@@ -110,7 +120,9 @@ function agentProjectsShort(a: CoordAgent): string[] {
 }
 
 function initials(name: string): string {
-  const clean = name.replace(/^Agent[e]?\s*[·-]?\s*/i, "").replace(/^hmtrack-/i, "");
+  const clean = name
+    .replace(/^Agent[e]?\s*[·-]?\s*/i, "")
+    .replace(/^hmtrack-/i, "");
   const parts = clean.split(/[\s_-]+/).filter(Boolean);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return clean.slice(0, 2).toUpperCase();
@@ -127,6 +139,7 @@ function fmtBucket(iso: string, period: Period): string {
 const STATUS_LABEL: Record<TaskStatus, string> = {
   open: "Sem label",
   todo: "To-Do",
+  sem_agente: "Sem agente",
   pending: "Precisa de você",
   waiting_agent: "Aguardando agente",
   running: "Em progresso",
@@ -156,32 +169,40 @@ export default function DashboardPage(): React.ReactNode {
   const [showPrs, setShowPrs] = useState(false);
   const [showBacklog, setShowBacklog] = useState(false);
   const [showOrphans, setShowOrphans] = useState(false);
+  const [showSemAgente, setShowSemAgente] = useState(false);
+  // nowMs em estado (lazy init, não Date.now() em render — regra react-hooks/
+  // purity); o intervalo faz o "tempo ocioso" do Sem-agente avançar sozinho.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const qs = useMemo(() => `?period=${period}`, [period]);
 
   const { data, loading, unavailable, error, refetch } =
-    useCoordinationPoll<DashboardBundle>(
-      async () => {
-        const [dashboard, tasksRes, agentsRes, hitlRes, flow, prs] =
-          await Promise.all([
-            fetchDashboard(qs),
-            fetchTasks(),
-            fetchAgents(),
-            fetchHitlPending(),
-            fetchFlowHealth(24),
-            fetchOpenPrs(),
-          ]);
-        return {
-          dashboard,
-          tasks: tasksRes.tasks,
-          agents: agentsRes.agents,
-          hitl: hitlRes.prompts,
-          flow,
-          prs,
-        };
-      },
-      [qs],
-    );
+    useCoordinationPoll<DashboardBundle>(async () => {
+      const [dashboard, tasksRes, agentsRes, hitlRes, flow, prs] =
+        await Promise.all([
+          fetchDashboard(qs),
+          // Só OPEN: buscar todos os estados deixava as 513 CLOSED estourarem o
+          // LIMIT 200 e expulsarem issues OPEN antigas (mesma brecha já corrigida
+          // no /tasks) → contadores Sem-agente/Backlog/Sem-dono não batiam.
+          fetchTasks("?state=OPEN"),
+          fetchAgents(),
+          fetchHitlPending(),
+          fetchFlowHealth(24),
+          fetchOpenPrs(),
+        ]);
+      return {
+        dashboard,
+        tasks: tasksRes.tasks,
+        agents: agentsRes.agents,
+        hitl: hitlRes.prompts,
+        flow,
+        prs,
+      };
+    }, [qs]);
 
   // status derivado por task (uma vez)
   const statusByRef = useMemo(() => {
@@ -222,7 +243,8 @@ export default function DashboardPage(): React.ReactNode {
   }, [data]);
 
   const agentsActive = useMemo(
-    () => (data ? data.agents.filter((a) => a.enabled && !a.archived_at).length : 0),
+    () =>
+      data ? data.agents.filter((a) => a.enabled && !a.archived_at).length : 0,
     [data],
   );
 
@@ -247,11 +269,13 @@ export default function DashboardPage(): React.ReactNode {
   const taskVisible = useMemo(() => {
     return (t: CoordTask): boolean => {
       const st = statusByRef.get(t.source_ref) ?? "unknown";
-      if (statusFilter !== "all" && statusGroup(st) !== statusFilter) return false;
+      if (statusFilter !== "all" && statusGroup(st) !== statusFilter)
+        return false;
       if (projectFilter !== "all" && t.project !== projectFilter) return false;
       if (search) {
         const q = search.toLowerCase();
-        const hay = `${t.title ?? ""} ${t.project ?? ""} #${t.number}`.toLowerCase();
+        const hay =
+          `${t.title ?? ""} ${t.project ?? ""} #${t.number}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -310,6 +334,32 @@ export default function DashboardPage(): React.ReactNode {
       .filter((t) => statusByRef.get(t.source_ref) === "backlog")
       .sort((a, b) => a.number - b.number);
   }, [data, statusByRef]);
+
+  // Sem agente (afk ocioso): OPEN ∧ afk ∧ sem wip/claim ∧ sem parked/backlogs/epic
+  // — pronto pro dispatch, só esperando o próximo ciclo do cron do dev-loop.
+  // (deriveStatus já aplica a regra; aqui só filtra status === sem_agente.)
+  // Os mais ociosos (overdue) vão pro topo; depois por tempo ocioso desc.
+  const semAgenteTasks = useMemo(() => {
+    if (!data)
+      return [] as { task: CoordTask; idleMs: number; overdue: boolean }[];
+    const rows = data.tasks
+      .filter((t) => statusByRef.get(t.source_ref) === "sem_agente")
+      .map((t) => {
+        const iso = idleSince(t);
+        const ms = iso ? nowMs - Date.parse(iso) : 0;
+        const idleMs = Number.isNaN(ms) || ms < 0 ? 0 : ms;
+        return { task: t, idleMs, overdue: idleMs >= IDLE_ALERT_MS };
+      });
+    rows.sort(
+      (a, b) => Number(b.overdue) - Number(a.overdue) || b.idleMs - a.idleMs,
+    );
+    return rows;
+  }, [data, statusByRef, nowMs]);
+
+  const semAgenteOverdue = useMemo(
+    () => semAgenteTasks.filter((r) => r.overdue).length,
+    [semAgenteTasks],
+  );
 
   // board: colunas por agente (tasks atribuídas) + coluna FILA (visíveis SEM agente).
   // A maioria das tasks não tem claim/run agent (ou tem 'cron:...'/nome divergente)
@@ -429,11 +479,32 @@ export default function DashboardPage(): React.ReactNode {
         <>
           {/* Stat cards */}
           <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-5 mb-7">
-            <StatCard label="Agentes ativos" value={agentsActive} accent="#a855f7" glow />
-            <StatCard label="Em progresso" value={groupCounts.in_progress} accent="#38bdf8" />
-            <StatCard label="Na fila" value={groupCounts.queue} accent="#ec4899" />
-            <StatCard label="Concluídas hoje" value={closedToday} accent="#34d399" />
-            <StatCard label="Precisa de você" value={groupCounts.need_you} accent="#fbbf24" />
+            <StatCard
+              label="Agentes ativos"
+              value={agentsActive}
+              accent="#a855f7"
+              glow
+            />
+            <StatCard
+              label="Em progresso"
+              value={groupCounts.in_progress}
+              accent="#38bdf8"
+            />
+            <StatCard
+              label="Na fila"
+              value={groupCounts.queue}
+              accent="#ec4899"
+            />
+            <StatCard
+              label="Concluídas hoje"
+              value={closedToday}
+              accent="#34d399"
+            />
+            <StatCard
+              label="Precisa de você"
+              value={groupCounts.need_you}
+              accent="#fbbf24"
+            />
             <StatCard
               label="PRs abertos ↗"
               value={data.prs.total}
@@ -445,17 +516,31 @@ export default function DashboardPage(): React.ReactNode {
           {/* Summary bar */}
           <section className="rounded-2xl p-5 mb-7 backdrop-blur-md border border-[rgba(168,85,247,0.25)] bg-[rgba(20,14,38,0.6)]">
             <div className="text-sm text-[#9a93b3] mb-3.5 flex items-center gap-1.5 flex-wrap">
-              <b className="text-white">{data.dashboard.github.open} abertas</b> ={" "}
-              <span className="text-[#ec4899] font-bold">{groupCounts.errors} erros</span> ·{" "}
-              <span className="text-[#fbbf24] font-bold">{groupCounts.pending} precisa de você</span> ·{" "}
-              <span className="text-[#38bdf8] font-bold">{groupCounts.in_progress} em andamento</span> ·{" "}
-              <span className="text-[#9a93b3] font-bold">{groupCounts.queue} na fila</span>
+              <b className="text-white">{data.dashboard.github.open} abertas</b>{" "}
+              ={" "}
+              <span className="text-[#ec4899] font-bold">
+                {groupCounts.errors} erros
+              </span>{" "}
+              ·{" "}
+              <span className="text-[#fbbf24] font-bold">
+                {groupCounts.pending} precisa de você
+              </span>{" "}
+              ·{" "}
+              <span className="text-[#38bdf8] font-bold">
+                {groupCounts.in_progress} em andamento
+              </span>{" "}
+              ·{" "}
+              <span className="text-[#9a93b3] font-bold">
+                {groupCounts.queue} na fila
+              </span>
             </div>
             <div className="flex gap-2.5 flex-wrap">
               <SummaryPill
                 active={statusFilter === "need_you"}
                 onClick={() =>
-                  setStatusFilter((s) => (s === "need_you" ? "all" : "need_you"))
+                  setStatusFilter((s) =>
+                    s === "need_you" ? "all" : "need_you",
+                  )
                 }
                 color="#fbbf24"
               >
@@ -464,7 +549,9 @@ export default function DashboardPage(): React.ReactNode {
               <SummaryPill
                 active={statusFilter === "in_progress"}
                 onClick={() =>
-                  setStatusFilter((s) => (s === "in_progress" ? "all" : "in_progress"))
+                  setStatusFilter((s) =>
+                    s === "in_progress" ? "all" : "in_progress",
+                  )
                 }
                 color="#38bdf8"
               >
@@ -472,13 +559,29 @@ export default function DashboardPage(): React.ReactNode {
               </SummaryPill>
               <SummaryPill
                 active={statusFilter === "queue"}
-                onClick={() => setStatusFilter((s) => (s === "queue" ? "all" : "queue"))}
+                onClick={() =>
+                  setStatusFilter((s) => (s === "queue" ? "all" : "queue"))
+                }
                 color="#9a93b3"
               >
                 🧱 Fila ({groupCounts.queue})
               </SummaryPill>
-              <SummaryPill active={false} onClick={() => void refetch()} color="#ec4899">
+              <SummaryPill
+                active={false}
+                onClick={() => void refetch()}
+                color="#ec4899"
+              >
                 ✕ Erros — {groupCounts.errors}
+              </SummaryPill>
+              <SummaryPill
+                active={showSemAgente}
+                onClick={() => setShowSemAgente((s) => !s)}
+                color={semAgenteOverdue > 0 ? "#ec4899" : "#c084fc"}
+              >
+                {semAgenteOverdue > 0 ? "🔴" : "🕒"} Sem agente (
+                {semAgenteTasks.length}
+                {semAgenteOverdue > 0 ? ` · ${semAgenteOverdue} parada(s)` : ""}
+                )
               </SummaryPill>
               <SummaryPill
                 active={showBacklog}
@@ -586,7 +689,10 @@ export default function DashboardPage(): React.ReactNode {
             </div>
             <div className="flex gap-2 items-center">
               <span className="text-[#9a93b3] text-[13px]">Projeto:</span>
-              <Chip active={projectFilter === "all"} onClick={() => setProjectFilter("all")}>
+              <Chip
+                active={projectFilter === "all"}
+                onClick={() => setProjectFilter("all")}
+              >
                 Todos
               </Chip>
               {projects.map((p) => (
@@ -609,8 +715,13 @@ export default function DashboardPage(): React.ReactNode {
               const agentsOnIt = data.agents.filter((a) =>
                 a.projetos.includes(p.project),
               );
-              const total = data.dashboard.openByProject.reduce((s, x) => s + x.n, 0);
-              const pct = total ? Math.round((p.n / Math.max(1, maxBucket * 2)) * 100) : 0;
+              const total = data.dashboard.openByProject.reduce(
+                (s, x) => s + x.n,
+                0,
+              );
+              const pct = total
+                ? Math.round((p.n / Math.max(1, maxBucket * 2)) * 100)
+                : 0;
               return (
                 <div
                   key={p.project}
@@ -649,7 +760,9 @@ export default function DashboardPage(): React.ReactNode {
               );
             })}
             {data.dashboard.openByProject.length === 0 && (
-              <p className="text-[#6b6485] text-sm">Sem projetos com issues abertas.</p>
+              <p className="text-[#6b6485] text-sm">
+                Sem projetos com issues abertas.
+              </p>
             )}
           </section>
 
@@ -672,7 +785,10 @@ export default function DashboardPage(): React.ReactNode {
                       }`}
                       style={
                         period === p
-                          ? { background: "linear-gradient(135deg,#38bdf8,#2563eb)" }
+                          ? {
+                              background:
+                                "linear-gradient(135deg,#38bdf8,#2563eb)",
+                            }
                           : undefined
                       }
                     >
@@ -709,7 +825,9 @@ export default function DashboardPage(): React.ReactNode {
                       }}
                     />
                   </div>
-                  <span className="text-[13px] font-bold text-right">{b.n}</span>
+                  <span className="text-[13px] font-bold text-right">
+                    {b.n}
+                  </span>
                 </div>
               ))}
             </div>
@@ -765,9 +883,7 @@ export default function DashboardPage(): React.ReactNode {
         onClose={() => setRespondingTask(null)}
         onDone={async () => {
           if (respondingTask)
-            setRespondedRefs((p) =>
-              new Set(p).add(respondingTask.source_ref),
-            );
+            setRespondedRefs((p) => new Set(p).add(respondingTask.source_ref));
           setRespondingTask(null);
           await refetch();
         }}
@@ -778,8 +894,20 @@ export default function DashboardPage(): React.ReactNode {
         <PrModal data={data?.prs ?? null} onClose={() => setShowPrs(false)} />
       )}
 
+      {showSemAgente && (
+        <SemAgenteModal
+          rows={semAgenteTasks}
+          overdue={semAgenteOverdue}
+          nowMs={nowMs}
+          onClose={() => setShowSemAgente(false)}
+        />
+      )}
+
       {showBacklog && (
-        <BacklogModal tasks={backlogTasks} onClose={() => setShowBacklog(false)} />
+        <BacklogModal
+          tasks={backlogTasks}
+          onClose={() => setShowBacklog(false)}
+        />
       )}
 
       {showOrphans && (
@@ -882,7 +1010,9 @@ function OrphansModal({
                           rel="noopener noreferrer"
                           className="flex items-baseline gap-2 rounded-lg px-3 py-2 bg-[rgba(251,191,36,0.06)] border border-[rgba(251,191,36,0.15)] hover:border-[rgba(251,191,36,0.45)] transition text-sm"
                         >
-                          <span className="text-[#fbbf24] font-mono">#{t.number}</span>
+                          <span className="text-[#fbbf24] font-mono">
+                            #{t.number}
+                          </span>
                           <span className="text-[#cfc9e0] flex-1 truncate">
                             {t.title}
                           </span>
@@ -949,8 +1079,12 @@ function BacklogModal({
                     rel="noopener noreferrer"
                     className="flex items-baseline gap-2 rounded-lg px-3 py-2 bg-[rgba(180,140,40,0.06)] border border-[rgba(180,140,40,0.15)] hover:border-[rgba(180,140,40,0.45)] transition text-sm"
                   >
-                    <span className="text-[#d4af37] font-mono">#{t.number}</span>
-                    <span className="text-[#cfc9e0] flex-1 truncate">{t.title}</span>
+                    <span className="text-[#d4af37] font-mono">
+                      #{t.number}
+                    </span>
+                    <span className="text-[#cfc9e0] flex-1 truncate">
+                      {t.title}
+                    </span>
                     {areas.map((a) => (
                       <span
                         key={a}
@@ -962,6 +1096,131 @@ function BacklogModal({
                     {t.labels.includes("hitl") && (
                       <span className="text-[10px] text-[#fbbf24] whitespace-nowrap">
                         hitl
+                      </span>
+                    )}
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SemAgenteModal({
+  rows,
+  overdue,
+  nowMs,
+  onClose,
+}: {
+  rows: { task: CoordTask; idleMs: number; overdue: boolean }[];
+  overdue: number;
+  nowMs: number;
+  onClose: () => void;
+}): React.ReactNode {
+  const accent = overdue > 0 ? "236,72,153" : "192,132,252";
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className={`w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-2xl border bg-[rgba(20,14,38,0.97)] p-6`}
+        style={{
+          borderColor: `rgba(${accent},0.4)`,
+          boxShadow: `0 0 40px rgba(${accent},0.2)`,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-lg font-bold text-[#e8e4f3]">
+            🕒 Sem agente{" "}
+            <span style={{ color: `rgb(${accent})` }}>{rows.length}</span>
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-[#9a93b3] hover:text-white text-xl leading-none"
+            aria-label="Fechar"
+          >
+            ×
+          </button>
+        </div>
+        <p className="text-[#9a93b3] text-xs mb-4">
+          afk ocioso — pronto pro dispatch, esperando o próximo ciclo do
+          dev-loop.
+          {overdue > 0 && (
+            <>
+              {" "}
+              <span className="text-[#ec4899] font-semibold">
+                {overdue} parada(s) há tempo demais
+              </span>{" "}
+              — dev-loop possivelmente travado ou sem slot.
+            </>
+          )}
+        </p>
+
+        {rows.length === 0 ? (
+          <p className="text-[#9a93b3] text-sm py-6 text-center">
+            Nenhuma task ociosa. 🎉
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-1.5">
+            {rows.map(({ task: t, overdue: od }) => {
+              const areas = taskAreas(t);
+              const idle = formatStuckTime(idleSince(t), nowMs, IDLE_ALERT_MS);
+              const num = t.source_ref.replace(/^agents-ia#/, "");
+              return (
+                <li key={t.source_ref}>
+                  <a
+                    href={
+                      t.url ??
+                      `https://github.com/IsakielSouza/agents-ia/issues/${num}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-baseline gap-2 rounded-lg px-3 py-2 border transition text-sm"
+                    style={{
+                      background: od
+                        ? "rgba(236,72,153,0.08)"
+                        : "rgba(192,132,252,0.06)",
+                      borderColor: od
+                        ? "rgba(236,72,153,0.4)"
+                        : "rgba(192,132,252,0.15)",
+                    }}
+                  >
+                    <span
+                      className="font-mono"
+                      style={{ color: od ? "#ec4899" : "#c084fc" }}
+                    >
+                      #{t.number}
+                    </span>
+                    <span className="text-[#cfc9e0] flex-1 truncate">
+                      {t.title}
+                    </span>
+                    {areas.length > 0 ? (
+                      areas.map((a) => (
+                        <span
+                          key={a}
+                          className="text-[10px] text-[#9a93b3] border border-[rgba(168,85,247,0.25)] rounded px-1.5 py-0.5 whitespace-nowrap"
+                        >
+                          {shortArea(a)}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-[10px] text-[#6b6485] whitespace-nowrap">
+                        (sem área)
+                      </span>
+                    )}
+                    {idle.label && (
+                      <span
+                        className="text-[11px] font-semibold whitespace-nowrap"
+                        style={{ color: od ? "#ec4899" : "#9a93b3" }}
+                        title="tempo ocioso (desde o último release de wip / virou afk)"
+                      >
+                        {idle.label}
+                        {od ? " 🔴" : ""}
                       </span>
                     )}
                   </a>
@@ -996,7 +1255,10 @@ function PrModal({
           <h2 className="text-lg font-bold text-[#e8e4f3]">
             PRs abertos{" "}
             <span className="text-[#22d3ee]">{data?.total ?? 0}</span>
-            <span className="text-[#9a93b3] text-sm font-normal"> · por projeto</span>
+            <span className="text-[#9a93b3] text-sm font-normal">
+              {" "}
+              · por projeto
+            </span>
           </h2>
           <button
             onClick={onClose}
@@ -1022,7 +1284,9 @@ function PrModal({
             {groups.map((g) => (
               <div key={g.repo}>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[#e8e4f3] font-semibold">{g.project}</span>
+                  <span className="text-[#e8e4f3] font-semibold">
+                    {g.project}
+                  </span>
                   <span className="text-[#6b6485] text-xs">{g.repo}</span>
                   <span className="ml-auto text-[#22d3ee] font-bold text-sm">
                     {g.count}
@@ -1126,7 +1390,10 @@ function StatCard({
       style={glow ? { boxShadow: "0 0 22px rgba(168,85,247,0.25)" } : undefined}
     >
       <div className="text-[#9a93b3] text-[13px] mb-2.5">{label}</div>
-      <div className="text-[34px] font-bold leading-none" style={{ color: accent }}>
+      <div
+        className="text-[34px] font-bold leading-none"
+        style={{ color: accent }}
+      >
         {value}
       </div>
     </div>
@@ -1313,7 +1580,9 @@ function AgentColumn({
       </div>
       <div className="p-3.5 flex flex-col gap-3">
         {tasks.length === 0 && (
-          <div className="text-[#6b6485] text-xs px-1 py-2">Sem tasks ativas.</div>
+          <div className="text-[#6b6485] text-xs px-1 py-2">
+            Sem tasks ativas.
+          </div>
         )}
         {tasks.map((t) => (
           <TaskCard
@@ -1347,7 +1616,9 @@ function QueueColumn({
           📋
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold truncate">Fila — não atribuídas</div>
+          <div className="text-sm font-bold truncate">
+            Fila — não atribuídas
+          </div>
           <div className="text-xs text-[#9a93b3] truncate">
             tasks visíveis sem agente ativo
           </div>

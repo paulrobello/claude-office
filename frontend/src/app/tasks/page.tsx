@@ -54,6 +54,7 @@ const STATUS_COLOR: Record<TaskStatus, string> = {
   running: "text-sky-400",
   waiting_agent: "text-sky-300",
   todo: "text-slate-200",
+  sem_agente: "text-fuchsia-300",
   open: "text-slate-400",
   done: "text-emerald-400",
   backlog: "text-yellow-600",
@@ -69,8 +70,10 @@ function stuckSince(t: CoordTask, status: TaskStatus): string | null {
 }
 
 function agentModel(t: CoordTask, status: TaskStatus): string {
-  const agent = status === "error" ? t.run_agent : (t.claim_agent ?? t.run_agent);
-  const model = status === "error" ? t.run_model : (t.claim_model ?? t.run_model);
+  const agent =
+    status === "error" ? t.run_agent : (t.claim_agent ?? t.run_agent);
+  const model =
+    status === "error" ? t.run_model : (t.claim_model ?? t.run_model);
   if (!agent) return "";
   return model ? `${agent} · ${model}` : agent;
 }
@@ -280,14 +283,17 @@ export default function TasksPage(): React.ReactNode {
     }
     markProcessing(ref, true);
     try {
-      if (act.kind === "answer" && prompt) await answerHitl(prompt.id, act.value);
+      if (act.kind === "answer" && prompt)
+        await answerHitl(prompt.id, act.value);
       else if (act.kind === "relabel") await approveTask(ref);
       setResolved((s) => new Set(s).add(ref)); // some da lista AGORA
       setFeedback(`#${t.number} aprovada`);
       void refetchHitl();
       void refetch();
     } catch (e) {
-      setFeedback(`#${t.number} falhou: ${e instanceof Error ? e.message : "erro"}`);
+      setFeedback(
+        `#${t.number} falhou: ${e instanceof Error ? e.message : "erro"}`,
+      );
     } finally {
       markProcessing(ref, false);
     }
@@ -360,14 +366,17 @@ export default function TasksPage(): React.ReactNode {
     });
     setFeedback(
       `Aprovadas: ${answered + relabeled} (${relabeled} liberadas, ${answered} respondidas)` +
-        (manual ? ` · ${manual} precisam de decisão individual (abra os detalhes)` : ""),
+        (manual
+          ? ` · ${manual} precisam de decisão individual (abra os detalhes)`
+          : ""),
     );
     void refetchHitl();
     void refetch();
   };
   const onBatchSkip = async () => {
     const n = selected.size;
-    for (const ref of Array.from(selected)) await setTaskPriority(ref, "bottom");
+    for (const ref of Array.from(selected))
+      await setTaskPriority(ref, "bottom");
     setFeedback(`${n} despriorizada(s)`);
     setSelected(new Set());
     await refetch();
@@ -427,11 +436,15 @@ export default function TasksPage(): React.ReactNode {
             )}
           </div>
         </div>
-        <div className={`text-sm font-bold w-44 shrink-0 ${STATUS_COLOR[status]}`}>
+        <div
+          className={`text-sm font-bold w-44 shrink-0 ${STATUS_COLOR[status]}`}
+        >
           {tr(`tasks.status.${status}` as TranslationKey)}
           {stuck.label && (
             <span
-              className={stuck.overdue ? "text-rose-400 ml-1" : "text-slate-500 ml-1"}
+              className={
+                stuck.overdue ? "text-rose-400 ml-1" : "text-slate-500 ml-1"
+              }
             >
               {" "}
               · {stuck.label}
@@ -470,7 +483,9 @@ export default function TasksPage(): React.ReactNode {
                   ↻ {tr("tasks.retry")}
                 </button>
               )}
-              {(status === "todo" || status === "open") && (
+              {(status === "todo" ||
+                status === "open" ||
+                status === "sem_agente") && (
                 <>
                   <button
                     onClick={() => onPrioritize(t.source_ref)}
@@ -551,7 +566,9 @@ export default function TasksPage(): React.ReactNode {
         )}
         <div className="border border-slate-800 rounded-lg overflow-hidden">
           {tasks.length === 0 ? (
-            <p className="px-3 py-4 text-slate-600 text-sm">{tr("tasks.empty")}</p>
+            <p className="px-3 py-4 text-slate-600 text-sm">
+              {tr("tasks.empty")}
+            </p>
           ) : (
             tasks.map((t, i) => renderRow(t, numbered ? i + 1 : undefined))
           )}
@@ -600,7 +617,9 @@ export default function TasksPage(): React.ReactNode {
           Erro ao carregar: {error}
         </div>
       )}
-      {loading && !data && <p className="text-slate-500 text-sm">Carregando…</p>}
+      {loading && !data && (
+        <p className="text-slate-500 text-sm">Carregando…</p>
+      )}
 
       {feedback && (
         <div className="mb-3 px-3 py-2 rounded bg-sky-500/10 border border-sky-500/30 text-sky-200 text-sm flex items-center justify-between">

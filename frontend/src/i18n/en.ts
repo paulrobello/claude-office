@@ -272,6 +272,7 @@ const en = {
   "tasks.status.running": "Running",
   "tasks.status.waiting_agent": "Waiting for agent",
   "tasks.status.todo": "To do",
+  "tasks.status.sem_agente": "No agent",
   "tasks.status.open": "OPEN / New",
   "tasks.status.unknown": "Undefined",
   "tasks.needYouBadge": "Needs you",

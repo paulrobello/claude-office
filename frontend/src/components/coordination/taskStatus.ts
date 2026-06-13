@@ -3,6 +3,7 @@ import type { CoordTask, HitlPrompt } from "./coordinationApi";
 export type TaskStatus =
   | "open"
   | "todo"
+  | "sem_agente"
   | "pending"
   | "waiting_agent"
   | "running"
@@ -28,7 +29,8 @@ export function deriveStatus(
   if (task.labels.includes("backlogs")) return "backlog";
 
   const claim = task.claim_status;
-  if (claim === "in_progress" || task.run_status === "running") return "running";
+  if (claim === "in_progress" || task.run_status === "running")
+    return "running";
 
   const hasPendingPrompt = hitlPrompts.some(
     (p) => p.source_ref === task.source_ref && p.status === "pending",
@@ -41,6 +43,14 @@ export function deriveStatus(
     return "error";
 
   if (task.state === "OPEN") {
+    // "Sem agente" (afk ocioso): pronto pro dispatch, só esperando o cron do
+    // dev-loop. Fonte de verdade do "tem agente ativo" = label wip + claim em
+    // work_claims (:5433) — ambos já excluídos acima (running/waiting_agent),
+    // mas um label `wip` órfão (race, claim caiu) ainda pode estar presente, então
+    // checamos explicitamente. `epic` é guarda-chuva, não vai pro dispatch.
+    const hasAfk = task.labels.includes("afk");
+    const blocked = task.labels.includes("wip") || task.labels.includes("epic");
+    if (hasAfk && !blocked) return "sem_agente";
     return task.labels.some((l) => AREA_LABEL.test(l)) ? "todo" : "open";
   }
   return "unknown";
@@ -54,6 +64,7 @@ export function statusGroup(status: TaskStatus): TaskGroup {
     case "running":
     case "waiting_agent":
       return "in_progress";
+    case "sem_agente":
     case "todo":
     case "open":
     case "unknown":
@@ -110,7 +121,8 @@ export function formatStuckTime(
 ): StuckTime {
   if (!iso) return { label: "", overdue: false };
   const elapsed = nowMs - Date.parse(iso);
-  if (Number.isNaN(elapsed) || elapsed < 0) return { label: "", overdue: false };
+  if (Number.isNaN(elapsed) || elapsed < 0)
+    return { label: "", overdue: false };
   const min = Math.floor(elapsed / 60_000);
   const hours = Math.floor(min / 60);
   const days = Math.floor(hours / 24);
@@ -133,3 +145,14 @@ export function needYouCount(
 
 /** Limite padrão de SLA antes de marcar como atrasado: 4h. */
 export const DEFAULT_SLA_MS = 4 * 3600_000;
+
+/** Limite padrão de "ocioso demais" pro afk não despachado: ~3 ciclos do
+ *  dev-loop (~90min). Acima disso = dev-loop possivelmente travado/sem slot. */
+export const DEFAULT_IDLE_ALERT_MS = 90 * 60_000;
+
+/** Desde quando uma task "sem agente" está ociosa: o último release de wip
+ *  (run terminado) se houve run, senão a última transição de label (afk entrou).
+ *  source_updated_at é o melhor proxy disponível pra "virou afk". */
+export function idleSince(t: CoordTask): string | null {
+  return t.run_ended_at ?? t.source_updated_at;
+}

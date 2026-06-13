@@ -10,6 +10,8 @@ import {
   queueRank,
   formatStuckTime,
   needYouCount,
+  idleSince,
+  DEFAULT_IDLE_ALERT_MS,
 } from "../src/components/coordination/taskStatus";
 
 const baseTask = (over: Partial<CoordTask>): CoordTask => ({
@@ -58,16 +60,18 @@ describe("deriveStatus", () => {
     expect(deriveStatus(baseTask({ state: "CLOSED" }), [])).toBe("done");
   });
   it("label parked → done (removida da fila, sai do vivo)", () => {
-    expect(deriveStatus(baseTask({ labels: ["parked", "area:trackers"] }), [])).toBe(
-      "done",
-    );
+    expect(
+      deriveStatus(baseTask({ labels: ["parked", "area:trackers"] }), []),
+    ).toBe("done");
   });
   it("claim in_progress → running (precede pendente)", () => {
     const t = baseTask({ claim_status: "in_progress", labels: ["hitl"] });
     expect(deriveStatus(t, [pendingPrompt(t.source_ref)])).toBe("running");
   });
   it("run running → running", () => {
-    expect(deriveStatus(baseTask({ run_status: "running" }), [])).toBe("running");
+    expect(deriveStatus(baseTask({ run_status: "running" }), [])).toBe(
+      "running",
+    );
   });
   it("prompt HITL pendente → pending", () => {
     const t = baseTask({});
@@ -87,8 +91,26 @@ describe("deriveStatus", () => {
   it("run timeout → error", () => {
     expect(deriveStatus(baseTask({ run_status: "timeout" }), [])).toBe("error");
   });
-  it("OPEN triada (afk) sem claim → todo", () => {
-    expect(deriveStatus(baseTask({ labels: ["afk"] }), [])).toBe("todo");
+  it("OPEN afk ocioso (sem wip/claim) → sem_agente", () => {
+    expect(deriveStatus(baseTask({ labels: ["afk"] }), [])).toBe("sem_agente");
+  });
+  it("OPEN afk + area:* (sem wip/claim) → sem_agente", () => {
+    expect(deriveStatus(baseTask({ labels: ["afk", "area:office"] }), [])).toBe(
+      "sem_agente",
+    );
+  });
+  it("OPEN afk + epic → todo (epic é guarda-chuva, fora do dispatch)", () => {
+    expect(
+      deriveStatus(baseTask({ labels: ["afk", "epic", "area:office"] }), []),
+    ).toBe("todo");
+  });
+  it("OPEN afk + label wip órfão → todo (não conta como sem-agente)", () => {
+    expect(deriveStatus(baseTask({ labels: ["afk", "wip"] }), [])).toBe("todo");
+  });
+  it("OPEN com area:* mas SEM afk → todo (não é sem-agente)", () => {
+    expect(deriveStatus(baseTask({ labels: ["area:office"] }), [])).toBe(
+      "todo",
+    );
   });
   it("OPEN sem label de área → open", () => {
     expect(deriveStatus(baseTask({ labels: [] }), [])).toBe("open");
@@ -104,9 +126,10 @@ describe("statusGroup", () => {
     expect(statusGroup("running")).toBe("in_progress");
     expect(statusGroup("waiting_agent")).toBe("in_progress");
   });
-  it("todo e open → queue", () => {
+  it("todo, open e sem_agente → queue", () => {
     expect(statusGroup("todo")).toBe("queue");
     expect(statusGroup("open")).toBe("queue");
+    expect(statusGroup("sem_agente")).toBe("queue");
   });
   it("done → history", () => {
     expect(statusGroup("done")).toBe("history");
@@ -156,9 +179,9 @@ describe("formatStuckTime", () => {
     expect(r.overdue).toBe(false);
   });
   it("horas", () => {
-    expect(formatStuckTime("2026-06-01T10:00:00Z", now, 4 * 3600_000).label).toBe(
-      "2h",
-    );
+    expect(
+      formatStuckTime("2026-06-01T10:00:00Z", now, 4 * 3600_000).label,
+    ).toBe("2h");
   });
   it("dias + overdue quando passa do limite", () => {
     const r = formatStuckTime("2026-05-31T06:00:00Z", now, 4 * 3600_000);
@@ -170,6 +193,27 @@ describe("formatStuckTime", () => {
       label: "",
       overdue: false,
     });
+  });
+});
+
+describe("idleSince (tempo ocioso do sem-agente)", () => {
+  it("usa o último release de wip (run_ended_at) quando houve run", () => {
+    const t = baseTask({
+      labels: ["afk"],
+      run_ended_at: "2026-06-01T10:00:00Z",
+      source_updated_at: "2026-06-01T09:00:00Z",
+    });
+    expect(idleSince(t)).toBe("2026-06-01T10:00:00Z");
+  });
+  it("cai pra source_updated_at quando nunca rodou", () => {
+    const t = baseTask({
+      labels: ["afk"],
+      source_updated_at: "2026-06-01T08:00:00Z",
+    });
+    expect(idleSince(t)).toBe("2026-06-01T08:00:00Z");
+  });
+  it("threshold padrão de ocioso = 90min", () => {
+    expect(DEFAULT_IDLE_ALERT_MS).toBe(90 * 60_000);
   });
 });
 

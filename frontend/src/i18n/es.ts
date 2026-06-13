@@ -274,6 +274,7 @@ const es: Record<TranslationKey, string> = {
   "tasks.status.running": "En ejecución",
   "tasks.status.waiting_agent": "Esperando agente",
   "tasks.status.todo": "Por hacer",
+  "tasks.status.sem_agente": "Sin agente",
   "tasks.status.open": "OPEN / Nueva",
   "tasks.status.unknown": "Indefinido",
   "tasks.needYouBadge": "Te necesita",

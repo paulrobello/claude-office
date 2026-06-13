@@ -274,6 +274,7 @@ const ptBR: Record<TranslationKey, string> = {
   "tasks.status.running": "Em execução",
   "tasks.status.waiting_agent": "Aguardando agente",
   "tasks.status.todo": "A fazer",
+  "tasks.status.sem_agente": "Sem agente",
   "tasks.status.open": "OPEN / Nova",
   "tasks.status.unknown": "Indefinido",
   "tasks.needYouBadge": "Precisa de você",
