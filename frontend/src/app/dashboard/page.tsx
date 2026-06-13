@@ -56,6 +56,7 @@ import {
   type FacetName,
   type StatusFacetKey,
 } from "@/components/coordination/taskFilters";
+import { PROJECT_TO_AREA_LABEL } from "@/components/coordination/projectArea";
 
 type Period = "day" | "week" | "month";
 
@@ -92,20 +93,6 @@ function colorFor(name: string): string {
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
   return NEON[Math.abs(h) % NEON.length];
 }
-
-/** Projeto (em agent.projetos) → label area:*. Espelha o mapa do dev-loop. */
-const PROJECT_TO_AREA: Record<string, string> = {
-  "hmtrack-front": "area:front",
-  "hmtrack-api-py": "area:api",
-  "hmtrack-trackers": "area:trackers",
-  "hmtrack-alert-system": "area:alert-system",
-  "hmtrack-app": "area:mobile",
-  HMTrackApp: "area:mobile",
-  "banco-dados": "area:db",
-  "hmtrack-documentacao": "area:db",
-  "hmtrack-whatsapp": "area:whatsapp",
-  "claude-office": "area:office",
-};
 
 /** Papéis que NÃO executam (coordenam) — não contam como "dono" de uma área. */
 const COORDINATION_ROLES = new Set([
@@ -381,7 +368,7 @@ export default function DashboardPage(): React.ReactNode {
       if (!a.enabled || a.archived_at) continue;
       if (COORDINATION_ROLES.has(a.role)) continue;
       for (const p of a.projetos) {
-        const area = PROJECT_TO_AREA[p];
+        const area = PROJECT_TO_AREA_LABEL[p];
         if (area) s.add(area);
       }
     }

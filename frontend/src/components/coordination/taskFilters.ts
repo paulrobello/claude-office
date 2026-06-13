@@ -11,7 +11,8 @@
  * Aqui só tratamos a lógica de match; o lazy-fetch das fechadas é na página.
  */
 import type { CoordTask, CoordAgent, HitlPrompt } from "./coordinationApi";
-import { deriveStatus } from "./taskStatus";
+import { deriveStatus, type TaskStatus } from "./taskStatus";
+import { PROJECT_TO_AREA_SHORT } from "./projectArea";
 
 // ── Faceta Status ─────────────────────────────────────────────────────────
 // Cada task cai em EXATAMENTE uma chave (partição total dos status derivados),
@@ -41,15 +42,32 @@ export function statusFacetOf(
   task: CoordTask,
   hitlPrompts: HitlPrompt[],
 ): StatusFacetKey {
-  const d = deriveStatus(task, hitlPrompts);
-  if (d === "running" || d === "waiting_agent") return "em_execucao";
-  if (d === "pending" || d === "error") return "aguardando";
-  if (d === "sem_agente") return "sem_agente";
-  if (d === "done") return "done";
-  // epic sobrepõe os status "parados" (só quando não está ativo/fechado acima).
-  if (task.labels.includes("epic")) return "epic";
-  if (d === "sem_dono") return "sem_dono";
-  return "backlog"; // backlog, todo, unknown
+  const d: TaskStatus = deriveStatus(task, hitlPrompts);
+  switch (d) {
+    case "running":
+    case "waiting_agent":
+      return "em_execucao";
+    case "pending":
+    case "error":
+      return "aguardando";
+    case "sem_agente":
+      return "sem_agente";
+    case "done":
+      return "done";
+    case "sem_dono":
+    case "todo":
+    case "backlog":
+    case "unknown":
+      // epic sobrepõe os status "parados" (só quando não está ativo/fechado acima).
+      if (task.labels.includes("epic")) return "epic";
+      return d === "sem_dono" ? "sem_dono" : "backlog"; // backlog, todo, unknown
+    default: {
+      // Exaustividade: um TaskStatus novo não-mapeado vira erro de compilação
+      // aqui (em vez de cair em "backlog" silenciosamente).
+      const _exhaustive: never = d;
+      return _exhaustive;
+    }
+  }
 }
 
 // ── Faceta Projeto/Área ─────────────────────────────────────────────────────
@@ -61,27 +79,13 @@ export function areaKeysOf(task: CoordTask): string[] {
 }
 
 // ── Faceta Agente ───────────────────────────────────────────────────────────
-/** Projeto (roster) → label `area:*`. Espelha o mapa do dev-loop / dashboard. */
-const PROJECT_TO_AREA: Record<string, string> = {
-  "hmtrack-front": "front",
-  "hmtrack-api-py": "api",
-  "hmtrack-trackers": "trackers",
-  "hmtrack-alert-system": "alert-system",
-  "hmtrack-app": "mobile",
-  HMTrackApp: "mobile",
-  "banco-dados": "db",
-  "hmtrack-documentacao": "db",
-  "hmtrack-whatsapp": "whatsapp",
-  "claude-office": "office",
-};
-
 /** Mapa área-curta → agentes do roster que a cobrem (pra derivar "dono" por área). */
 export function buildAreaToAgents(agents: CoordAgent[]): Map<string, string[]> {
   const m = new Map<string, string[]>();
   for (const a of agents) {
     if (a.archived_at) continue;
     for (const proj of a.projetos) {
-      const area = PROJECT_TO_AREA[proj];
+      const area = PROJECT_TO_AREA_SHORT[proj];
       if (!area) continue;
       const list = m.get(area) ?? [];
       if (!list.includes(a.nome)) list.push(a.nome);

@@ -273,10 +273,12 @@ export default function TasksPage(): React.ReactNode {
   }, [agentsData, groups]);
 
   // Prompts sem task casada na lista atual — não podem sumir (brecha HITL).
+  // Usa `allTasks` (inclui as fechadas quando `Concluída` está marcado), senão
+  // um prompt pendente cujo source_ref casa uma task FECHADA apareceria órfão.
   const orphanPrompts = useMemo(() => {
-    const refs = new Set((data?.tasks ?? []).map((t) => t.source_ref));
+    const refs = new Set(allTasks.map((t) => t.source_ref));
     return prompts.filter((p) => !p.source_ref || !refs.has(p.source_ref));
-  }, [prompts, data]);
+  }, [prompts, allTasks]);
 
   const handleAnswer = async (id: number, answer: HitlAnswerValue) => {
     await answerHitl(id, answer);
