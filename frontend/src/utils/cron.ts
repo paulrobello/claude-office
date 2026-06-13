@@ -1,5 +1,20 @@
 /** Helpers puros entre o editor amigável e a expressão cron (5 campos). */
 
+/** Horário comercial padrão: horas 8..23 (minuto 0). Pré-popula o modo "horários fixos". */
+export const DEFAULT_BUSINESS_HOURS: number[] = Array.from(
+  { length: 16 },
+  (_, i) => 8 + i,
+);
+
+/**
+ * Ao entrar no modo "horários fixos": lista vazia (vindo de interval/raw, ou
+ * agente sem agenda) vira horário comercial; lista já existente é preservada
+ * (não clobbera horários fixos salvos).
+ */
+export function enterTimesHours(current: number[]): number[] {
+  return current.length === 0 ? [...DEFAULT_BUSINESS_HOURS] : current;
+}
+
 export type CronEditor =
   | { mode: "times"; minute: number; hours: number[] }
   | {

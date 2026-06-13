@@ -2,7 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { Clock, Plus, X } from "lucide-react";
-import { cronToEditor, timesToCron, intervalToCron } from "@/utils/cron";
+import {
+  cronToEditor,
+  timesToCron,
+  intervalToCron,
+  DEFAULT_BUSINESS_HOURS,
+  enterTimesHours,
+} from "@/utils/cron";
 import { patchAgent, type CoordAgent } from "./coordinationApi";
 
 const STEPS = [5, 10, 15, 20, 30];
@@ -27,7 +33,7 @@ export function AgendaEditor({
     initial.mode === "times" ? initial.minute : 0,
   );
   const [hours, setHours] = useState<number[]>(
-    initial.mode === "times" ? initial.hours : [8, 12, 15, 18, 23],
+    initial.mode === "times" ? initial.hours : DEFAULT_BUSINESS_HOURS,
   );
   const [everyMin, setEveryMin] = useState(
     initial.mode === "interval" ? initial.everyMin : 15,
@@ -57,6 +63,13 @@ export function AgendaEditor({
       : h24
         ? intervalToCron(everyMin, 0, 23)
         : intervalToCron(everyMin, startHour, endHour);
+
+  // Entrar em "horários fixos": lista vazia (vindo de interval/raw) pré-popula
+  // com horário comercial; horas já presentes são preservadas.
+  function selectTimes(): void {
+    setMode("times");
+    setHours((hs) => enterTimesHours(hs));
+  }
 
   function addTime(): void {
     const m = newTime.match(/^(\d{1,2}):(\d{2})$/);
@@ -126,7 +139,7 @@ export function AgendaEditor({
           <input
             type="radio"
             checked={mode === "times"}
-            onChange={() => setMode("times")}
+            onChange={selectTimes}
             className="accent-[#a855f7]"
           />{" "}
           Horários fixos
