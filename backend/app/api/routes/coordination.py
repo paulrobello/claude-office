@@ -1452,6 +1452,24 @@ _COORD_PY = f"{_AGENTS_DIR}/coletor-task/.venv/bin/python"
 _COORD_SCRIPT = f"{_AGENTS_DIR}/coletor-task/coordination.py"
 _DISPATCH_SCRIPT = f"{_AGENTS_DIR}/gerente/automation/dispatch-agent.sh"
 
+
+def _coord_cli_dsn(url: str) -> str:
+    """Converte a URL SQLAlchemy async (postgresql+asyncpg://...) na DSN libpq
+    síncrona que o coordination.py (psycopg) entende — remove o sufixo de driver
+    (+asyncpg) do scheme. Idempotente p/ DSNs já síncronas. Como só mexe no scheme,
+    funciona com OU sem senha/porta no userinfo. O backend conecta via asyncpg
+    (settings.COORDINATION_DATABASE_URL); o subprocess do coordination.py NÃO herda
+    COORD_DB_DSN, então precisa receber a DSN explícita via --dsn (#835)."""
+    scheme, sep, rest = url.partition("://")
+    if not sep:
+        return url
+    return f"{scheme.split('+', 1)[0]}{sep}{rest}"
+
+
+# DSN síncrona (psycopg) derivada da URL async do backend — passada via --dsn aos
+# subprocessos do coordination.py, que não herdam COORD_DB_DSN do ambiente (#835).
+_COORD_DSN = _coord_cli_dsn(get_settings().COORDINATION_DATABASE_URL)
+
 # Nome de agente do roster: letras/dígitos/espaço e ()._- (cobre 'QA-FRONT (1)').
 _AGENT_NAME_RE = re.compile(r"^[A-Za-z0-9 ()._-]{1,64}$")
 
@@ -1564,6 +1582,8 @@ async def run_agent_now(
         proc = await asyncio.create_subprocess_exec(
             _COORD_PY,
             _COORD_SCRIPT,
+            "--dsn",
+            _COORD_DSN,
             "loop-command",
             "--agent",
             nome,

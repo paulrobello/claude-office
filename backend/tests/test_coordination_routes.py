@@ -839,6 +839,68 @@ def test_run_agent_started(monkeypatch: pytest.MonkeyPatch) -> None:
         app.dependency_overrides.pop(get_coordination_db, None)
 
 
+def test_coord_cli_dsn_strips_async_driver() -> None:
+    from app.api.routes.coordination import _coord_cli_dsn
+
+    # com senha + porta
+    assert (
+        _coord_cli_dsn("postgresql+asyncpg://coordinator:s3cr3t@db:5433/coordination")
+        == "postgresql://coordinator:s3cr3t@db:5433/coordination"
+    )
+    # sem senha
+    assert (
+        _coord_cli_dsn("postgresql+asyncpg://coordinator@127.0.0.1:5433/coordination")
+        == "postgresql://coordinator@127.0.0.1:5433/coordination"
+    )
+    # já síncrona => idempotente
+    assert (
+        _coord_cli_dsn("postgresql://coordinator@127.0.0.1:5433/coordination")
+        == "postgresql://coordinator@127.0.0.1:5433/coordination"
+    )
+    # sem scheme:// => devolve intacto
+    assert _coord_cli_dsn("coordination") == "coordination"
+
+
+def test_run_agent_passes_dsn_to_loop_command(monkeypatch: pytest.MonkeyPatch) -> None:
+    """#835: o subprocess do loop-command precisa receber --dsn <dsn síncrona>,
+    senão coordination.py sai com 'COORD_DB_DSN não definido' → 502."""
+    import json as _json
+
+    import app.api.routes.coordination as coord
+
+    seen_args: list[tuple] = []
+
+    async def _fake(*args, **kwargs):  # type: ignore[no-untyped-def]
+        seen_args.append(args)
+        if "loop-command" in args:
+            out = _json.dumps(
+                {
+                    "argv": ["/x/gerente-loop.sh"],
+                    "claim_key": "loop-gerente",
+                    "role": "office-manager",
+                }
+            ).encode()
+            return _FakeProc(out=out, rc=0)
+        return _FakeProc()
+
+    monkeypatch.setattr(coord.asyncio, "create_subprocess_exec", _fake)
+    _override(_SeqSession([_Result(scalar=None)]))
+    client = TestClient(app)
+    try:
+        r = client.post("/api/v1/coordination/agents/gerente/run")
+        assert r.status_code == 202
+    finally:
+        app.dependency_overrides.pop(get_coordination_db, None)
+
+    loop_call = next(a for a in seen_args if "loop-command" in a)
+    assert "--dsn" in loop_call
+    dsn = loop_call[loop_call.index("--dsn") + 1]
+    assert dsn == coord._COORD_DSN
+    assert "+asyncpg" not in dsn
+    # --dsn é arg global => vem ANTES do subcomando loop-command
+    assert loop_call.index("--dsn") < loop_call.index("loop-command")
+
+
 def test_dispatch_rejects_non_positive() -> None:
     client = TestClient(app)
     assert client.post("/api/v1/coordination/issues/0/dispatch").status_code == 422
