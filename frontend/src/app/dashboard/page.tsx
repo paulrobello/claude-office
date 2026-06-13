@@ -23,7 +23,6 @@ import {
   fetchOpenPrs,
   answerHitl,
   respondTask,
-  runAgentNow,
   type CoordDashboard,
   type CoordTask,
   type CoordAgent,
@@ -40,6 +39,8 @@ import {
   type TaskStatus,
   type TaskGroup,
 } from "@/components/coordination/taskStatus";
+import { useRunAgentNow } from "@/components/coordination/useRunAgentNow";
+import { AgentStatePill } from "@/components/coordination/AgentStatePill";
 import HitlAnswerModal from "@/components/coordination/HitlAnswerModal";
 import { TaskFilterBar } from "@/components/coordination/TaskFilterBar";
 import {
@@ -1274,8 +1275,8 @@ function SemAgenteModal({
   );
 }
 
-/** ▶ Play num agente derivado do roster (QA/DevOps do repo do PR). Reusa o
- * runAgentNow (#833) e os estados started/already_running do Play do agente.
+/** ▶ Play num agente derivado do roster (QA/DevOps do repo do PR). Reusa o hook
+ * useRunAgentNow (#833/#839): sucesso reflete 'Em execução' (pill Ocupado).
  * `agent=null` → sem agente p/ o repo: botão desabilitado com tooltip. */
 function PrAgentPlay({
   agent,
@@ -1288,46 +1289,34 @@ function PrAgentPlay({
   icon: string;
   noAgentTip: string;
 }): React.ReactNode {
-  const [running, setRunning] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  // ocupado = já tem claim/loop ativo: evita forçar 2º loop (igual AgentColumn).
-  const busy = agent
-    ? agent.active_claims > 0 || Boolean(agent.current_ref)
-    : false;
+  // ocupado = claim/loop ativo (ou override otimista do started, #839): evita
+  // forçar 2º loop e reflete 'Em execução' como pill 'Ocupado' canônico.
+  const { running, busy, msg, runNow } = useRunAgentNow(agent);
   const disabled = !agent || running || busy;
-  const runNow = async (): Promise<void> => {
-    if (!agent) return;
-    setRunning(true);
-    setMsg(null);
-    try {
-      const res = await runAgentNow(agent.nome);
-      setMsg(res.status === "already_running" ? "já rodando" : "iniciado ✓");
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : "erro");
-    } finally {
-      setRunning(false);
-    }
-  };
   const tip = !agent
     ? noAgentTip
     : busy
       ? `${agent.nome} já tem claim/loop ativo`
       : `rodar ${agent.nome} agora (${role}) — sem esperar o cron`;
   return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        void runNow();
-      }}
-      disabled={disabled}
-      title={tip}
-      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold text-[#34d399] border border-[rgba(52,211,153,0.35)] bg-[rgba(52,211,153,0.08)] hover:bg-[rgba(52,211,153,0.16)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-    >
-      <Play size={10} className={running ? "animate-pulse" : ""} />
-      {icon} {running ? "…" : (msg ?? role)}
-    </button>
+    <span className="flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          void runNow();
+        }}
+        disabled={disabled}
+        title={tip}
+        className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold text-[#34d399] border border-[rgba(52,211,153,0.35)] bg-[rgba(52,211,153,0.08)] hover:bg-[rgba(52,211,153,0.16)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        <Play size={10} className={running ? "animate-pulse" : ""} />
+        {icon} {running ? "…" : (msg ?? role)}
+      </button>
+      {/* Sucesso do Play reflete 'Em execução' (Ocupado) com o pill canônico. */}
+      {agent && busy && <AgentStatePill enabled={agent.enabled} busy />}
+    </span>
   );
 }
 
@@ -1643,29 +1632,10 @@ function AgentColumn({
   statusByRef: Map<string, TaskStatus>;
   onRespond: (t: CoordTask) => void;
 }): React.ReactNode {
-  const busy = agent.active_claims > 0 || Boolean(agent.current_ref);
-  const pill = !agent.enabled
-    ? { label: "Pausado", color: "#ec4899" }
-    : busy
-      ? { label: "Ocupado", color: "#fbbf24" }
-      : { label: "Livre", color: "#34d399" };
-
   // ▶ Play (#833): roda o loop do agente agora, aditivo ao cron. Desabilita
-  // enquanto há claim/loop ativo (busy) — não força 2º loop.
-  const [running, setRunning] = useState(false);
-  const [runMsg, setRunMsg] = useState<string | null>(null);
-  const runNow = async (): Promise<void> => {
-    setRunning(true);
-    setRunMsg(null);
-    try {
-      const res = await runAgentNow(agent.nome);
-      setRunMsg(res.status === "already_running" ? "já rodando" : "iniciado ✓");
-    } catch (e) {
-      setRunMsg(e instanceof Error ? e.message : "erro");
-    } finally {
-      setRunning(false);
-    }
-  };
+  // enquanto há claim/loop ativo (busy) — não força 2º loop. Sucesso (#839)
+  // reflete como 'Ocupado' (pill canônico), não uma label 'iniciado'.
+  const { running, busy, msg: runMsg, runNow } = useRunAgentNow(agent);
 
   return (
     <div className="rounded-2xl backdrop-blur-md border border-[rgba(168,85,247,0.25)] bg-[rgba(20,14,38,0.6)] overflow-hidden">
@@ -1698,19 +1668,7 @@ function AgentColumn({
           <Play size={11} className={running ? "animate-pulse" : ""} />
           {running ? "…" : (runMsg ?? "Play")}
         </button>
-        <span
-          className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-md"
-          style={{ color: pill.color, background: `${pill.color}1f` }}
-          title={
-            !agent.enabled
-              ? "desativado na Agenda (enabled=false)"
-              : busy
-                ? "tem claim/dispatch ativo"
-                : "ativo e ocioso"
-          }
-        >
-          {pill.label}
-        </span>
+        <AgentStatePill enabled={agent.enabled} busy={busy} />
       </div>
       <div className="p-3.5 flex flex-col gap-3">
         {tasks.length === 0 && (

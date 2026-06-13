@@ -58,6 +58,32 @@ export function deriveStatus(
   return "unknown";
 }
 
+/** Override otimista do Play (#839): refs recém-despachadas (status `started` do
+ *  backend) refletem 'Em execução' usando a MESMA derivação de status — em vez de
+ *  uma label 'iniciado' avulsa. Só promove tasks ainda na FILA (queue): se o real
+ *  já avançou (running/waiting_agent/pending/done/error), o poll vence e o override
+ *  vira no-op (e o ref pode ser podado via [[startedOverrideSettled]]). */
+export function applyStartedOverride(
+  task: CoordTask,
+  hitlPrompts: HitlPrompt[],
+  startedRefs: ReadonlySet<string>,
+): CoordTask {
+  if (!startedRefs.has(task.source_ref)) return task;
+  if (statusGroup(deriveStatus(task, hitlPrompts)) !== "queue") return task;
+  // run_status=running → deriveStatus retorna "running" ("Em execução"), movendo
+  // a task pro grupo "Em andamento" com o badge canônico do cockpit.
+  return { ...task, run_status: "running" };
+}
+
+/** O override otimista de Play já pode sair? (o poll trouxe o estado real: a task
+ *  saiu da fila). Use pra podar o Set de startedRefs e não mascarar erro/done. */
+export function startedOverrideSettled(
+  task: CoordTask,
+  hitlPrompts: HitlPrompt[],
+): boolean {
+  return statusGroup(deriveStatus(task, hitlPrompts)) !== "queue";
+}
+
 export function statusGroup(status: TaskStatus): TaskGroup {
   switch (status) {
     case "pending":

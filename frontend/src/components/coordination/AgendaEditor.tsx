@@ -9,7 +9,9 @@ import {
   DEFAULT_BUSINESS_HOURS,
   enterTimesHours,
 } from "@/utils/cron";
-import { patchAgent, runAgentNow, type CoordAgent } from "./coordinationApi";
+import { patchAgent, type CoordAgent } from "./coordinationApi";
+import { useRunAgentNow } from "./useRunAgentNow";
+import { AgentStatePill } from "./AgentStatePill";
 
 const STEPS = [5, 10, 15, 20, 30];
 
@@ -51,25 +53,14 @@ export function AgendaEditor({
   const [enabled, setEnabled] = useState(agent.enabled);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  // ▶ Play (#833): roda o loop do agente agora, sem esperar o cron.
-  const [running, setRunning] = useState(false);
-  const [runMsg, setRunMsg] = useState<string | null>(null);
-  const claimActive = agent.active_claims > 0 || Boolean(agent.current_ref);
-
-  async function runNow(): Promise<void> {
-    setRunning(true);
-    setRunMsg(null);
-    try {
-      const res = await runAgentNow(agent.nome);
-      setRunMsg(
-        res.status === "already_running" ? "já rodando" : "iniciado ✓",
-      );
-    } catch (e) {
-      setRunMsg(e instanceof Error ? e.message : "erro");
-    } finally {
-      setRunning(false);
-    }
-  }
+  // ▶ Play (#833): roda o loop do agente agora, sem esperar o cron. Sucesso
+  // (#839) reflete como 'Ocupado' (pill canônico), não uma label 'iniciado'.
+  const {
+    running,
+    busy: claimActive,
+    msg: runMsg,
+    runNow,
+  } = useRunAgentNow(agent);
 
   const cron =
     mode === "times"
@@ -141,8 +132,10 @@ export function AgendaEditor({
             className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-[#34d399] border border-[rgba(52,211,153,0.35)] bg-[rgba(52,211,153,0.08)] hover:bg-[rgba(52,211,153,0.16)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <Play size={12} className={running ? "animate-pulse" : ""} />
-            {running ? "iniciando…" : runMsg ?? "Play"}
+            {running ? "iniciando…" : (runMsg ?? "Play")}
           </button>
+          {/* Sucesso do Play reflete 'Em execução' (Ocupado) com o pill canônico. */}
+          {claimActive && <AgentStatePill enabled={enabled} busy />}
           <button
             type="button"
             role="switch"
@@ -156,7 +149,9 @@ export function AgendaEditor({
           >
             <span
               className="inline-block h-4 w-4 rounded-full bg-white transition-transform"
-              style={{ transform: enabled ? "translateX(24px)" : "translateX(4px)" }}
+              style={{
+                transform: enabled ? "translateX(24px)" : "translateX(4px)",
+              }}
             />
           </button>
           <span

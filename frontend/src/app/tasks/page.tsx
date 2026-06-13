@@ -30,6 +30,7 @@ import {
   groupAndSortTasks,
   queueRank,
   formatStuckTime,
+  applyStartedOverride,
   DEFAULT_SLA_MS,
   type TaskStatus,
 } from "@/components/coordination/taskStatus";
@@ -114,6 +115,11 @@ export default function TasksPage(): React.ReactNode {
   const [resolved, setResolved] = useState<Set<string>>(() => new Set());
   // refs com ação em voo: mostram "processando" e botões desabilitados.
   const [processing, setProcessing] = useState<Set<string>>(() => new Set());
+  // refs recém-despachadas pelo Play (#839): refletem 'Em execução' (badge
+  // canônico) otimista até o poll trazer o claim/wip real — sem label 'iniciado'.
+  // applyStartedOverride só promove tasks ainda na FILA, então vira no-op sozinho
+  // quando o estado real chega (auto-cura, sem precisar podar o Set).
+  const [startedRefs, setStartedRefs] = useState<Set<string>>(() => new Set());
   // reordenação OTIMISTA da fila (o label só reflete no /tasks após o sync do
   // coletor ~5min; aqui sobe/desce na hora). prioritized: mais recente primeiro.
   const [prioritized, setPrioritized] = useState<string[]>([]);
@@ -183,15 +189,27 @@ export default function TasksPage(): React.ReactNode {
   );
 
   // Universo de tasks: OPEN sempre + CLOSED só quando "Concluída" está marcada.
-  const allTasks = useMemo(
-    () => [...(data?.tasks ?? []), ...(showClosed ? (closedData?.tasks ?? []) : [])],
+  const rawTasks = useMemo(
+    () => [
+      ...(data?.tasks ?? []),
+      ...(showClosed ? (closedData?.tasks ?? []) : []),
+    ],
     [data, closedData, showClosed],
+  );
+
+  // Override otimista do Play (#839): refs recém-despachadas (`started`) refletem
+  // 'Em execução' pela MESMA derivação de status, até o poll trazer o claim real.
+  // `allTasks` é a fonte única do resto da tela (filtros, grupos, badges).
+  const allTasks = useMemo(
+    () => rawTasks.map((t) => applyStartedOverride(t, prompts, startedRefs)),
+    [rawTasks, prompts, startedRefs],
   );
 
   // Aplica as 3 facetas (AND entre facetas, OR dentro). Default vazio = tudo
   // que é OPEN; sem `done` marcado, as CLOSED nem entram em allTasks.
   const filtered = useMemo(
-    () => allTasks.filter((t) => matchesFilters(t, prompts, filters, areaToAgents)),
+    () =>
+      allTasks.filter((t) => matchesFilters(t, prompts, filters, areaToAgents)),
     [allTasks, prompts, filters, areaToAgents],
   );
 
@@ -203,7 +221,8 @@ export default function TasksPage(): React.ReactNode {
   }, [allTasks]);
   const agentOptions = useMemo(() => {
     const s = new Set<string>();
-    for (const t of allTasks) for (const a of agentKeysOf(t, areaToAgents)) s.add(a);
+    for (const t of allTasks)
+      for (const a of agentKeysOf(t, areaToAgents)) s.add(a);
     return [...s].sort();
   }, [allTasks, areaToAgents]);
 
@@ -366,15 +385,20 @@ export default function TasksPage(): React.ReactNode {
     markProcessing(ref, true);
     try {
       const res = await dispatchIssueNow(t.number);
-      const msg =
-        res.status === "started"
-          ? tr("tasks.playStarted", { n: t.number })
-          : res.status === "already_running"
+      if (res.status === "started") {
+        // Sucesso (#839): reflete 'Em execução' no badge canônico (otimista até
+        // o poll), em vez de uma label 'iniciado' avulsa. Sem toast.
+        setStartedRefs((s) => new Set(s).add(ref));
+        setFeedback("");
+      } else {
+        setFeedback(
+          res.status === "already_running"
             ? tr("tasks.playRunning", { n: t.number })
             : res.status === "cap_full"
               ? tr("tasks.playCapFull")
-              : tr("tasks.playClosed", { n: t.number });
-      setFeedback(msg);
+              : tr("tasks.playClosed", { n: t.number }),
+        );
+      }
       void refetch();
     } catch (e) {
       setFeedback(

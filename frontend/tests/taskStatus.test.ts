@@ -11,6 +11,8 @@ import {
   formatStuckTime,
   needYouCount,
   idleSince,
+  applyStartedOverride,
+  startedOverrideSettled,
   DEFAULT_IDLE_ALERT_MS,
 } from "../src/components/coordination/taskStatus";
 
@@ -225,5 +227,52 @@ describe("needYouCount", () => {
       baseTask({ claim_status: "in_progress", source_ref: "r3" }),
     ];
     expect(needYouCount(tasks, [])).toBe(2);
+  });
+});
+
+describe("applyStartedOverride (#839)", () => {
+  const queued = baseTask({ labels: ["afk"], source_ref: "agents-ia#7" }); // sem_agente (queue)
+
+  it("promove task na fila a running ('Em execução')", () => {
+    const out = applyStartedOverride(queued, [], new Set(["agents-ia#7"]));
+    expect(deriveStatus(out, [])).toBe("running");
+    expect(statusGroup(deriveStatus(out, []))).toBe("in_progress");
+  });
+
+  it("não toca refs fora do Set", () => {
+    const out = applyStartedOverride(queued, [], new Set(["outra#1"]));
+    expect(out).toBe(queued);
+    expect(deriveStatus(out, [])).toBe("sem_agente");
+  });
+
+  it("é no-op quando o real já saiu da fila (poll venceu)", () => {
+    // claim real ativo → running de verdade; override não precisa mexer.
+    const claimed = baseTask({
+      claim_status: "in_progress",
+      source_ref: "agents-ia#7",
+    });
+    const out = applyStartedOverride(claimed, [], new Set(["agents-ia#7"]));
+    expect(out).toBe(claimed);
+    // e erro real (need_you) NÃO é mascarado como running pelo override:
+    const errored = baseTask({
+      run_status: "error",
+      source_ref: "agents-ia#7",
+    });
+    expect(applyStartedOverride(errored, [], new Set(["agents-ia#7"]))).toBe(
+      errored,
+    );
+  });
+});
+
+describe("startedOverrideSettled (#839)", () => {
+  it("false enquanto na fila, true quando o real avança", () => {
+    const queued = baseTask({ labels: ["afk"] }); // sem_agente (queue)
+    expect(startedOverrideSettled(queued, [])).toBe(false);
+    expect(
+      startedOverrideSettled(baseTask({ claim_status: "in_progress" }), []),
+    ).toBe(true);
+    expect(startedOverrideSettled(baseTask({ state: "CLOSED" }), [])).toBe(
+      true,
+    );
   });
 });
