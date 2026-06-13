@@ -137,16 +137,20 @@ class TestCoordinationLive:
         if body["metrics"]:
             row = body["metrics"][0]
             assert {
-                "project", "total", "success", "error", "timeout",
-                "success_rate", "avg_duration_seconds", "last_run_at",
+                "project",
+                "total",
+                "success",
+                "error",
+                "timeout",
+                "success_rate",
+                "avg_duration_seconds",
+                "last_run_at",
             } <= row.keys()
             assert row["success_rate"] is None or 0 <= float(row["success_rate"]) <= 1
 
     def test_agent_metrics_since_filter(self) -> None:
         client = TestClient(app)
-        r = client.get(
-            "/api/v1/coordination/agents/metrics?since=2099-01-01T00:00:00Z"
-        )
+        r = client.get("/api/v1/coordination/agents/metrics?since=2099-01-01T00:00:00Z")
         assert r.status_code == 200
         assert r.json()["metrics"] == []
 
@@ -599,9 +603,7 @@ def test_ref_to_issue_number_parsing() -> None:
 
 def test_priority_rejects_bad_rank() -> None:
     client = TestClient(app)
-    r = client.post(
-        "/api/v1/coordination/tasks/agents-ia%23294/priority", json={"rank": "x"}
-    )
+    r = client.post("/api/v1/coordination/tasks/agents-ia%23294/priority", json={"rank": "x"})
     assert r.status_code == 422
 
 
@@ -641,17 +643,13 @@ def test_remove_rejects_ref_without_number() -> None:
 
 def test_note_rejects_empty() -> None:
     client = TestClient(app)
-    r = client.post(
-        "/api/v1/coordination/tasks/agents-ia%2333/note", json={"note": "   "}
-    )
+    r = client.post("/api/v1/coordination/tasks/agents-ia%2333/note", json={"note": "   "})
     assert r.status_code == 422
 
 
 def test_note_rejects_bad_ref() -> None:
     client = TestClient(app)
-    r = client.post(
-        "/api/v1/coordination/tasks/semnumero/note", json={"note": "oi"}
-    )
+    r = client.post("/api/v1/coordination/tasks/semnumero/note", json={"note": "oi"})
     assert r.status_code == 400
 
 
@@ -676,6 +674,302 @@ def test_agent_metrics_degrade_503_when_db_down() -> None:
     try:
         client = TestClient(app)
         r = client.get("/api/v1/coordination/agents/metrics")
+        assert r.status_code == 503
+    finally:
+        app.dependency_overrides.pop(get_coordination_db, None)
+
+
+# ── Botão Play (#833): /agents/{nome}/run e /issues/{n}/dispatch ────────────────
+# Unit-style: sem :5433 e sem disparar processo de verdade. Mockamos o subprocess
+# (loop-command / spawn) e a sessão do DB (resultados sequenciais por execute).
+
+
+class _Mapping:
+    def __init__(self, m: object) -> None:
+        self._m = m
+
+    def first(self) -> object:
+        return self._m
+
+    def one(self) -> object:
+        return self._m
+
+
+class _Result:
+    def __init__(self, scalar: object = None, mapping: object = None) -> None:
+        self._scalar = scalar
+        self._mapping = mapping
+
+    def scalar(self) -> object:
+        return self._scalar
+
+    def mappings(self) -> _Mapping:
+        return _Mapping(self._mapping)
+
+
+class _SeqSession:
+    """Sessão fake: cada execute() devolve o próximo _Result da fila."""
+
+    def __init__(self, results: list[_Result]) -> None:
+        self._results = list(results)
+
+    async def execute(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        return self._results.pop(0)
+
+    async def close(self) -> None:
+        return None
+
+
+class _FakeProc:
+    def __init__(self, out: bytes = b"", err: bytes = b"", rc: int = 0) -> None:
+        self._out, self._err, self.returncode = out, err, rc
+        self.pid = 4242
+
+    async def communicate(self):  # type: ignore[no-untyped-def]
+        return (self._out, self._err)
+
+
+def _override(session: _SeqSession) -> None:
+    async def _dep():  # type: ignore[no-untyped-def]
+        yield session
+
+    app.dependency_overrides[get_coordination_db] = _dep
+
+
+def _patch_subprocess(
+    monkeypatch: pytest.MonkeyPatch, *, loop_out: bytes = b"", loop_rc: int = 0
+) -> None:
+    """Mocka asyncio.create_subprocess_exec: 'loop-command' devolve loop_out/loop_rc;
+    qualquer outro argv (o spawn detached) devolve um proc com pid fixo."""
+    import app.api.routes.coordination as coord
+
+    async def _fake(*args, **kwargs):  # type: ignore[no-untyped-def]
+        if "loop-command" in args:
+            return _FakeProc(out=loop_out, rc=loop_rc)
+        return _FakeProc()
+
+    monkeypatch.setattr(coord.asyncio, "create_subprocess_exec", _fake)
+
+
+def test_project_from_labels() -> None:
+    from app.api.routes.coordination import _project_from_labels
+
+    assert _project_from_labels(["enhancement", "area:office"]) == "claude-office"
+    assert _project_from_labels(["area:front"]) == "hmtrack-front"
+    assert _project_from_labels(["area:db"]) == "banco-dados"
+    assert _project_from_labels(["area:mobile"]) == "HMTrackApp"
+    assert _project_from_labels(["afk", "bug"]) is None
+    assert _project_from_labels(["area:desconhecida"]) is None
+    assert _project_from_labels(None) is None
+
+
+def test_dispatch_briefing_has_key_instructions() -> None:
+    from app.api.routes.coordination import _dispatch_briefing
+
+    b = _dispatch_briefing(833, "claude-office")
+    assert "agents-ia#833" in b
+    assert "claude-office" in b
+    assert "Closes #833" in b
+    assert "Brechas mapeadas" in b
+    assert "DECISÃO JÁ TOMADA" in b
+
+
+def test_run_agent_rejects_bad_name() -> None:
+    client = TestClient(app)
+    r = client.post("/api/v1/coordination/agents/bad;rm -rf/run")
+    # barra no nome → rota não casa (404) ; nome com ';' isolado → 422
+    assert r.status_code in (404, 422)
+    r2 = client.post("/api/v1/coordination/agents/" + "x" * 80 + "/run")
+    assert r2.status_code == 422
+
+
+def test_run_agent_404_when_not_in_roster(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_subprocess(monkeypatch, loop_out=b"", loop_rc=3)
+    client = TestClient(app)
+    try:
+        r = client.post("/api/v1/coordination/agents/NAO-EXISTE-1/run")
+        assert r.status_code == 404
+        assert r.json()["detail"]["error"] == "agent_not_in_roster"
+    finally:
+        app.dependency_overrides.pop(get_coordination_db, None)
+
+
+def test_run_agent_already_running(monkeypatch: pytest.MonkeyPatch) -> None:
+    import json as _json
+
+    out = _json.dumps(
+        {
+            "argv": ["/x/dev-loop.sh", "--agent", "DEV-OFFICE-1", "--project", "claude-office"],
+            "claim_key": "dev-claude-office",
+            "role": "dev-office",
+        }
+    ).encode()
+    _patch_subprocess(monkeypatch, loop_out=out, loop_rc=0)
+    _override(_SeqSession([_Result(scalar=1)]))  # loop-claim vivo
+    client = TestClient(app)
+    try:
+        r = client.post("/api/v1/coordination/agents/DEV-OFFICE-1/run")
+        assert r.status_code == 202
+        assert r.json()["status"] == "already_running"
+        assert r.json()["claim_key"] == "dev-claude-office"
+    finally:
+        app.dependency_overrides.pop(get_coordination_db, None)
+
+
+def test_run_agent_started(monkeypatch: pytest.MonkeyPatch) -> None:
+    import json as _json
+
+    out = _json.dumps(
+        {
+            "argv": ["/x/dev-loop.sh", "--agent", "DEV-OFFICE-1", "--project", "claude-office"],
+            "claim_key": "dev-claude-office",
+            "role": "dev-office",
+        }
+    ).encode()
+    _patch_subprocess(monkeypatch, loop_out=out, loop_rc=0)
+    _override(_SeqSession([_Result(scalar=None)]))  # sem loop-claim vivo
+    client = TestClient(app)
+    try:
+        r = client.post("/api/v1/coordination/agents/DEV-OFFICE-1/run")
+        assert r.status_code == 202
+        body = r.json()
+        assert body["status"] == "started"
+        assert body["pid"] == 4242
+    finally:
+        app.dependency_overrides.pop(get_coordination_db, None)
+
+
+def test_dispatch_rejects_non_positive() -> None:
+    client = TestClient(app)
+    assert client.post("/api/v1/coordination/issues/0/dispatch").status_code == 422
+
+
+def test_dispatch_issue_not_found() -> None:
+    _override(_SeqSession([_Result(mapping=None)]))
+    client = TestClient(app)
+    try:
+        r = client.post("/api/v1/coordination/issues/424242/dispatch")
+        assert r.status_code == 404
+        assert r.json()["detail"]["error"] == "issue_not_found"
+    finally:
+        app.dependency_overrides.pop(get_coordination_db, None)
+
+
+def test_dispatch_closed_issue() -> None:
+    _override(_SeqSession([_Result(mapping={"state": "CLOSED", "labels": ["area:office"]})]))
+    client = TestClient(app)
+    try:
+        r = client.post("/api/v1/coordination/issues/833/dispatch")
+        assert r.status_code == 202
+        assert r.json()["status"] == "closed"
+    finally:
+        app.dependency_overrides.pop(get_coordination_db, None)
+
+
+def test_dispatch_no_area_label() -> None:
+    _override(_SeqSession([_Result(mapping={"state": "OPEN", "labels": ["afk"]})]))
+    client = TestClient(app)
+    try:
+        r = client.post("/api/v1/coordination/issues/833/dispatch")
+        assert r.status_code == 422
+        assert r.json()["detail"]["error"] == "sem_projeto"
+    finally:
+        app.dependency_overrides.pop(get_coordination_db, None)
+
+
+def test_dispatch_already_running() -> None:
+    _override(
+        _SeqSession(
+            [
+                _Result(mapping={"state": "OPEN", "labels": ["area:office"]}),
+                _Result(scalar=1),  # claim ativo
+            ]
+        )
+    )
+    client = TestClient(app)
+    try:
+        r = client.post("/api/v1/coordination/issues/833/dispatch")
+        assert r.status_code == 202
+        assert r.json()["status"] == "already_running"
+        assert r.json()["project"] == "claude-office"
+    finally:
+        app.dependency_overrides.pop(get_coordination_db, None)
+
+
+def test_dispatch_cap_full(monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.api.routes.coordination as coord
+
+    monkeypatch.setattr(coord, "get_settings", lambda: type("S", (), {"DISPATCH_CAP": 8})())
+    _override(
+        _SeqSession(
+            [
+                _Result(mapping={"state": "OPEN", "labels": ["area:office"]}),
+                _Result(scalar=None),  # sem claim
+                _Result(scalar=8),  # cap cheio
+            ]
+        )
+    )
+    client = TestClient(app)
+    try:
+        r = client.post("/api/v1/coordination/issues/833/dispatch")
+        assert r.status_code == 202
+        assert r.json()["status"] == "cap_full"
+        assert r.json()["cap"] == 8
+    finally:
+        app.dependency_overrides.pop(get_coordination_db, None)
+
+
+def test_dispatch_started(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_subprocess(monkeypatch)  # spawn detached → pid fixo
+    _override(
+        _SeqSession(
+            [
+                _Result(mapping={"state": "OPEN", "labels": ["area:office"]}),
+                _Result(scalar=None),  # sem claim
+                _Result(scalar=0),  # cap livre
+                _Result(scalar="DEV-OFFICE-1"),  # agente do roster
+            ]
+        )
+    )
+    client = TestClient(app)
+    try:
+        r = client.post("/api/v1/coordination/issues/833/dispatch")
+        assert r.status_code == 202
+        body = r.json()
+        assert body["status"] == "started"
+        assert body["project"] == "claude-office"
+        assert body["agent"] == "DEV-OFFICE-1"
+        assert body["pid"] == 4242
+    finally:
+        app.dependency_overrides.pop(get_coordination_db, None)
+
+
+def test_run_agent_degrade_503_when_db_down(monkeypatch: pytest.MonkeyPatch) -> None:
+    import json as _json
+
+    out = _json.dumps({"argv": ["/x/loop.sh"], "claim_key": "dev-x", "role": "dev-office"}).encode()
+    _patch_subprocess(monkeypatch, loop_out=out, loop_rc=0)
+
+    async def _boom():  # type: ignore[no-untyped-def]
+        yield _BoomSession()
+
+    app.dependency_overrides[get_coordination_db] = _boom
+    try:
+        client = TestClient(app)
+        r = client.post("/api/v1/coordination/agents/DEV-OFFICE-1/run")
+        assert r.status_code == 503
+    finally:
+        app.dependency_overrides.pop(get_coordination_db, None)
+
+
+def test_dispatch_degrade_503_when_db_down() -> None:
+    async def _boom():  # type: ignore[no-untyped-def]
+        yield _BoomSession()
+
+    app.dependency_overrides[get_coordination_db] = _boom
+    try:
+        client = TestClient(app)
+        r = client.post("/api/v1/coordination/issues/833/dispatch")
         assert r.status_code == 503
     finally:
         app.dependency_overrides.pop(get_coordination_db, None)

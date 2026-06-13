@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     COORDINATION_DATABASE_URL: str = "postgresql+asyncpg://coordinator@127.0.0.1:5433/coordination"
     GIT_POLL_INTERVAL: int = 5
 
+    # Botão Play (#833): dispara loop de agente / dispatch de issue na hora, sem
+    # esperar o cron. Os scripts de orquestração vivem no repo de coordenação
+    # (hmtrack-documentacao); o backend já lê o roster de lá. Configurável p/ deploy.
+    AGENTS_REPO_DIR: str = "/home/isakiel/projects/zartoo/hmtrack-documentacao"
+    # Cap global de dispatches simultâneos — espelha DISPATCH_CAP do dispatch-agent.sh.
+    DISPATCH_CAP: int = 8
+
     CLAUDE_CODE_OAUTH_TOKEN: str = ""
     SUMMARY_MODEL: str = "claude-haiku-4-5-20251001"
     SUMMARY_ENABLED: bool = True

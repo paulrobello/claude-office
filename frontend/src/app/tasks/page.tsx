@@ -13,6 +13,7 @@ import {
   setTaskPriority,
   approveTask,
   removeFromQueue,
+  dispatchIssueNow,
   fetchAgents,
   type CoordTask,
   type CoordAgent,
@@ -356,6 +357,34 @@ export default function TasksPage(): React.ReactNode {
     );
   };
 
+  // ▶ Play (#833): despacha a issue AGORA (dispara `claude -p` → custa tokens).
+  // Pede confirmação antes. Feedback varia pelo status do backend
+  // (started/already_running/cap_full/closed). Pós-clique, a task vira wip no poll.
+  const onPlay = async (t: CoordTask) => {
+    if (!window.confirm(tr("tasks.playConfirm", { n: t.number }))) return;
+    const ref = t.source_ref;
+    markProcessing(ref, true);
+    try {
+      const res = await dispatchIssueNow(t.number);
+      const msg =
+        res.status === "started"
+          ? tr("tasks.playStarted", { n: t.number })
+          : res.status === "already_running"
+            ? tr("tasks.playRunning", { n: t.number })
+            : res.status === "cap_full"
+              ? tr("tasks.playCapFull")
+              : tr("tasks.playClosed", { n: t.number });
+      setFeedback(msg);
+      void refetch();
+    } catch (e) {
+      setFeedback(
+        `#${t.number} falhou: ${e instanceof Error ? e.message : "erro"}`,
+      );
+    } finally {
+      markProcessing(ref, false);
+    }
+  };
+
   // Aprovação direta (1 clique): responde o prompt do banco OU libera o label
   // hitl. Hide otimista: a task some de "Precisa de você" assim que o servidor
   // confirma, sem esperar o coletor re-sincronizar (refetch roda em background).
@@ -570,6 +599,18 @@ export default function TasksPage(): React.ReactNode {
                   className="px-3 py-1.5 rounded text-sm font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40 hover:bg-sky-500/30"
                 >
                   ↻ {tr("tasks.retry")}
+                </button>
+              )}
+              {(status === "todo" ||
+                status === "sem_dono" ||
+                status === "sem_agente" ||
+                status === "error") && (
+                <button
+                  onClick={() => void onPlay(t)}
+                  title={tr("tasks.playTitle")}
+                  className="px-3 py-1.5 rounded text-sm font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30"
+                >
+                  ▶ {tr("tasks.play")}
                 </button>
               )}
               {(status === "todo" ||

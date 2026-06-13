@@ -23,6 +23,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.exc import DBAPIError, InterfaceError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db.coordination import get_coordination_db
 
 logger = logging.getLogger(__name__)
@@ -151,25 +152,28 @@ class PriorityBody(BaseModel):
 _PRIORITY_LABELS = {"top": "fila:topo", "bottom": "fila:fim"}
 
 
-@router.post(
-    "/tasks/{source_ref}/priority", dependencies=[Depends(enforce_write_rate_limit)]
-)
+@router.post("/tasks/{source_ref}/priority", dependencies=[Depends(enforce_write_rate_limit)])
 async def set_task_priority(source_ref: str, body: PriorityBody) -> dict[str, Any]:
     if body.rank not in _PRIORITY_LABELS:
-        raise HTTPException(
-            status_code=422, detail={"error": "rank inválido (top|bottom)"}
-        )
+        raise HTTPException(status_code=422, detail={"error": "rank inválido (top|bottom)"})
     num = _ref_to_issue_number(source_ref)
     if num is None:
-        raise HTTPException(
-            status_code=400, detail={"error": "source_ref sem número de issue"}
-        )
+        raise HTTPException(status_code=400, detail={"error": "source_ref sem número de issue"})
     add = _PRIORITY_LABELS[body.rank]
     remove = _PRIORITY_LABELS["bottom" if body.rank == "top" else "top"]
     proc = await asyncio.create_subprocess_exec(
-        "gh", "issue", "edit", str(num), "--repo", _AGENTS_IA_REPO,
-        "--add-label", add, "--remove-label", remove,
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        "gh",
+        "issue",
+        "edit",
+        str(num),
+        "--repo",
+        _AGENTS_IA_REPO,
+        "--add-label",
+        add,
+        "--remove-label",
+        remove,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
     )
     _, err = await proc.communicate()
     if proc.returncode != 0:
@@ -183,19 +187,24 @@ async def set_task_priority(source_ref: str, body: PriorityBody) -> dict[str, An
 # Aprovar uma pendência que é label `hitl` no GitHub (gate pré-dispatch, sem
 # pergunta estruturada): libera pro agente trocando hitl→afk. O triador então
 # briefa e o gerente despacha (vira "Aguardando agente"). SPEC §5.
-@router.post(
-    "/tasks/{source_ref}/approve", dependencies=[Depends(enforce_write_rate_limit)]
-)
+@router.post("/tasks/{source_ref}/approve", dependencies=[Depends(enforce_write_rate_limit)])
 async def approve_task(source_ref: str) -> dict[str, Any]:
     num = _ref_to_issue_number(source_ref)
     if num is None:
-        raise HTTPException(
-            status_code=400, detail={"error": "source_ref sem número de issue"}
-        )
+        raise HTTPException(status_code=400, detail={"error": "source_ref sem número de issue"})
     proc = await asyncio.create_subprocess_exec(
-        "gh", "issue", "edit", str(num), "--repo", _AGENTS_IA_REPO,
-        "--remove-label", "hitl", "--add-label", "afk",
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        "gh",
+        "issue",
+        "edit",
+        str(num),
+        "--repo",
+        _AGENTS_IA_REPO,
+        "--remove-label",
+        "hitl",
+        "--add-label",
+        "afk",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
     )
     _, err = await proc.communicate()
     if proc.returncode != 0:
@@ -210,19 +219,22 @@ async def approve_task(source_ref: str) -> dict[str, Any]:
 # como faz com CLOSED). NÃO basta tirar `afk` — uma issue com `area:*` continua na
 # fila como `todo`/`open` (bug #33). `parked` tira de vez do cockpit; reversível
 # (basta remover o label). O triador deve pular `parked` (follow-up, janela).
-@router.post(
-    "/tasks/{source_ref}/remove", dependencies=[Depends(enforce_write_rate_limit)]
-)
+@router.post("/tasks/{source_ref}/remove", dependencies=[Depends(enforce_write_rate_limit)])
 async def remove_from_queue(source_ref: str) -> dict[str, Any]:
     num = _ref_to_issue_number(source_ref)
     if num is None:
-        raise HTTPException(
-            status_code=400, detail={"error": "source_ref sem número de issue"}
-        )
+        raise HTTPException(status_code=400, detail={"error": "source_ref sem número de issue"})
     proc = await asyncio.create_subprocess_exec(
-        "gh", "issue", "edit", str(num), "--repo", _AGENTS_IA_REPO,
-        "--add-label", "parked",
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        "gh",
+        "issue",
+        "edit",
+        str(num),
+        "--repo",
+        _AGENTS_IA_REPO,
+        "--add-label",
+        "parked",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
     )
     _, err = await proc.communicate()
     if proc.returncode != 0:
@@ -252,9 +264,7 @@ ORDER BY created_at DESC
 """)
 
 
-@router.post(
-    "/tasks/{source_ref}/note", dependencies=[Depends(enforce_write_rate_limit)]
-)
+@router.post("/tasks/{source_ref}/note", dependencies=[Depends(enforce_write_rate_limit)])
 async def add_task_note(
     source_ref: str,
     body: NoteBody,
@@ -264,17 +274,21 @@ async def add_task_note(
     if not text_note:
         raise HTTPException(status_code=422, detail={"error": "nota vazia"})
     if _ref_to_issue_number(source_ref) is None:
-        raise HTTPException(
-            status_code=400, detail={"error": "source_ref sem número de issue"}
-        )
+        raise HTTPException(status_code=400, detail={"error": "source_ref sem número de issue"})
     try:
         row = (
-            await db.execute(
-                _NOTE_INSERT_SQL,
-                {"ref": source_ref, "note": text_note, "by": body.created_by},
+            (
+                await db.execute(
+                    _NOTE_INSERT_SQL,
+                    {"ref": source_ref, "note": text_note, "by": body.created_by},
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         await db.commit()
+        if row is None:
+            raise HTTPException(status_code=503, detail=_DOWN_DETAIL)
         return {"id": row["id"], "source_ref": source_ref, "created_at": row["created_at"]}
     except (OperationalError, InterfaceError, DBAPIError) as exc:
         logger.warning("coordination /note unavailable: %s", exc)
@@ -291,9 +305,16 @@ async def task_detail(
     num = _ref_to_issue_number(source_ref)
     if num is not None:
         proc = await asyncio.create_subprocess_exec(
-            "gh", "issue", "view", str(num), "--repo", _AGENTS_IA_REPO,
-            "--json", "body,title,url",
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            "gh",
+            "issue",
+            "view",
+            str(num),
+            "--repo",
+            _AGENTS_IA_REPO,
+            "--json",
+            "body,title,url",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
         out, _ = await proc.communicate()
         if proc.returncode == 0:
@@ -414,7 +435,8 @@ async def _run_gh(args: list[str]) -> str:
     """Roda `gh <args>`; 502 se gh faltar ou falhar."""
     try:
         proc = await asyncio.create_subprocess_exec(
-            "gh", *args,
+            "gh",
+            *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -438,14 +460,30 @@ async def respond_task(source_ref: str, body: RespondTaskBody) -> dict[str, Any]
     if not resp:
         raise HTTPException(status_code=422, detail={"error": "response_required"})
     await _run_gh(
-        ["issue", "comment", str(n), "--repo", _AGENTS_IA_REPO,
-         "--body", f"💬 **Resposta do CEO (cockpit):**\n\n{resp}"]
+        [
+            "issue",
+            "comment",
+            str(n),
+            "--repo",
+            _AGENTS_IA_REPO,
+            "--body",
+            f"💬 **Resposta do CEO (cockpit):**\n\n{resp}",
+        ]
     )
     if body.relabel_afk:
         # volta pro fluxo: hitl→afk (o dev-loop lê o comentário com a resposta)
         await _run_gh(
-            ["issue", "edit", str(n), "--repo", _AGENTS_IA_REPO,
-             "--remove-label", "hitl", "--add-label", "afk"]
+            [
+                "issue",
+                "edit",
+                str(n),
+                "--repo",
+                _AGENTS_IA_REPO,
+                "--remove-label",
+                "hitl",
+                "--add-label",
+                "afk",
+            ]
         )
     return {"ok": True, "issue": n, "relabeled_afk": body.relabel_afk}
 
@@ -898,9 +936,7 @@ def _pr_group(
         "reviewer": reviewer,
         "reviewer_cron": cron,
         "next_review_at": nxt.isoformat() if nxt else None,
-        "next_review_in_min": (
-            int((nxt - now).total_seconds() // 60) if nxt else None
-        ),
+        "next_review_in_min": (int((nxt - now).total_seconds() // 60) if nxt else None),
         "prs": sorted(prs, key=lambda p: str(p.get("created_at", ""))),
     }
 
@@ -925,10 +961,19 @@ async def _fetch_open_prs(db: AsyncSession) -> dict[str, Any]:
     """gh search prs --owner hmtrack --state open, agrupado por repo→projeto,
     enriquecido com o QA reviewer + previsão da próxima análise (cron)."""
     proc = await asyncio.create_subprocess_exec(
-        "gh", "search", "prs", "--owner", "hmtrack", "--state", "open",
-        "--limit", "100",
-        "--json", "repository,number,title,url,createdAt",
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        "gh",
+        "search",
+        "prs",
+        "--owner",
+        "hmtrack",
+        "--state",
+        "open",
+        "--limit",
+        "100",
+        "--json",
+        "repository,number,title,url,createdAt",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
     )
     out, err = await proc.communicate()
     if proc.returncode != 0:
@@ -1387,3 +1432,256 @@ async def create_meeting(
     except (OperationalError, InterfaceError, DBAPIError) as exc:
         logger.warning("coordination POST /meeting unavailable: %s", exc)
         raise HTTPException(status_code=503, detail=_DOWN_DETAIL) from exc
+
+
+# ── Botão Play (#833): dispara agente/issue NA HORA, sem esperar o cron ─────────
+# Aditivo ao cron (o agendamento segue). Dois caminhos, ambos detached (não
+# bloqueiam o request) e SEM shell (argv como lista — nunca interpola input cru):
+#   POST /agents/{nome}/run     → roda 1 ciclo do loop do agente
+#   POST /issues/{n}/dispatch   → despacha aquela issue agora (custa tokens)
+# A concorrência NÃO é burlada: reusamos as mesmas barreiras dos scripts —
+# loop-claim/file-lock (already_running) e DISPATCH_CAP/claim (cap_full). Os
+# pré-checks aqui são best-effort p/ feedback; o script re-checa de forma
+# autoritativa e PULA se preciso (idempotente).
+
+# Loop-script + venv do coordination.py vivem no repo de coordenação. A montagem
+# do comando por role fica no coordination.py (loop-command) — fonte única com o
+# gen_crontab; o backend não duplica o mapa ROLE_LOOP_SCRIPT.
+_AGENTS_DIR = f"{get_settings().AGENTS_REPO_DIR}/Agents"
+_COORD_PY = f"{_AGENTS_DIR}/coletor-task/.venv/bin/python"
+_COORD_SCRIPT = f"{_AGENTS_DIR}/coletor-task/coordination.py"
+_DISPATCH_SCRIPT = f"{_AGENTS_DIR}/gerente/automation/dispatch-agent.sh"
+
+# Nome de agente do roster: letras/dígitos/espaço e ()._- (cobre 'QA-FRONT (1)').
+_AGENT_NAME_RE = re.compile(r"^[A-Za-z0-9 ()._-]{1,64}$")
+
+# area:<short> → nome de projeto que dispatch-agent.sh/dev-loop entendem (reverso
+# EXATO do mapa de áreas do dev-loop.sh). Resolve o projeto pela label, não pela
+# coluna issues.project (que guarda lixo de prefixo de título tipo 'EPIC 1.1').
+_AREA_TO_PROJECT = {
+    "front": "hmtrack-front",
+    "api": "hmtrack-api-py",
+    "trackers": "hmtrack-trackers",
+    "alert-system": "hmtrack-alert-system",
+    "db": "banco-dados",
+    "mobile": "HMTrackApp",
+    "office": "claude-office",
+    "whatsapp": "hmtrack-whatsapp",
+}
+
+# Loop-claim VIVO no DB (lease 1800s = default do loop_claim): se existe, o loop do
+# agente já está rodando → already_running (não força 2º).
+_LOOP_ACTIVE_SQL = text("""
+SELECT 1 FROM work_claims
+WHERE source = 'loop' AND source_ref = :key
+  AND status IN ('claimed', 'in_progress')
+  AND COALESCE(heartbeat_at, claimed_at) > now() - interval '1800 seconds'
+LIMIT 1
+""")
+
+_ISSUE_ROW_SQL = text("SELECT state, labels FROM issues WHERE source_ref = :ref")
+
+# Claim ATIVO da issue (active_work já filtra status) → dispatch em andamento.
+_ISSUE_CLAIM_SQL = text("SELECT 1 FROM active_work WHERE source_ref = :ref LIMIT 1")
+
+# Cap global — MESMA contagem do dispatch-agent.sh (active_work, todos os sources).
+_ACTIVE_COUNT_SQL = text(
+    "SELECT count(*) FROM active_work WHERE status IN ('claimed', 'in_progress')"
+)
+
+# Agente do roster pro projeto — espelha a resolução do dispatch-agent.sh (--as-agent).
+_ROSTER_AGENT_SQL = text("""
+SELECT nome FROM agents
+WHERE :project = ANY(projetos) AND status <> 'busy' AND archived_at IS NULL
+ORDER BY mode DESC, last_active_at ASC NULLS FIRST
+LIMIT 1
+""")
+
+
+async def _spawn_detached(argv: list[str]) -> int:
+    """Lança argv desacoplado do request (nova sessão de processo, stdio
+    descartado). Os scripts cuidam dos próprios logs/claim/cap. Retorna o pid."""
+    proc = await asyncio.create_subprocess_exec(
+        *argv,
+        stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    return proc.pid
+
+
+def _project_from_labels(labels: list[str] | None) -> str | None:
+    """Resolve o projeto de dispatch pela 1ª label area:* conhecida."""
+    for lbl in labels or []:
+        if lbl.startswith("area:"):
+            return _AREA_TO_PROJECT.get(lbl[len("area:") :])
+    return None
+
+
+def _dispatch_briefing(n: int, project: str) -> str:
+    """Briefing auto-gerado (espelha o do dev-loop) com a instrução de
+    decisão-no-corpo, pra dispatches manuais do cockpit."""
+    return (
+        "MODO UNATTENDED (execute inline até abrir o PR, NÃO faça perguntas "
+        "interativas).\n\n"
+        f"Implemente a issue agents-ia#{n} no projeto {project}.\n"
+        f"- Leia a issue E OS COMENTÁRIOS: gh issue view {n} "
+        "--repo IsakielSouza/agents-ia --comments\n"
+        "- ⚠️ DECISÃO JÁ TOMADA: se o CORPO listar opções A/B/C ou disser "
+        "'Decisão necessária'/'Aguardando direcionamento', a escolha JÁ foi feita "
+        "— procure '✅ DECIDIDO' no corpo OU 'Decisão HITL (CEO)' no comentário "
+        "mais recente, e IMPLEMENTE essa opção. NUNCA encerre re-perguntando a "
+        "decisão. Se realmente não houver decisão em lugar nenhum, aí sim pare e "
+        "reporte.\n"
+        "- Trabalhe e commite SOMENTE no seu worktree (cwd). Crie um branch "
+        "nomeado (não detached). NUNCA git checkout no repo principal.\n"
+        f"- Abra um PR com 'Closes #{n}' no corpo.\n"
+        "- Se tocar arquivos em hmtrack-documentacao/, os commits ficam LOCAIS "
+        "(este repo não tem remote de código) — NUNCA git push de dentro dele.\n"
+        "- Finalize o relatório com uma seção '## Brechas mapeadas'."
+    )
+
+
+@router.post(
+    "/agents/{nome}/run",
+    status_code=202,
+    dependencies=[Depends(enforce_write_rate_limit)],
+)
+async def run_agent_now(
+    nome: str,
+    db: Annotated[AsyncSession, Depends(get_coordination_db)],
+) -> dict[str, Any]:
+    """Roda 1 ciclo do loop do agente AGORA (#833). Reusa loop-command do
+    coordination.py p/ montar o comando (ROLE_LOOP_SCRIPT/gen_crontab) e respeita
+    o loop-claim (already_running). Spawn detached."""
+    nome = nome.strip()
+    if not _AGENT_NAME_RE.match(nome):
+        raise HTTPException(status_code=422, detail={"error": "nome_invalido"})
+
+    # 1. Resolve o comando do loop via coordination.py (fonte única; sem shell).
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            _COORD_PY,
+            _COORD_SCRIPT,
+            "loop-command",
+            "--agent",
+            nome,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        out, err = await proc.communicate()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=502, detail={"error": "coordination_unavailable"}) from exc
+    rc = proc.returncode
+    if rc == 3:
+        raise HTTPException(status_code=404, detail={"error": "agent_not_in_roster", "nome": nome})
+    if rc == 4:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "role_sem_loop_script", "message": err.decode()[:200]},
+        )
+    if rc != 0:
+        raise HTTPException(
+            status_code=502,
+            detail={"error": "loop_command_failed", "message": err.decode()[:300]},
+        )
+    try:
+        info = json.loads(out.decode())
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=502, detail={"error": "loop_command_bad_output"}) from exc
+    argv = cast("list[str]", info.get("argv") or [])
+    claim_key = info.get("claim_key")
+    if not argv:
+        raise HTTPException(status_code=422, detail={"error": "role_sem_loop_script", "nome": nome})
+
+    # 2. already_running? (loop-claim vivo) — não força 2º loop.
+    if claim_key:
+        try:
+            active = (await db.execute(_LOOP_ACTIVE_SQL, {"key": claim_key})).scalar()
+        except (OperationalError, InterfaceError, DBAPIError) as exc:
+            logger.warning("coordination /agents/run unavailable: %s", exc)
+            raise HTTPException(status_code=503, detail=_DOWN_DETAIL) from exc
+        if active:
+            return {
+                "status": "already_running",
+                "agent": nome,
+                "claim_key": claim_key,
+            }
+
+    # 3. Spawn detached.
+    try:
+        pid = await _spawn_detached(argv)
+    except (FileNotFoundError, PermissionError) as exc:
+        raise HTTPException(
+            status_code=502, detail={"error": "spawn_failed", "message": str(exc)[:200]}
+        ) from exc
+    return {"status": "started", "agent": nome, "pid": pid, "claim_key": claim_key}
+
+
+@router.post(
+    "/issues/{n}/dispatch",
+    status_code=202,
+    dependencies=[Depends(enforce_write_rate_limit)],
+)
+async def dispatch_issue_now(
+    n: int,
+    db: Annotated[AsyncSession, Depends(get_coordination_db)],
+) -> dict[str, Any]:
+    """Despacha a issue #n AGORA via dispatch-agent.sh (#833). Resolve o projeto
+    pela label area:*, respeita claim (already_running) e DISPATCH_CAP (cap_full).
+    Spawn detached. Custa tokens — o frontend confirma antes."""
+    if n <= 0:
+        raise HTTPException(status_code=422, detail={"error": "issue_invalida"})
+    ref = f"agents-ia#{n}"
+
+    # 1. Estado + labels do mirror (resolve projeto pela area:*).
+    try:
+        row = (await db.execute(_ISSUE_ROW_SQL, {"ref": ref})).mappings().first()
+    except (OperationalError, InterfaceError, DBAPIError) as exc:
+        logger.warning("coordination /issues/dispatch unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail=_DOWN_DETAIL) from exc
+    if not row:
+        raise HTTPException(status_code=404, detail={"error": "issue_not_found", "issue": n})
+    if (row["state"] or "").upper() == "CLOSED":
+        return {"status": "closed", "issue": n}
+    project = _project_from_labels(row["labels"])
+    if not project:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "sem_projeto", "message": "issue sem label area:* conhecida"},
+        )
+
+    # 2. already_running? (claim ativo da issue).
+    try:
+        if (await db.execute(_ISSUE_CLAIM_SQL, {"ref": ref})).scalar():
+            return {"status": "already_running", "issue": n, "project": project}
+        # 3. cap cheio? (mesma contagem do dispatch-agent.sh).
+        cap = get_settings().DISPATCH_CAP
+        active = (await db.execute(_ACTIVE_COUNT_SQL)).scalar() or 0
+        if active >= cap:
+            return {"status": "cap_full", "issue": n, "active": active, "cap": cap}
+        # 4. agente do roster (best-effort; o script resolve se vier vazio).
+        agent = (await db.execute(_ROSTER_AGENT_SQL, {"project": project})).scalar()
+    except (OperationalError, InterfaceError, DBAPIError) as exc:
+        logger.warning("coordination /issues/dispatch unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail=_DOWN_DETAIL) from exc
+
+    # 5. Spawn detached (argv como lista — sem shell, sem injeção).
+    argv = [_DISPATCH_SCRIPT]
+    if agent:
+        argv += ["--as-agent", agent]
+    argv += [project, str(n), _dispatch_briefing(n, project)]
+    try:
+        pid = await _spawn_detached(argv)
+    except (FileNotFoundError, PermissionError) as exc:
+        raise HTTPException(
+            status_code=502, detail={"error": "spawn_failed", "message": str(exc)[:200]}
+        ) from exc
+    return {
+        "status": "started",
+        "issue": n,
+        "project": project,
+        "agent": agent,
+        "pid": pid,
+    }

@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, RefreshCw, Search, Building2 } from "lucide-react";
+import { Play, Plus, RefreshCw, Search, Building2 } from "lucide-react";
 import { CoordinationNav } from "@/components/coordination/CoordinationNav";
 import { useCoordinationPoll } from "@/components/coordination/useCoordinationPoll";
 import {
@@ -23,6 +23,7 @@ import {
   fetchOpenPrs,
   answerHitl,
   respondTask,
+  runAgentNow,
   type CoordDashboard,
   type CoordTask,
   type CoordAgent,
@@ -1559,6 +1560,23 @@ function AgentColumn({
       ? { label: "Ocupado", color: "#fbbf24" }
       : { label: "Livre", color: "#34d399" };
 
+  // ▶ Play (#833): roda o loop do agente agora, aditivo ao cron. Desabilita
+  // enquanto há claim/loop ativo (busy) — não força 2º loop.
+  const [running, setRunning] = useState(false);
+  const [runMsg, setRunMsg] = useState<string | null>(null);
+  const runNow = async (): Promise<void> => {
+    setRunning(true);
+    setRunMsg(null);
+    try {
+      const res = await runAgentNow(agent.nome);
+      setRunMsg(res.status === "already_running" ? "já rodando" : "iniciado ✓");
+    } catch (e) {
+      setRunMsg(e instanceof Error ? e.message : "erro");
+    } finally {
+      setRunning(false);
+    }
+  };
+
   return (
     <div className="rounded-2xl backdrop-blur-md border border-[rgba(168,85,247,0.25)] bg-[rgba(20,14,38,0.6)] overflow-hidden">
       <div className="px-4 py-4 flex items-center gap-3 border-b border-[rgba(168,85,247,0.25)]">
@@ -1576,6 +1594,20 @@ function AgentColumn({
               ` · ${agent.projetos.map((p) => p.replace(/^hmtrack-/, "")).join(", ")}`}
           </div>
         </div>
+        <button
+          type="button"
+          onClick={() => void runNow()}
+          disabled={running || busy}
+          title={
+            busy
+              ? "agente já tem claim/loop ativo"
+              : "rodar o loop deste agente agora (não espera o cron)"
+          }
+          className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold text-[#34d399] border border-[rgba(52,211,153,0.35)] bg-[rgba(52,211,153,0.08)] hover:bg-[rgba(52,211,153,0.16)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <Play size={11} className={running ? "animate-pulse" : ""} />
+          {running ? "…" : (runMsg ?? "Play")}
+        </button>
         <span
           className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-md"
           style={{ color: pill.color, background: `${pill.color}1f` }}

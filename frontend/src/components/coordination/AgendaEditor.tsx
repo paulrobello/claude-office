@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Clock, Plus, X } from "lucide-react";
+import { Clock, Play, Plus, X } from "lucide-react";
 import {
   cronToEditor,
   timesToCron,
@@ -9,7 +9,7 @@ import {
   DEFAULT_BUSINESS_HOURS,
   enterTimesHours,
 } from "@/utils/cron";
-import { patchAgent, type CoordAgent } from "./coordinationApi";
+import { patchAgent, runAgentNow, type CoordAgent } from "./coordinationApi";
 
 const STEPS = [5, 10, 15, 20, 30];
 
@@ -51,6 +51,25 @@ export function AgendaEditor({
   const [enabled, setEnabled] = useState(agent.enabled);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // ▶ Play (#833): roda o loop do agente agora, sem esperar o cron.
+  const [running, setRunning] = useState(false);
+  const [runMsg, setRunMsg] = useState<string | null>(null);
+  const claimActive = agent.active_claims > 0 || Boolean(agent.current_ref);
+
+  async function runNow(): Promise<void> {
+    setRunning(true);
+    setRunMsg(null);
+    try {
+      const res = await runAgentNow(agent.nome);
+      setRunMsg(
+        res.status === "already_running" ? "já rodando" : "iniciado ✓",
+      );
+    } catch (e) {
+      setRunMsg(e instanceof Error ? e.message : "erro");
+    } finally {
+      setRunning(false);
+    }
+  }
 
   const cron =
     mode === "times"
@@ -109,6 +128,21 @@ export function AgendaEditor({
         </span>
         {/* Toggle ligado/desligado — controla agent.enabled (liga/desliga o cron) */}
         <div className="flex items-center gap-2">
+          {/* ▶ Play (#833): roda o loop agora, aditivo ao cron */}
+          <button
+            type="button"
+            onClick={() => void runNow()}
+            disabled={running || claimActive}
+            title={
+              claimActive
+                ? "agente já tem claim/loop ativo"
+                : "rodar o loop deste agente agora (não espera o cron)"
+            }
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-[#34d399] border border-[rgba(52,211,153,0.35)] bg-[rgba(52,211,153,0.08)] hover:bg-[rgba(52,211,153,0.16)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <Play size={12} className={running ? "animate-pulse" : ""} />
+            {running ? "iniciando…" : runMsg ?? "Play"}
+          </button>
           <button
             type="button"
             role="switch"

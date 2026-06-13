@@ -443,6 +443,41 @@ export const restoreAgent = (nome: string): Promise<{ agent: CoordAgent }> =>
 export const deleteAgent = (nome: string): Promise<void> =>
   mutate(`/agents/${encodeURIComponent(nome)}`, "DELETE");
 
+// ── Botão Play (#833): disparar agente/issue AGORA, sem esperar o cron ──────────
+/** Resultado do Play do AGENTE: roda 1 ciclo do loop agora. */
+export interface RunAgentResult {
+  status: "started" | "already_running";
+  agent: string;
+  pid?: number;
+  claim_key?: string | null;
+}
+
+/** Resultado do Play da TASK: despacha a issue agora (custa tokens). */
+export interface DispatchIssueResult {
+  status: "started" | "already_running" | "cap_full" | "closed";
+  issue: number;
+  project?: string;
+  agent?: string | null;
+  pid?: number;
+  active?: number;
+  cap?: number;
+}
+
+/**
+ * ▶ Play no AGENTE: roda o loop do agente AGORA (1 ciclo), sem esperar o cron.
+ * Aditivo ao agendamento. Respeita o loop-claim (already_running) — não força 2º.
+ */
+export const runAgentNow = (nome: string): Promise<RunAgentResult> =>
+  mutate(`/agents/${encodeURIComponent(nome)}/run`, "POST");
+
+/**
+ * ▶ Play na TASK: despacha a issue #n AGORA (dispara `claude -p` → custa tokens).
+ * Respeita claim ativo (already_running) e DISPATCH_CAP (cap_full). Confirme antes
+ * de chamar (a UI pede confirmação).
+ */
+export const dispatchIssueNow = (n: number): Promise<DispatchIssueResult> =>
+  mutate(`/issues/${n}/dispatch`, "POST");
+
 /** Skip/Retry do cockpit: aplica label de prioridade (fila:topo/fila:fim) via backend. */
 export const setTaskPriority = (
   sourceRef: string,
