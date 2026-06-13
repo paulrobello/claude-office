@@ -32,6 +32,21 @@ import {
   DEFAULT_SLA_MS,
   type TaskStatus,
 } from "@/components/coordination/taskStatus";
+import {
+  STATUS_FACET_ORDER,
+  areaKeysOf,
+  agentKeysOf,
+  buildAreaToAgents,
+  matchesFilters,
+  toggleFacet,
+  emptyFilters,
+  showsClosed,
+  facetCounts,
+  filtersToQuery,
+  filtersFromQuery,
+  type TaskFilters,
+  type FacetName,
+} from "@/components/coordination/taskFilters";
 
 /** Mark do GitHub inline (lucide removeu ícones de marca nesta versão). */
 function GithubMark({ size = 18 }: { size?: number }): React.ReactNode {
@@ -55,7 +70,7 @@ const STATUS_COLOR: Record<TaskStatus, string> = {
   waiting_agent: "text-sky-300",
   todo: "text-slate-200",
   sem_agente: "text-fuchsia-300",
-  open: "text-slate-400",
+  sem_dono: "text-slate-400",
   done: "text-emerald-400",
   backlog: "text-yellow-600",
   unknown: "text-slate-500",
@@ -84,7 +99,15 @@ export default function TasksPage(): React.ReactNode {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [detailTask, setDetailTask] = useState<CoordTask | null>(null);
   const [feedback, setFeedback] = useState<string>("");
-  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  // Filtros multi-seleção (#818): Status, Projeto/Área, Agente. Default vazio =
+  // mostra todo o trabalho vivo e ESCONDE as fechadas (done não vem marcado).
+  // Hidrata da querystring no lazy init (client-only; SSR cai no vazio) —
+  // compartilhável + sobrevive reload, sem setState-in-effect.
+  const [filters, setFilters] = useState<TaskFilters>(() =>
+    typeof window === "undefined"
+      ? emptyFilters()
+      : filtersFromQuery(window.location.search),
+  );
   // refs aprovados nesta sessão: somem de "Precisa de você" na hora (otimista),
   // sem esperar o coletor re-sincronizar o relabel hitl→afc no /tasks.
   const [resolved, setResolved] = useState<Set<string>>(() => new Set());
@@ -104,11 +127,26 @@ export default function TasksPage(): React.ReactNode {
     return () => window.clearInterval(id);
   }, []);
 
-  // Só OPEN: a tela exclui CLOSED de qualquer forma, e buscar fechadas (513!)
-  // estourava o LIMIT 200 e expulsava issues OPEN antigas (sumiam da tela).
+  // Espelha os filtros na URL sem navegar (replaceState).
+  useEffect(() => {
+    const qs = filtersToQuery(filters);
+    window.history.replaceState(null, "", qs || window.location.pathname);
+  }, [filters]);
+
+  // OPEN sempre; as CLOSED só entram quando "Concluída" é marcada — buscar todas
+  // as fechadas (513!) estourava o LIMIT e expulsava OPEN antigas. Limite 200 nas
+  // mais recentes é suficiente pra auditoria pontual.
+  const showClosed = showsClosed(filters);
   const { data, loading, unavailable, error, refetch } = useCoordinationPoll(
     () => fetchTasks("?state=OPEN"),
     [],
+  );
+  const { data: closedData } = useCoordinationPoll(
+    () =>
+      showClosed
+        ? fetchTasks("?state=CLOSED&limit=200")
+        : Promise.resolve({ tasks: [] }),
+    [showClosed],
   );
   const { data: hitlData, refetch: refetchHitl } = useCoordinationPoll(
     fetchHitlPending,
@@ -137,8 +175,58 @@ export default function TasksPage(): React.ReactNode {
     return m;
   }, [prompts]);
 
+  // Mapa área → agentes do roster (faceta Agente: deriva "dono" pela área).
+  const areaToAgents = useMemo(
+    () => buildAreaToAgents(agentsData?.agents ?? []),
+    [agentsData],
+  );
+
+  // Universo de tasks: OPEN sempre + CLOSED só quando "Concluída" está marcada.
+  const allTasks = useMemo(
+    () => [...(data?.tasks ?? []), ...(showClosed ? (closedData?.tasks ?? []) : [])],
+    [data, closedData, showClosed],
+  );
+
+  // Aplica as 3 facetas (AND entre facetas, OR dentro). Default vazio = tudo
+  // que é OPEN; sem `done` marcado, as CLOSED nem entram em allTasks.
+  const filtered = useMemo(
+    () => allTasks.filter((t) => matchesFilters(t, prompts, filters, areaToAgents)),
+    [allTasks, prompts, filters, areaToAgents],
+  );
+
+  // Opções das facetas Projeto/Área e Agente, derivadas dos dados (data-driven).
+  const areaOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const t of allTasks) for (const a of areaKeysOf(t)) s.add(a);
+    return [...s].sort();
+  }, [allTasks]);
+  const agentOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const t of allTasks) for (const a of agentKeysOf(t, areaToAgents)) s.add(a);
+    return [...s].sort();
+  }, [allTasks, areaToAgents]);
+
+  // Contadores por opção (respeitam as outras facetas marcadas).
+  const counts = useMemo(
+    () => ({
+      status: facetCounts("status", allTasks, prompts, filters, areaToAgents),
+      area: facetCounts("area", allTasks, prompts, filters, areaToAgents),
+      agent: facetCounts("agent", allTasks, prompts, filters, areaToAgents),
+    }),
+    [allTasks, prompts, filters, areaToAgents],
+  );
+
+  // Fechadas que passam pelos filtros (só aparecem com "Concluída" marcada).
+  const doneTasks = useMemo(
+    () =>
+      filtered
+        .filter((t) => deriveStatus(t, prompts) === "done")
+        .sort((a, b) => b.number - a.number),
+    [filtered, prompts],
+  );
+
   const groups = useMemo(() => {
-    const g = groupAndSortTasks(data?.tasks ?? [], prompts);
+    const g = groupAndSortTasks(filtered, prompts);
     // Aprovadas/removidas nesta sessão somem na hora (otimista). E a fila reordena
     // otimista por prioritized/deprioritized (o label só reflete após o sync ~5min).
     const effRank = (t: CoordTask) =>
@@ -163,7 +251,7 @@ export default function TasksPage(): React.ReactNode {
             a.number - b.number,
         ),
     };
-  }, [data, prompts, resolved, prioritized, deprioritized]);
+  }, [filtered, prompts, resolved, prioritized, deprioritized]);
 
   // "Precisa de você" se divide em Erros (precisam retry) e Pendentes (aguardam você).
   const errorTasks = useMemo(
@@ -381,13 +469,12 @@ export default function TasksPage(): React.ReactNode {
     setSelected(new Set());
     await refetch();
   };
-  const toggleGroup = (key: string) =>
-    setHidden((s) => {
-      const n = new Set(s);
-      if (n.has(key)) n.delete(key);
-      else n.add(key);
-      return n;
-    });
+  // Toggle de uma caixa de faceta (#818): atualiza filtros → re-renderiza a lista.
+  const onToggleFacet = (facet: FacetName, value: string) =>
+    setFilters((f) => toggleFacet(f, facet, value));
+  const clearFilters = () => setFilters(emptyFilters());
+  const filterCount =
+    filters.status.size + filters.area.size + filters.agent.size;
 
   const renderRow = (t: CoordTask, queuePos?: number) => {
     const status = deriveStatus(t, prompts);
@@ -484,7 +571,7 @@ export default function TasksPage(): React.ReactNode {
                 </button>
               )}
               {(status === "todo" ||
-                status === "open" ||
+                status === "sem_dono" ||
                 status === "sem_agente") && (
                 <>
                   <button
@@ -577,6 +664,49 @@ export default function TasksPage(): React.ReactNode {
     );
   };
 
+  // Uma faceta = um bloco de checkboxes (OR dentro; AND entre facetas).
+  const renderFacet = (
+    facet: FacetName,
+    titleKey: TranslationKey,
+    options: { value: string; label: string }[],
+    selectedSet: Set<string>,
+    countMap: Record<string, number>,
+  ) => {
+    if (options.length === 0) return null;
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="text-[11px] uppercase tracking-wide font-bold text-slate-500">
+          {tr(titleKey)}
+        </span>
+        <div className="flex flex-wrap gap-1.5">
+          {options.map(({ value, label }) => {
+            const on = selectedSet.has(value);
+            const n = countMap[value] ?? 0;
+            return (
+              <label
+                key={value}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-bold border cursor-pointer transition-colors ${
+                  on
+                    ? "bg-sky-500/20 text-sky-200 border-sky-500/50"
+                    : "bg-slate-800 text-slate-300 border-slate-700 hover:border-slate-500"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="w-3.5 h-3.5"
+                  checked={on}
+                  onChange={() => onToggleFacet(facet, value)}
+                />
+                {label}
+                <span className="text-slate-500">{n}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <main className="min-h-screen bg-neutral-950 text-slate-200 p-4">
       <div className="flex items-center justify-between mb-3">
@@ -655,45 +785,66 @@ export default function TasksPage(): React.ReactNode {
             {" · "}
             <span>{groups.queue.length} na fila</span>
           </div>
-          <div className="flex flex-wrap gap-2 mb-3">
-            {(
-              [
-                ["need_you", "tasks.group.needYou"],
-                ["in_progress", "tasks.group.inProgress"],
-                ["queue", "tasks.group.queue"],
-              ] as const
-            ).map(([key, labelKey]) => (
-              <button
-                key={key}
-                onClick={() => toggleGroup(key)}
-                aria-pressed={!hidden.has(key)}
-                className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
-                  hidden.has(key)
-                    ? "bg-slate-900 text-slate-600 border-slate-800"
-                    : "bg-slate-800 text-slate-200 border-slate-600"
-                }`}
-              >
-                {tr(labelKey)} ({groups[key].length})
-              </button>
-            ))}
+          <div className="flex flex-col gap-2 mb-3 p-3 rounded-lg border border-slate-800 bg-slate-900/40">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-slate-300">
+                {tr("tasks.filter.title")}
+              </span>
+              {filterCount > 0 && (
+                <button
+                  onClick={clearFilters}
+                  className="text-xs font-bold text-slate-400 hover:text-white"
+                >
+                  ✕ {tr("tasks.filter.clear")} ({filterCount})
+                </button>
+              )}
+            </div>
+            {renderFacet(
+              "status",
+              "tasks.filter.status",
+              STATUS_FACET_ORDER.map((k) => ({
+                value: k,
+                label: tr(`tasks.facet.${k}` as TranslationKey),
+              })),
+              filters.status,
+              counts.status,
+            )}
+            {renderFacet(
+              "area",
+              "tasks.filter.area",
+              areaOptions.map((a) => ({ value: a, label: a })),
+              filters.area,
+              counts.area,
+            )}
+            {renderFacet(
+              "agent",
+              "tasks.filter.agent",
+              agentOptions.map((a) => ({ value: a, label: a })),
+              filters.agent,
+              counts.agent,
+            )}
+            {!showClosed && (
+              <p className="text-[11px] text-slate-500">
+                {tr("tasks.filter.noClosedHint")}
+              </p>
+            )}
           </div>
-          {!hidden.has("need_you") &&
-            errorTasks.length > 0 &&
+          {errorTasks.length > 0 &&
             renderGroup("tasks.group.errors", errorTasks, "text-rose-400")}
-          {!hidden.has("need_you") &&
+          {(pendingTasks.length > 0 || filterCount === 0) &&
             renderGroup(
               "tasks.group.needYou",
               pendingTasks,
               "text-amber-400",
               true,
             )}
-          {!hidden.has("in_progress") &&
+          {(groups.in_progress.length > 0 || filterCount === 0) &&
             renderGroup(
               "tasks.group.inProgress",
               groups.in_progress,
               "text-sky-400",
             )}
-          {!hidden.has("in_progress") && busyAgents.length > 0 && (
+          {busyAgents.length > 0 && (
             <div className="mb-5 -mt-3">
               <div className="text-xs text-slate-500 mb-1">
                 Agentes ativos agora
@@ -720,7 +871,7 @@ export default function TasksPage(): React.ReactNode {
               </div>
             </div>
           )}
-          {!hidden.has("queue") &&
+          {(groups.queue.length > 0 || filterCount === 0) &&
             renderGroup(
               "tasks.group.queue",
               groups.queue,
@@ -728,6 +879,8 @@ export default function TasksPage(): React.ReactNode {
               false,
               true,
             )}
+          {showClosed &&
+            renderGroup("tasks.status.done", doneTasks, "text-emerald-400")}
         </>
       )}
 

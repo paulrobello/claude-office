@@ -1,7 +1,7 @@
 import type { CoordTask, HitlPrompt } from "./coordinationApi";
 
 export type TaskStatus =
-  | "open"
+  | "sem_dono"
   | "todo"
   | "sem_agente"
   | "pending"
@@ -51,7 +51,9 @@ export function deriveStatus(
     const hasAfk = task.labels.includes("afk");
     const blocked = task.labels.includes("wip") || task.labels.includes("epic");
     if (hasAfk && !blocked) return "sem_agente";
-    return task.labels.some((l) => AREA_LABEL.test(l)) ? "todo" : "open";
+    // "Sem dono" (órfã): OPEN sem nenhum `area:*` = nenhum projeto/agente
+    // responsável. Com área (ou afk) → todo (tem dono, na fila).
+    return task.labels.some((l) => AREA_LABEL.test(l)) ? "todo" : "sem_dono";
   }
   return "unknown";
 }
@@ -66,7 +68,7 @@ export function statusGroup(status: TaskStatus): TaskGroup {
       return "in_progress";
     case "sem_agente":
     case "todo":
-    case "open":
+    case "sem_dono":
     case "unknown":
       return "queue";
     case "done":

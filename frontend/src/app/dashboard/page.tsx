@@ -137,7 +137,7 @@ function fmtBucket(iso: string, period: Period): string {
 }
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
-  open: "Sem label",
+  sem_dono: "Sem dono",
   todo: "To-Do",
   sem_agente: "Sem agente",
   pending: "Precisa de você",

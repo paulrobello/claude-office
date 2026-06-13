@@ -112,8 +112,8 @@ describe("deriveStatus", () => {
       "todo",
     );
   });
-  it("OPEN sem label de área → open", () => {
-    expect(deriveStatus(baseTask({ labels: [] }), [])).toBe("open");
+  it("OPEN sem label de área → sem_dono (órfã)", () => {
+    expect(deriveStatus(baseTask({ labels: [] }), [])).toBe("sem_dono");
   });
 });
 
@@ -126,9 +126,9 @@ describe("statusGroup", () => {
     expect(statusGroup("running")).toBe("in_progress");
     expect(statusGroup("waiting_agent")).toBe("in_progress");
   });
-  it("todo, open e sem_agente → queue", () => {
+  it("todo, sem_dono e sem_agente → queue", () => {
     expect(statusGroup("todo")).toBe("queue");
-    expect(statusGroup("open")).toBe("queue");
+    expect(statusGroup("sem_dono")).toBe("queue");
     expect(statusGroup("sem_agente")).toBe("queue");
   });
   it("done → history", () => {
