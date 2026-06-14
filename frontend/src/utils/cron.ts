@@ -69,7 +69,12 @@ export function cronToEditor(expr: string): CronEditor {
     if (ok) {
       const startHour = Number(rangeMatch[1]);
       const endHour = Number(rangeMatch[2]);
-      const editor: CronEditor = { mode: "interval", everyMin: step, startHour, endHour };
+      const editor: CronEditor = {
+        mode: "interval",
+        everyMin: step,
+        startHour,
+        endHour,
+      };
       // janela 0-23 == "24h por dia" → reabre com a caixa marcada (round-trip)
       if (startHour === 0 && endHour === 23) editor.h24 = true;
       return editor;

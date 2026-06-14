@@ -348,7 +348,8 @@ export default function AgentsPage(): React.ReactNode {
                           </span>
                           <span className="text-slate-500">
                             {" "}
-                            · {m.total} runs · {fmtDuration(m.avg_duration_seconds)}
+                            · {m.total} runs ·{" "}
+                            {fmtDuration(m.avg_duration_seconds)}
                           </span>
                         </span>
                       );

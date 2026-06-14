@@ -23,6 +23,8 @@ import {
   fetchOpenPrs,
   answerHitl,
   respondTask,
+  assignArea,
+  dispatchIssueNow,
   type CoordDashboard,
   type CoordTask,
   type CoordAgent,
@@ -230,6 +232,17 @@ export default function DashboardPage(): React.ReactNode {
   const areaToAgents = useMemo(
     () => buildAreaToAgents(data?.agents ?? []),
     [data],
+  );
+
+  // Opções de "Atribuir dono" (#840/#851): áreas cobertas pelo roster vivo + o
+  // agente dono de cada uma. Sem hardcode — deriva de `data.agents`. Alimenta o
+  // select de ÁREA inline da pill "Sem dono" (e o fallback de task sem área).
+  const areaAssignOptions = useMemo(
+    () =>
+      [...areaToAgents.entries()]
+        .map(([area, agents]) => ({ area, agents }))
+        .sort((a, b) => a.area.localeCompare(b.area)),
+    [areaToAgents],
   );
 
   // Universo: OPEN sempre + CLOSED só com "Concluída" marcada.
@@ -940,6 +953,9 @@ export default function DashboardPage(): React.ReactNode {
           rows={semAgenteTasks}
           overdue={semAgenteOverdue}
           nowMs={nowMs}
+          areaToAgents={areaToAgents}
+          areaOptions={areaAssignOptions}
+          onChanged={refetch}
           onClose={() => setShowSemAgente(false)}
         />
       )}
@@ -955,6 +971,8 @@ export default function DashboardPage(): React.ReactNode {
         <OrphansModal
           total={orphans.length}
           byArea={orphansByArea}
+          areaOptions={areaAssignOptions}
+          onChanged={refetch}
           onClose={() => setShowOrphans(false)}
         />
       )}
@@ -986,13 +1004,203 @@ function fmtClock(iso: string | null): string {
   return dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Opção do select "Atribuir dono": área curta + agentes do roster que a cobrem. */
+interface AreaAssignOption {
+  area: string;
+  agents: string[];
+}
+
+/** ▶ Aplicar inline na pill "Sem dono" (#851/#840): escolhe uma ÁREA (do roster
+ *  vivo) e adiciona `area:<x>`+`afk` na issue — sai do limbo e entra na fila do
+ *  dispatch. Mesma lógica do TaskDetailModal/#840, trazida pro dashboard. */
+function InlineAreaAssign({
+  task,
+  areaOptions,
+  onChanged,
+}: {
+  task: CoordTask;
+  areaOptions: AreaAssignOption[];
+  onChanged: () => void;
+}): React.ReactNode {
+  const [area, setArea] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const apply = async () => {
+    if (!area || busy) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await assignArea(task.source_ref, area);
+      setMsg("✓ atribuída");
+      onChanged();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "erro");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-1.5 flex items-center gap-2">
+      <select
+        value={area}
+        onChange={(e) => setArea(e.target.value)}
+        disabled={busy || areaOptions.length === 0}
+        className="flex-1 min-w-0 bg-[rgba(10,7,20,0.8)] border border-[rgba(251,191,36,0.25)] rounded-lg px-2 py-1 text-xs text-[#e8e4f3] disabled:opacity-40"
+      >
+        <option value="">
+          {areaOptions.length === 0
+            ? "(sem áreas no roster)"
+            : "Atribuir área…"}
+        </option>
+        {areaOptions.map((o) => (
+          <option key={o.area} value={o.area}>
+            area:{o.area}
+            {o.agents.length > 0
+              ? ` — ${o.agents.join(", ")}`
+              : " — (sem agente)"}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={() => void apply()}
+        disabled={busy || !area}
+        className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold text-[#fbbf24] border border-[rgba(251,191,36,0.4)] bg-[rgba(251,191,36,0.1)] hover:bg-[rgba(251,191,36,0.2)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        {busy ? "…" : "Aplicar"}
+      </button>
+      {msg && (
+        <span className="text-[11px] text-[#9a93b3] whitespace-nowrap">
+          {msg}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** ▶ Aplicar inline na pill "Sem agente" (#851): escolhe um agente que COBRE a
+ *  área da task (roster vivo, default = dono da área) e DISPACHA a issue pra ele
+ *  agora (#833 + param `agent`). Feedback canônico: started→'Em execução' (#839),
+ *  already_running, cap_full. Task sem área (caso raro que vazou) cai no fluxo de
+ *  atribuir área (#840). */
+function InlineAgentDispatch({
+  task,
+  areaToAgents,
+  areaOptions,
+  onChanged,
+}: {
+  task: CoordTask;
+  areaToAgents: Map<string, string[]>;
+  areaOptions: AreaAssignOption[];
+  onChanged: () => void;
+}): React.ReactNode {
+  // Agentes do roster que cobrem QUALQUER área da task (dedup, dono 1º).
+  const agents = useMemo(() => {
+    const out: string[] = [];
+    for (const a of areaKeysOf(task))
+      for (const ag of areaToAgents.get(a) ?? [])
+        if (!out.includes(ag)) out.push(ag);
+    return out;
+  }, [task, areaToAgents]);
+
+  const [agent, setAgent] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  // Default = dono da área (1º do roster), reagindo ao roster carregar. Ajuste de
+  // estado em render (padrão React, não-effect) — só quando ainda nada escolhido.
+  const [prevFirst, setPrevFirst] = useState("");
+  const first = agents[0] ?? "";
+  if (first !== prevFirst) {
+    setPrevFirst(first);
+    if (!agent && first) setAgent(first);
+  }
+
+  // Sem área (vazou pra cá) → atribuir área (#840), não dispatch.
+  if (areaKeysOf(task).length === 0) {
+    return (
+      <InlineAreaAssign
+        task={task}
+        areaOptions={areaOptions}
+        onChanged={onChanged}
+      />
+    );
+  }
+
+  const apply = async () => {
+    if (!agent || busy) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await dispatchIssueNow(task.number, agent);
+      if (res.status === "started") setMsg("▶ Em execução");
+      else if (res.status === "already_running") setMsg("já em execução");
+      else if (res.status === "cap_full")
+        setMsg(`cap cheio (${res.active}/${res.cap})`);
+      else if (res.status === "closed") setMsg("fechada");
+      onChanged();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "erro");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const noAgents = agents.length === 0;
+  return (
+    <div className="mt-1.5 flex items-center gap-2">
+      <select
+        value={agent}
+        onChange={(e) => setAgent(e.target.value)}
+        disabled={busy || noAgents}
+        className="flex-1 min-w-0 bg-[rgba(10,7,20,0.8)] border border-[rgba(192,132,252,0.3)] rounded-lg px-2 py-1 text-xs text-[#e8e4f3] disabled:opacity-40"
+      >
+        {noAgents ? (
+          <option value="">(nenhum agente cobre a área)</option>
+        ) : (
+          agents.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))
+        )}
+      </select>
+      <button
+        type="button"
+        onClick={() => void apply()}
+        disabled={busy || !agent}
+        title={
+          noAgents
+            ? "nenhum agente do roster cobre a área desta task"
+            : `despachar a issue pro ${agent} agora — custa tokens`
+        }
+        className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold text-[#34d399] border border-[rgba(52,211,153,0.4)] bg-[rgba(52,211,153,0.1)] hover:bg-[rgba(52,211,153,0.2)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        <Play size={11} className={busy ? "animate-pulse" : ""} />
+        {busy ? "…" : "Aplicar"}
+      </button>
+      {msg && (
+        <span className="text-[11px] text-[#9a93b3] whitespace-nowrap">
+          {msg}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function OrphansModal({
   total,
   byArea,
+  areaOptions,
+  onChanged,
   onClose,
 }: {
   total: number;
   byArea: [string, CoordTask[]][];
+  areaOptions: AreaAssignOption[];
+  onChanged: () => void;
   onClose: () => void;
 }): React.ReactNode {
   return (
@@ -1041,7 +1249,10 @@ function OrphansModal({
                   {list.map((t) => {
                     const num = t.source_ref.replace(/^agents-ia#/, "");
                     return (
-                      <li key={t.source_ref}>
+                      <li
+                        key={t.source_ref}
+                        className="rounded-lg px-3 py-2 bg-[rgba(251,191,36,0.06)] border border-[rgba(251,191,36,0.15)]"
+                      >
                         <a
                           href={
                             t.url ??
@@ -1049,7 +1260,7 @@ function OrphansModal({
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-baseline gap-2 rounded-lg px-3 py-2 bg-[rgba(251,191,36,0.06)] border border-[rgba(251,191,36,0.15)] hover:border-[rgba(251,191,36,0.45)] transition text-sm"
+                          className="flex items-baseline gap-2 transition text-sm hover:opacity-80"
                         >
                           <span className="text-[#fbbf24] font-mono">
                             #{t.number}
@@ -1058,6 +1269,12 @@ function OrphansModal({
                             {t.title}
                           </span>
                         </a>
+                        {/* Atribuir ÁREA inline (#851): sai de "Sem dono" → fila. */}
+                        <InlineAreaAssign
+                          task={t}
+                          areaOptions={areaOptions}
+                          onChanged={onChanged}
+                        />
                       </li>
                     );
                   })}
@@ -1154,11 +1371,17 @@ function SemAgenteModal({
   rows,
   overdue,
   nowMs,
+  areaToAgents,
+  areaOptions,
+  onChanged,
   onClose,
 }: {
   rows: { task: CoordTask; idleMs: number; overdue: boolean }[];
   overdue: number;
   nowMs: number;
+  areaToAgents: Map<string, string[]>;
+  areaOptions: AreaAssignOption[];
+  onChanged: () => void;
   onClose: () => void;
 }): React.ReactNode {
   const accent = overdue > 0 ? "236,72,153" : "192,132,252";
@@ -1213,7 +1436,18 @@ function SemAgenteModal({
               const idle = formatStuckTime(idleSince(t), nowMs, IDLE_ALERT_MS);
               const num = t.source_ref.replace(/^agents-ia#/, "");
               return (
-                <li key={t.source_ref}>
+                <li
+                  key={t.source_ref}
+                  className="rounded-lg px-3 py-2 border"
+                  style={{
+                    background: od
+                      ? "rgba(236,72,153,0.08)"
+                      : "rgba(192,132,252,0.06)",
+                    borderColor: od
+                      ? "rgba(236,72,153,0.4)"
+                      : "rgba(192,132,252,0.15)",
+                  }}
+                >
                   <a
                     href={
                       t.url ??
@@ -1221,15 +1455,7 @@ function SemAgenteModal({
                     }
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-baseline gap-2 rounded-lg px-3 py-2 border transition text-sm"
-                    style={{
-                      background: od
-                        ? "rgba(236,72,153,0.08)"
-                        : "rgba(192,132,252,0.06)",
-                      borderColor: od
-                        ? "rgba(236,72,153,0.4)"
-                        : "rgba(192,132,252,0.15)",
-                    }}
+                    className="flex items-baseline gap-2 transition text-sm hover:opacity-80"
                   >
                     <span
                       className="font-mono"
@@ -1265,6 +1491,14 @@ function SemAgenteModal({
                       </span>
                     )}
                   </a>
+                  {/* Atribuir agente da área + Aplicar (▶ dispatch) inline (#851).
+                      Task sem área cai no fluxo de atribuir área (#840). */}
+                  <InlineAgentDispatch
+                    task={t}
+                    areaToAgents={areaToAgents}
+                    areaOptions={areaOptions}
+                    onChanged={onChanged}
+                  />
                 </li>
               );
             })}

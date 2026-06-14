@@ -13,7 +13,9 @@ export const CRON_ROLES = [
  *  dev-loops por projeto). Sem isto, os agentes dev não apareciam na tela de
  *  Agendas e não dava pra ligá-los. */
 export function isCronCapableRole(role: string): boolean {
-  return (CRON_ROLES as readonly string[]).includes(role) || role.startsWith("dev-");
+  return (
+    (CRON_ROLES as readonly string[]).includes(role) || role.startsWith("dev-")
+  );
 }
 
 export interface AgendaPartition {

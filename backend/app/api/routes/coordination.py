@@ -1024,9 +1024,7 @@ _QA_MARKER_RE = re.compile(r"## QA-[A-Z0-9]+ VEREDITO:")
 _QA_GO_RE = re.compile(r"## QA-[A-Z0-9]+ VEREDITO: ✅ GO")
 
 
-def _qa_gate_from_reviews(
-    reviews: list[dict[str, Any]], head_oid: str
-) -> bool:
+def _qa_gate_from_reviews(reviews: list[dict[str, Any]], head_oid: str) -> bool:
     """Lógica pura do gate QA (testável sem gh). Espelha o devops-loop.sh:
 
     entre os reviews cujo body tem o marcador E está vinculado ao head via
@@ -1071,9 +1069,7 @@ async def _pr_qa_approved(repo: str, number: int | None) -> bool:
     )
     out, err = await proc.communicate()
     if proc.returncode != 0:
-        logger.warning(
-            "open-prs qa-gate %s#%s falhou: %s", repo, number, err.decode()[:160]
-        )
+        logger.warning("open-prs qa-gate %s#%s falhou: %s", repo, number, err.decode()[:160])
         return False
     try:
         data = cast("dict[str, Any]", json.loads(out.decode() or "{}"))
@@ -1650,6 +1646,15 @@ ORDER BY mode DESC, last_active_at ASC NULLS FIRST
 LIMIT 1
 """)
 
+# Agente forçado (#851): existe no roster E cobre o projeto da issue? Fecha a porta
+# a --as-agent com nome inventado ou que não cobre a área (o front só oferece os que
+# cobrem, mas o backend re-valida — fonte autoritativa).
+_ROSTER_AGENT_COVERS_SQL = text("""
+SELECT 1 FROM agents
+WHERE nome = :nome AND :project = ANY(projetos) AND archived_at IS NULL
+LIMIT 1
+""")
+
 
 async def _spawn_detached(argv: list[str]) -> int:
     """Lança argv desacoplado do request (nova sessão de processo, stdio
@@ -1776,6 +1781,13 @@ async def run_agent_now(
     return {"status": "started", "agent": nome, "pid": pid, "claim_key": claim_key}
 
 
+# Dispatch da issue (#833) com agente OPCIONAL forçado (#851): o cockpit escolhe,
+# na pill "Sem agente", QUAL agente que cobre a área recebe a issue. Sem body (ou
+# agent=None) cai no comportamento original (dono da área via _ROSTER_AGENT_SQL).
+class DispatchBody(BaseModel):
+    agent: str | None = None  # força --as-agent (entre os que cobrem a área)
+
+
 @router.post(
     "/issues/{n}/dispatch",
     status_code=202,
@@ -1784,10 +1796,12 @@ async def run_agent_now(
 async def dispatch_issue_now(
     n: int,
     db: Annotated[AsyncSession, Depends(get_coordination_db)],
+    body: DispatchBody | None = None,
 ) -> dict[str, Any]:
     """Despacha a issue #n AGORA via dispatch-agent.sh (#833). Resolve o projeto
     pela label area:*, respeita claim (already_running) e DISPATCH_CAP (cap_full).
-    Spawn detached. Custa tokens — o frontend confirma antes."""
+    Spawn detached. Custa tokens — o frontend confirma antes. Com `agent` no corpo
+    (#851), força esse agente (validado: existe no roster e cobre o projeto)."""
     if n <= 0:
         raise HTTPException(status_code=422, detail={"error": "issue_invalida"})
     ref = f"agents-ia#{n}"
@@ -1818,8 +1832,27 @@ async def dispatch_issue_now(
         active = (await db.execute(_ACTIVE_COUNT_SQL)).scalar() or 0
         if active >= cap:
             return {"status": "cap_full", "issue": n, "active": active, "cap": cap}
-        # 4. agente do roster (best-effort; o script resolve se vier vazio).
-        agent = (await db.execute(_ROSTER_AGENT_SQL, {"project": project})).scalar()
+        # 4. agente: forçado (#851, validado) OU dono da área (best-effort; o script
+        #    resolve se vier vazio).
+        forced = (body.agent or "").strip() if body else ""
+        if forced:
+            if not _AGENT_NAME_RE.match(forced):
+                raise HTTPException(status_code=422, detail={"error": "nome_invalido"})
+            covers = (
+                await db.execute(_ROSTER_AGENT_COVERS_SQL, {"nome": forced, "project": project})
+            ).scalar()
+            if not covers:
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "error": "agente_nao_cobre_area",
+                        "agent": forced,
+                        "project": project,
+                    },
+                )
+            agent = forced
+        else:
+            agent = (await db.execute(_ROSTER_AGENT_SQL, {"project": project})).scalar()
     except (OperationalError, InterfaceError, DBAPIError) as exc:
         logger.warning("coordination /issues/dispatch unavailable: %s", exc)
         raise HTTPException(status_code=503, detail=_DOWN_DETAIL) from exc

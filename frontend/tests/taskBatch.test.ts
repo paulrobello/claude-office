@@ -57,33 +57,50 @@ describe("approveAction", () => {
   it("prompt choice c/ recomendada → answer a recomendada", () => {
     const r = approveAction(
       task({}),
-      prompt({ kind: "choice", options: [{ key: "A", label: "x" }], recommended_key: "A" }),
+      prompt({
+        kind: "choice",
+        options: [{ key: "A", label: "x" }],
+        recommended_key: "A",
+      }),
     );
     expect(r).toEqual({ kind: "answer", value: "A" });
   });
   it("prompt multi c/ recomendada → answer [recomendada]", () => {
     const r = approveAction(
       task({}),
-      prompt({ kind: "multi", options: [{ key: "A", label: "x" }], recommended_key: "A" }),
+      prompt({
+        kind: "multi",
+        options: [{ key: "A", label: "x" }],
+        recommended_key: "A",
+      }),
     );
     expect(r).toEqual({ kind: "answer", value: ["A"] });
   });
   it("prompt choice sem recomendada → modal", () => {
     expect(
-      approveAction(task({}), prompt({ kind: "choice", options: [{ key: "A", label: "x" }] })),
+      approveAction(
+        task({}),
+        prompt({ kind: "choice", options: [{ key: "A", label: "x" }] }),
+      ),
     ).toEqual({ kind: "modal" });
   });
   it("prompt text → modal", () => {
-    expect(approveAction(task({}), prompt({ kind: "text", options: null }))).toEqual({
+    expect(
+      approveAction(task({}), prompt({ kind: "text", options: null })),
+    ).toEqual({
       kind: "modal",
     });
   });
   it("sem prompt mas label hitl → relabel", () => {
-    expect(approveAction(task({ labels: ["hitl", "area:front"] }), undefined)).toEqual({
+    expect(
+      approveAction(task({ labels: ["hitl", "area:front"] }), undefined),
+    ).toEqual({
       kind: "relabel",
     });
   });
   it("sem prompt e sem hitl → none", () => {
-    expect(approveAction(task({ labels: ["afk"] }), undefined)).toEqual({ kind: "none" });
+    expect(approveAction(task({ labels: ["afk"] }), undefined)).toEqual({
+      kind: "none",
+    });
   });
 });

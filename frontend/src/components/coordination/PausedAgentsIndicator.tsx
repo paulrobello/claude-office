@@ -13,9 +13,8 @@ export function PausedAgentsIndicator(): React.ReactNode {
   const { data } = useCoordinationPoll(fetchAgents, []);
 
   const paused =
-    data?.agents.filter(
-      (a) => CRON_ROLES.has(a.role) && a.enabled === false,
-    ) ?? [];
+    data?.agents.filter((a) => CRON_ROLES.has(a.role) && a.enabled === false) ??
+    [];
 
   if (paused.length === 0) return null;
 

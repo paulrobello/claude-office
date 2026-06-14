@@ -22,8 +22,8 @@ export function AddAgendaRow({
     return (
       <div className="flex items-center justify-between rounded-xl border border-dashed border-[rgba(168,85,247,0.3)] bg-[rgba(20,14,38,0.4)] px-4 py-2.5 text-sm">
         <span className="text-[#ece9f5]">
-          {agent.nome}{" "}
-          <span className="text-[#9a93b3]">({agent.role})</span> — sem agenda
+          {agent.nome} <span className="text-[#9a93b3]">({agent.role})</span> —
+          sem agenda
         </span>
         <button
           onClick={() => setOpen(true)}

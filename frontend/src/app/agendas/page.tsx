@@ -60,8 +60,8 @@ export default function AgendasPage(): React.ReactNode {
             Agendas dos agentes
           </h1>
           <p className="text-[#9a93b3] text-[13px]">
-            Liga/desliga e define o horário (cron) de cada agente. Mudanças entram
-            no crontab em ~5 min (reconcile).
+            Liga/desliga e define o horário (cron) de cada agente. Mudanças
+            entram no crontab em ~5 min (reconcile).
           </p>
         </div>
       </header>
