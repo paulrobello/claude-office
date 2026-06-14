@@ -38,6 +38,7 @@ import {
   statusGroup,
   idleSince,
   isEpic,
+  isParked,
   formatStuckTime,
   DEFAULT_IDLE_ALERT_MS,
   type TaskStatus,
@@ -146,6 +147,7 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
   done: "Concluído",
   backlog: "Backlog",
   epic: "Epic",
+  parked: "Fora da fila",
   unknown: "—",
 };
 
@@ -194,6 +196,10 @@ export default function DashboardPage(): React.ReactNode {
   // Só busca as CLOSED quando "Concluída" está marcada (mesma brecha do /tasks:
   // puxar todas as fechadas estoura o LIMIT e expulsa OPEN antigas).
   const showClosed = showsClosed(filters);
+  // Parked (tirada da fila pelo CEO): ESCONDIDA por padrão no board, igual `done`,
+  // reaparece só com a faceta PRÓPRIA "Parked" (nunca com "Concluída"). É OPEN, então
+  // já vem no fetch de OPEN — sem lazy-fetch como as fechadas.
+  const showParked = filters.status.has("parked");
 
   const qs = useMemo(() => `?period=${period}`, [period]);
 
@@ -400,6 +406,7 @@ export default function DashboardPage(): React.ReactNode {
     return filtered.filter((t) => {
       const st = statusByRef.get(t.source_ref) ?? "unknown";
       if (st === "done") return false;
+      if (st === "parked") return false; // tirada da fila pelo CEO — não é órfã
       if (t.labels.includes("epic")) return false;
       const areas = taskAreas(t);
       if (areas.length === 0) return true; // sem area:* nenhuma
@@ -461,11 +468,15 @@ export default function DashboardPage(): React.ReactNode {
       queue: [] as CoordTask[],
     };
     if (!data) return empty;
-    // Concluídas (done) ficam ESCONDIDAS por padrão (#req1): só entram no board
-    // quando "Concluída" está marcada. Pega tanto CLOSED quanto OPEN+parked.
-    const boardTasks = showClosed
-      ? filtered
-      : filtered.filter((t) => statusByRef.get(t.source_ref) !== "done");
+    // Concluídas (done) e parked ficam ESCONDIDAS por padrão (#req1): done só com
+    // "Concluída" marcada, parked só com a faceta própria "Parked". Cada uma tem o
+    // seu gate — parked nunca reaparece via "Concluída" (a brecha que separamos).
+    const boardTasks = filtered.filter((t) => {
+      const st = statusByRef.get(t.source_ref);
+      if (st === "done" && !showClosed) return false;
+      if (st === "parked" && !showParked) return false;
+      return true;
+    });
     const shown = new Set<string>();
     const columns = data.agents
       .filter((a) => !a.archived_at)
@@ -483,7 +494,7 @@ export default function DashboardPage(): React.ReactNode {
       .filter(({ tasks }) => !filterActive || tasks.length > 0);
     const queue = boardTasks.filter((t) => !shown.has(t.source_ref));
     return { columns, queue };
-  }, [data, filtered, filters.agent, search, filterActive, showClosed, statusByRef]);
+  }, [data, filtered, filters.agent, search, filterActive, showClosed, showParked, statusByRef]);
 
   // clicar "responder" numa task pending: abre o modal HITL se houver prompt no DB
   // (canal hitl_prompts → web); senão (label hitl sem prompt) cai na issue.
@@ -1883,9 +1894,10 @@ function TaskCard({
   const st = statusByRef.get(t.source_ref) ?? "unknown";
   const border = GROUP_BORDER[statusGroup(st)];
   const done = st === "done";
-  // Epic e backlog = guarda-chuva/someday: não despacham. Aparecem semi-
-  // transparentes (mesma de-ênfase) — não são trabalho ativo nem têm Play.
-  const muted = isEpic(t) || st === "backlog";
+  // Epic/backlog (guarda-chuva/someday) e parked (tirada da fila pelo CEO): não
+  // despacham. Aparecem semi-transparentes (mesma de-ênfase) — não são trabalho
+  // ativo nem têm Play. Parked gate por STATUS (label parked num CLOSED já é done).
+  const muted = isEpic(t) || st === "backlog" || (isParked(t) && st === "parked");
   return (
     <div
       className={`rounded-xl px-3.5 py-3 bg-white/5 border border-white/10 hover:bg-[rgba(168,85,247,0.06)] transition-colors${

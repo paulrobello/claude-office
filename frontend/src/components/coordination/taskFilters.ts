@@ -21,8 +21,9 @@ export type StatusFacetKey =
   | "em_execucao" // running / waiting_agent (claim ativo, wip)
   | "sem_agente" // afk ocioso, pronto pro dispatch (#817)
   | "aguardando" // pending / error — precisa de você
-  | "backlog" // backlog/parked + todo/unknown (na fila, sem agente ativo)
+  | "backlog" // backlog + todo/unknown (na fila, sem agente ativo)
   | "epic" // guarda-chuva, não vai pro dispatch
+  | "parked" // tirada da fila pelo CEO — OPEN, fora do fluxo (NÃO é done)
   | "sem_dono" // OPEN sem area:* — órfã, ninguém responsável
   | "done"; // closed — escondida por padrão
 
@@ -33,6 +34,7 @@ export const STATUS_FACET_ORDER: StatusFacetKey[] = [
   "aguardando",
   "backlog",
   "epic",
+  "parked",
   "sem_dono",
   "done",
 ];
@@ -54,6 +56,10 @@ export function statusFacetOf(
       return "sem_agente";
     case "done":
       return "done";
+    case "parked":
+      // `deriveStatus` já promove parked OPEN ao status próprio `parked` — CRÍTICO
+      // que NÃO caia em `done`: o filtro "Concluída" deve mostrar só as CLOSED.
+      return "parked";
     case "epic":
       // `deriveStatus` já promove epics OPEN parados ao status próprio `epic`.
       return "epic";

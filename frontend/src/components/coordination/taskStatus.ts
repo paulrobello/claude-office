@@ -11,6 +11,7 @@ export type TaskStatus =
   | "done"
   | "backlog"
   | "epic"
+  | "parked"
   | "unknown";
 
 export type TaskGroup = "need_you" | "in_progress" | "queue" | "history";
@@ -27,14 +28,30 @@ export function isEpic(task: CoordTask): boolean {
   return task.labels.includes("epic");
 }
 
+/** Parked = tirada da fila ativa pelo CEO (botão do cockpit). NÃO é concluída:
+ *  a issue continua OPEN, só saiu do fluxo de dispatch. Na UI aparece semi-
+ *  transparente e SEM Play, igual ao epic/backlog, e — como eles — vive no grupo
+ *  `history` (FORA da fila ativa e dos contadores de fila), mas ESCONDIDA por
+ *  padrão (reaparece só com a faceta própria "Parked", nunca com "Concluída").
+ *  Análogo a [[isEpic]]: fonte do label pra estilização visual (muted) e pra
+ *  decidir sem-Play, independente do status derivado (um parked FECHADO já é
+ *  `done` via a precedência de CLOSED em `deriveStatus`). */
+export function isParked(task: CoordTask): boolean {
+  return task.labels.includes("parked");
+}
+
 /** Traduz os campos técnicos (issue + claim + run + hitl) num status humano. */
 export function deriveStatus(
   task: CoordTask,
   hitlPrompts: HitlPrompt[],
 ): TaskStatus {
   if (task.state === "CLOSED") return "done";
-  // Removida da fila pelo CEO (cockpit): sai dos grupos vivos como done/history.
-  if (task.labels.includes("parked")) return "done";
+  // Removida da fila pelo CEO (cockpit): status PRÓPRIO `parked` → grupo `history`,
+  // fora da fila ativa/contadores igual ao backlog/epic, mas SEM se misturar com as
+  // realmente fechadas (`done`). A precedência importa: CLOSED→done vence acima (um
+  // parked FECHADO é done), e parked vence backlogs/epic abaixo (parked é a decisão
+  // mais recente do CEO). O dev-loop ignora parked (não despacha).
+  if (task.labels.includes("parked")) return "parked";
   // Backlog (someday/longo prazo): sai da fila ativa e do "precisa de você" —
   // vive na lista de Backlog. Precede hitl/area (mesmo um backlog hitl é backlog).
   if (task.labels.includes("backlogs")) return "backlog";
@@ -125,6 +142,7 @@ export function statusGroup(status: TaskStatus): TaskGroup {
     case "done":
     case "backlog":
     case "epic":
+    case "parked":
       return "history";
   }
 }

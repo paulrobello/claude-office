@@ -61,10 +61,10 @@ describe("deriveStatus", () => {
   it("CLOSED → done", () => {
     expect(deriveStatus(baseTask({ state: "CLOSED" }), [])).toBe("done");
   });
-  it("label parked → done (removida da fila, sai do vivo)", () => {
+  it("label parked → parked (tirada da fila pelo CEO — status próprio, NÃO done)", () => {
     expect(
       deriveStatus(baseTask({ labels: ["parked", "area:trackers"] }), []),
-    ).toBe("done");
+    ).toBe("parked");
   });
   it("claim in_progress → running (precede pendente)", () => {
     const t = baseTask({ claim_status: "in_progress", labels: ["hitl"] });

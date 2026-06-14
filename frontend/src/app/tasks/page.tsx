@@ -33,6 +33,7 @@ import {
   formatStuckTime,
   applyStartedOverride,
   isEpic,
+  isParked,
   DEFAULT_SLA_MS,
   type TaskStatus,
 } from "@/components/coordination/taskStatus";
@@ -79,6 +80,7 @@ const STATUS_COLOR: Record<TaskStatus, string> = {
   done: "text-emerald-400",
   backlog: "text-yellow-600",
   epic: "text-violet-400",
+  parked: "text-cyan-600",
   unknown: "text-slate-500",
 };
 
@@ -150,6 +152,10 @@ export default function TasksPage(): React.ReactNode {
   // as fechadas (513!) estourava o LIMIT e expulsava OPEN antigas. Limite 200 nas
   // mais recentes é suficiente pra auditoria pontual.
   const showClosed = showsClosed(filters);
+  // Parked = tirada da fila pelo CEO: ESCONDIDA por padrão (igual `done`), mas
+  // reaparece só com a faceta PRÓPRIA "Parked" — nunca com "Concluída". Parked é
+  // OPEN, então já vem no fetch de OPEN (sem lazy-fetch como as fechadas).
+  const showParked = filters.status.has("parked");
   const { data, loading, unavailable, error, refetch } = useCoordinationPoll(
     () => fetchTasks("?state=OPEN"),
     [],
@@ -285,6 +291,22 @@ export default function TasksPage(): React.ReactNode {
         .filter(
           (t) =>
             deriveStatus(t, prompts) === "epic" && !resolved.has(t.source_ref),
+        )
+        .sort((a, b) => a.number - b.number),
+    [filtered, prompts, resolved],
+  );
+
+  // Parked (tirada da fila pelo CEO): FORA da fila ativa (grupo history) — não entra
+  // em groups.queue. Como `done`, fica ESCONDIDA por padrão e só aparece com a faceta
+  // própria "Parked" (showParked). Lista própria, semi-transparente e SEM Play
+  // (renderRow trata via isParked). Some otimista quando resolvida nesta sessão.
+  const parkedTasks = useMemo(
+    () =>
+      filtered
+        .filter(
+          (t) =>
+            deriveStatus(t, prompts) === "parked" &&
+            !resolved.has(t.source_ref),
         )
         .sort((a, b) => a.number - b.number),
     [filtered, prompts, resolved],
@@ -589,14 +611,18 @@ export default function TasksPage(): React.ReactNode {
     const stuck = formatStuckTime(stuckSince(t, status), nowMs, DEFAULT_SLA_MS);
     const am = agentModel(t, status);
     const busy = processing.has(t.source_ref);
-    // Epic = guarda-chuva: semi-transparente e SEM ações de disparo/fila, igual
-    // ao backlog (o dev-loop ignora epic — não é task final).
-    const epic = isEpic(t);
+    // Epic = guarda-chuva; parked = tirada da fila pelo CEO. Ambos semi-
+    // transparentes e SEM ações de disparo/fila (o dev-loop ignora os dois — não
+    // são task final/ativa). Gate por STATUS (não só label): um epic/parked já
+    // FECHADO deriva `done` e renderiza na seção de concluídas, sem de-ênfase.
+    const epic = isEpic(t) && status === "epic";
+    const parked = isParked(t) && status === "parked";
+    const muted = epic || parked;
     return (
       <div
         key={t.source_ref}
         className={`flex items-center gap-3 px-3 py-3 border-t border-slate-900 hover:bg-slate-900/40${
-          epic ? " opacity-60" : ""
+          muted ? " opacity-60" : ""
         }`}
       >
         {queuePos !== undefined && (
@@ -654,12 +680,12 @@ export default function TasksPage(): React.ReactNode {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {epic ? (
+          {muted ? (
             <span
               className="text-xs font-bold text-slate-500 px-2"
-              title={tr("tasks.epicNoPlay")}
+              title={tr(parked ? "tasks.parkedNoPlay" : "tasks.epicNoPlay")}
             >
-              epic
+              {parked ? "parked" : "epic"}
             </span>
           ) : busy ? (
             <span className="text-sm font-bold text-sky-300 animate-pulse px-2">
@@ -945,6 +971,9 @@ export default function TasksPage(): React.ReactNode {
             )}
           {epicTasks.length > 0 &&
             renderGroup("tasks.group.epic", epicTasks, "text-violet-400")}
+          {/* Parked: escondida por padrão, só com a faceta própria "Parked". */}
+          {showParked &&
+            renderGroup("tasks.group.parked", parkedTasks, "text-cyan-600")}
           {backlogTasks.length > 0 && (
             <section className="mb-5">
               <h2 className="text-sm font-extrabold tracking-wide mb-1 text-yellow-600">

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { CoordTask, HitlPrompt } from "./coordinationApi";
-import { deriveStatus, statusGroup } from "./taskStatus";
+import { deriveStatus, isParked, statusGroup } from "./taskStatus";
 
 function makeTask(overrides: Partial<CoordTask> = {}): CoordTask {
   return {
@@ -101,5 +101,54 @@ describe("deriveStatus — epic sai da fila ativa (status próprio → history)"
   it("epic + backlogs → backlog (backlogs vence; epic só pra OPEN parado)", () => {
     const task = makeTask({ labels: ["epic", "backlogs"] });
     expect(deriveStatus(task, [])).toBe("backlog");
+  });
+});
+
+describe("deriveStatus — parked tem status PRÓPRIO (não é done)", () => {
+  it("parked OPEN → status parked (NÃO done)", () => {
+    const task = makeTask({ labels: ["parked"] });
+    expect(deriveStatus(task, [])).toBe("parked");
+  });
+
+  it("parked vai pro grupo history (fora da fila, igual done/backlog/epic)", () => {
+    expect(statusGroup("parked")).toBe("history");
+  });
+
+  it("parked FECHADA continua done (CLOSED vence — parked só vale pra OPEN)", () => {
+    const task = makeTask({ labels: ["parked"], state: "CLOSED" });
+    expect(deriveStatus(task, [])).toBe("done");
+  });
+
+  it("parked vence backlogs e epic (decisão mais recente do CEO)", () => {
+    expect(deriveStatus(makeTask({ labels: ["parked", "backlogs"] }), [])).toBe(
+      "parked",
+    );
+    expect(deriveStatus(makeTask({ labels: ["parked", "epic"] }), [])).toBe(
+      "parked",
+    );
+  });
+
+  it("parked + afk → parked (NÃO sem_agente — não vai pro dispatch)", () => {
+    const task = makeTask({ labels: ["parked", "afk"] });
+    expect(deriveStatus(task, [])).toBe("parked");
+  });
+
+  it("parked vence running (alta precedência, logo após CLOSED — o CEO tirou da fila)", () => {
+    // Diferente do epic (baixa precedência): a checagem de parked está no TOPO
+    // (logo após CLOSED, ANTES de running/pending), exatamente onde o `parked →
+    // done` original ficava — preservamos essa ordem, só trocamos o destino.
+    const task = makeTask({ labels: ["parked"], run_status: "running" });
+    expect(deriveStatus(task, [])).toBe("parked");
+  });
+
+  it("isParked reflete o label parked", () => {
+    expect(isParked(makeTask({ labels: ["parked"] }))).toBe(true);
+    expect(isParked(makeTask({ labels: ["afk"] }))).toBe(false);
+  });
+
+  it("não-regressão: done/backlog/epic seguem como antes", () => {
+    expect(deriveStatus(makeTask({ state: "CLOSED" }), [])).toBe("done");
+    expect(deriveStatus(makeTask({ labels: ["backlogs"] }), [])).toBe("backlog");
+    expect(deriveStatus(makeTask({ labels: ["epic"] }), [])).toBe("epic");
   });
 });
