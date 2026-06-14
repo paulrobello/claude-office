@@ -35,7 +35,16 @@ export function deriveStatus(
   const hasPendingPrompt = hitlPrompts.some(
     (p) => p.source_ref === task.source_ref && p.status === "pending",
   );
-  if (hasPendingPrompt || task.labels.includes("hitl")) return "pending";
+  // Guarda anti-falso-positivo (#841): uma issue `hitl` que já foi decidida
+  // (`afk`, em fila), está em execução (`wip`) ou é guarda-chuva (`epic`) NÃO
+  // volta pro "Precisa de você" só pelo label hitl residual. `hasPendingPrompt`
+  // (prompt HITL real pendente) SEMPRE vence o guarda — é ação concreta esperada.
+  const dispositioned =
+    task.labels.includes("afk") ||
+    task.labels.includes("wip") ||
+    task.labels.includes("epic");
+  if (hasPendingPrompt || (task.labels.includes("hitl") && !dispositioned))
+    return "pending";
 
   if (claim === "claimed") return "waiting_agent";
 
