@@ -476,10 +476,14 @@ export const runAgentNow = (nome: string): Promise<RunAgentResult> =>
 /**
  * ▶ Play na TASK: despacha a issue #n AGORA (dispara `claude -p` → custa tokens).
  * Respeita claim ativo (already_running) e DISPATCH_CAP (cap_full). Confirme antes
- * de chamar (a UI pede confirmação).
+ * de chamar (a UI pede confirmação). `agent` opcional (#851) força um agente
+ * específico (entre os que cobrem a área); sem ele, usa o dono da área.
  */
-export const dispatchIssueNow = (n: number): Promise<DispatchIssueResult> =>
-  mutate(`/issues/${n}/dispatch`, "POST");
+export const dispatchIssueNow = (
+  n: number,
+  agent?: string,
+): Promise<DispatchIssueResult> =>
+  mutate(`/issues/${n}/dispatch`, "POST", agent ? { agent } : undefined);
 
 /** Skip/Retry do cockpit: aplica label de prioridade (fila:topo/fila:fim) via backend. */
 export const setTaskPriority = (

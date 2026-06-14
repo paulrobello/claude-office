@@ -23,20 +23,47 @@ const DISPOSICAO_OPTIONS: { value: Exclude<Disposicao, "">; hint: string }[] = [
 const AREA_OPTIONS: { value: string; project: string; label: string }[] = [
   { value: "area:api", project: "hmtrack-api-py", label: "API Python/FastAPI" },
   { value: "area:front", project: "hmtrack-front", label: "Frontend Angular" },
-  { value: "area:trackers", project: "hmtrack-trackers", label: "Rastreadores GPS" },
-  { value: "area:alert-system", project: "hmtrack-alert-system", label: "Workers de alertas" },
+  {
+    value: "area:trackers",
+    project: "hmtrack-trackers",
+    label: "Rastreadores GPS",
+  },
+  {
+    value: "area:alert-system",
+    project: "hmtrack-alert-system",
+    label: "Workers de alertas",
+  },
   { value: "area:db", project: "banco-dados", label: "Schema SQL Server" },
   { value: "area:mobile", project: "HMTrackApp", label: "App React Native" },
-  { value: "area:office", project: "claude-office", label: "claude-office (cockpit)" },
+  {
+    value: "area:office",
+    project: "claude-office",
+    label: "claude-office (cockpit)",
+  },
   { value: "area:coordination", project: "gerente", label: "Infra de agentes" },
-  { value: "area:whatsapp", project: "hmtrack-whatsapp", label: "hmtrack-whatsapp" },
+  {
+    value: "area:whatsapp",
+    project: "hmtrack-whatsapp",
+    label: "hmtrack-whatsapp",
+  },
 ];
 
 const EXTRA_LABELS: { value: string; cls: string; hint?: string }[] = [
   { value: "bug", cls: "border-rose-500/50 text-rose-400 bg-rose-500/10" },
-  { value: "security", cls: "border-amber-500/50 text-amber-400 bg-amber-500/10" },
-  { value: "fila:topo", cls: "border-sky-500/50 text-sky-300 bg-sky-500/10", hint: "fura a fila" },
-  { value: "fila:fim", cls: "border-slate-500/50 text-slate-400 bg-slate-500/10", hint: "despriorizada" },
+  {
+    value: "security",
+    cls: "border-amber-500/50 text-amber-400 bg-amber-500/10",
+  },
+  {
+    value: "fila:topo",
+    cls: "border-sky-500/50 text-sky-300 bg-sky-500/10",
+    hint: "fura a fila",
+  },
+  {
+    value: "fila:fim",
+    cls: "border-slate-500/50 text-slate-400 bg-slate-500/10",
+    hint: "despriorizada",
+  },
 ];
 
 export function CreateTaskForm({
@@ -140,7 +167,9 @@ export function CreateTaskForm({
   return (
     <div className="border border-slate-800 rounded-lg p-4 bg-slate-900/40 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-bold text-slate-200">Nova task (issue)</span>
+        <span className="text-sm font-bold text-slate-200">
+          Nova task (issue)
+        </span>
         <button
           onClick={() => setOpen(false)}
           className="text-slate-500 hover:text-slate-300"
@@ -179,8 +208,8 @@ export function CreateTaskForm({
           ))}
         </div>
         <div className="text-xs text-amber-400 mt-1">
-          ⚠ Qualquer decisão pendente (A vs B, &quot;escolher abordagem&quot;) → use{" "}
-          <b>hitl</b>. Na dúvida, hitl.
+          ⚠ Qualquer decisão pendente (A vs B, &quot;escolher abordagem&quot;) →
+          use <b>hitl</b>. Na dúvida, hitl.
         </div>
       </div>
 
@@ -188,7 +217,9 @@ export function CreateTaskForm({
       <div>
         <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">
           Área / Projeto <span className="text-rose-400">*</span>{" "}
-          <span className="text-slate-600 normal-case">(pode selecionar mais de uma)</span>
+          <span className="text-slate-600 normal-case">
+            (pode selecionar mais de uma)
+          </span>
         </div>
         <div className="flex gap-2 flex-wrap">
           {AREA_OPTIONS.map((a) => (

@@ -220,7 +220,10 @@ export function filtersFromQuery(search: string): TaskFilters {
     search.startsWith("?") ? search.slice(1) : search,
   );
   const split = (v: string | null): string[] =>
-    (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    (v ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   const status = new Set<StatusFacetKey>();
   for (const s of split(p.get(FACET_PARAM.status)))
     if (STATUS_KEYS.has(s)) status.add(s as StatusFacetKey);

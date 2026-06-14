@@ -185,9 +185,9 @@ describe("matchesFilters", () => {
     });
     expect(matchesFilters(baseTask({ labels: ["afk"] }), [], f)).toBe(true); // sem_agente
     expect(matchesFilters(baseTask({ labels: [] }), [], f)).toBe(true); // sem_dono
-    expect(
-      matchesFilters(baseTask({ run_status: "running" }), [], f),
-    ).toBe(false); // em_execucao não está marcado
+    expect(matchesFilters(baseTask({ run_status: "running" }), [], f)).toBe(
+      false,
+    ); // em_execucao não está marcado
   });
   it("AND entre facetas (Status ∩ Área)", () => {
     const f = filters({
@@ -207,12 +207,12 @@ describe("matchesFilters", () => {
       agent({ nome: "dev-front", projetos: ["hmtrack-front"] }),
     ]);
     const f = filters({ agent: new Set(["dev-front"]) });
-    expect(
-      matchesFilters(baseTask({ labels: ["area:front"] }), [], f, m),
-    ).toBe(true);
-    expect(
-      matchesFilters(baseTask({ labels: ["area:api"] }), [], f, m),
-    ).toBe(false);
+    expect(matchesFilters(baseTask({ labels: ["area:front"] }), [], f, m)).toBe(
+      true,
+    );
+    expect(matchesFilters(baseTask({ labels: ["area:api"] }), [], f, m)).toBe(
+      false,
+    );
   });
 });
 
