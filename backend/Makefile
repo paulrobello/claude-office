@@ -1,7 +1,7 @@
 .PHONY: dev start test lint fmt typecheck checkall
 
 dev:
-	uv run uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000
+	uv run uvicorn app.main:app --reload --reload-dir app --reload-include "*.py" --host 0.0.0.0 --port 8000
 
 start:
 	uv run uvicorn app.main:app --host 0.0.0.0 --port 8000

@@ -115,8 +115,39 @@ make dev
 Or directly with uv:
 
 ```bash
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn app.main:app --reload --reload-dir app --reload-include "*.py" --host 0.0.0.0 --port 8000
 ```
+
+#### Auto-reload (hot reload)
+
+`--reload` watches `backend/app/` and restarts the worker when a `.py` file
+changes — no manual restart needed, including after a feature is integrated onto
+`main`. The reloader is backed by [`watchfiles`](https://pypi.org/project/watchfiles/),
+which is pinned as a **direct dependency** in `pyproject.toml` (it also ships
+transitively via `uvicorn[standard]`, but we pin it directly so the watcher can
+never silently disappear if that extra is ever dropped).
+
+**Gotcha — reload "stopped working" / 404 or 502 after integration.** New
+endpoints return 404/502 and only a manual restart fixes it (historical
+incidents: Play 502 #835, assign-area 404 #840; root cause #850). This happens
+when `watchfiles` is **not** installed in the running venv — uvicorn then
+silently falls back to the `StatReload` poller, which is unreliable across git
+operations and may miss changes entirely. Verify the watcher on startup; the log
+**must** say:
+
+```
+INFO:     Started reloader process [...] using WatchFiles
+```
+
+If it instead says `using StatReload`, the watcher is missing — fix with
+`uv sync` (reinstalls `watchfiles`, now a direct dep). Other notes:
+
+- `touch`-ing a file (mtime only, no content change) does **not** trigger a
+  reload — that is expected. Save a real edit to test.
+- Only files under `backend/app/` are watched; changes elsewhere (e.g.
+  `pyproject.toml`) still need a manual restart.
+- On Linux, `watchfiles` uses `inotify`; if watches stop firing on a very large
+  tree, check `fs.inotify.max_user_watches`.
 
 ### Production Mode
 
