@@ -10,7 +10,14 @@ import { ZONES, MAX_SLOTS, slotPosition, type ZoneDef } from "./layout";
 // DESK WORKSTATION (Needs-you / Working) — composed from real office sprites.
 // ============================================================================
 
-type DeskItem = "mug" | "lamp" | "penholder" | "8ball" | "rubiks" | "duck" | "thermos";
+type DeskItem =
+  | "mug"
+  | "lamp"
+  | "penholder"
+  | "8ball"
+  | "rubiks"
+  | "duck"
+  | "thermos";
 const ITEM_SEQUENCE: DeskItem[] = [
   "lamp",
   "mug",
@@ -237,7 +244,9 @@ const ExitDoor = memo(ExitDoorComponent);
 
 function zoneFurniture(zone: ZoneDef, textures: OfficeTextures): ReactNode[] {
   if (zone.kind === "exit") {
-    return [<ExitDoor key={`${zone.key}-exit`} zone={zone} textures={textures} />];
+    return [
+      <ExitDoor key={`${zone.key}-exit`} zone={zone} textures={textures} />,
+    ];
   }
   const items: ReactNode[] = [];
   for (let slot = 0; slot < MAX_SLOTS; slot++) {

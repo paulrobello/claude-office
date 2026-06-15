@@ -141,6 +141,9 @@ export function useExitDriver(): void {
         rafId = null;
       }
       wasActive = false;
+      // Defensive: clear module-level exit state on unmount so a later mount
+      // can't briefly observe stale startTimes (useMotionCleanup also resets).
+      resetExit();
     };
   }, []);
 }

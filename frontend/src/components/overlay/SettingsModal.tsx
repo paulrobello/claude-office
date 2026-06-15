@@ -81,7 +81,6 @@ export default function SettingsModal({
 
   // Sync tab when initialTab changes (e.g. edit-building request).
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing the controlled initialTab prop into local tab state
     setActiveTab(initialTab);
   }, [initialTab]);
 
