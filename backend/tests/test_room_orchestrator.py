@@ -204,6 +204,37 @@ class TestBuildOverview:
             assert ov.entries[0].bucket == expected
             assert ov.entries[0].state == state
 
+    def test_idle_mid_turn_stays_working(self) -> None:
+        # The boss drops to IDLE between tool calls; while the turn is still
+        # running the terminal must not flicker into the "done" zone.
+        sm = _make_sm()
+        sm.boss_state = BossState.IDLE
+        sm.turn_active = True
+        assert build_overview({"s": sm}).entries[0].bucket == "working"
+
+    def test_idle_with_live_subagents_stays_working(self) -> None:
+        # A subagent stop flips the boss to IDLE, but if children are still
+        # present the parent counts as working.
+        sm = _make_sm()
+        sm.boss_state = BossState.IDLE
+        sm.turn_active = False
+        sm.agents = {"x": Agent(id="x", color="#fff", number=0, state=AgentState.WORKING)}
+        assert build_overview({"s": sm}).entries[0].bucket == "working"
+
+    def test_idle_after_turn_is_done(self) -> None:
+        # No active turn and no subagents -> genuinely idle/waiting.
+        sm = _make_sm()
+        sm.boss_state = BossState.IDLE
+        sm.turn_active = False
+        assert build_overview({"s": sm}).entries[0].bucket == "done"
+
+    def test_needs_you_wins_over_turn_active(self) -> None:
+        # Blocked-on-user states must surface even mid-turn.
+        sm = _make_sm()
+        sm.boss_state = BossState.WAITING_PERMISSION
+        sm.turn_active = True
+        assert build_overview({"s": sm}).entries[0].bucket == "needs_you"
+
     def test_todo_counts_and_subagents(self) -> None:
         sm = _make_sm()
         sm.boss_state = BossState.WORKING

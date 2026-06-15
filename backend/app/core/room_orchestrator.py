@@ -62,6 +62,22 @@ _BOSS_TO_BUCKET: dict[BossState, OverviewBucket] = {
 }
 
 
+def _overview_bucket(sm: StateMachine) -> OverviewBucket:
+    """Pick the Command Center zone for a session, smoothing out flicker.
+
+    The boss drops to ``IDLE`` in the brief gap *between* tool calls and right
+    after a subagent stops, even though the turn is still running. Mapping that
+    transient idle straight to "done" makes the terminal jump out of the working
+    zone and back every tool cycle. So a session counts as still working when
+    its turn is in progress (``turn_active``) or it has live subagents — only a
+    genuinely finished/waiting turn lands in "done".
+    """
+    bucket = _BOSS_TO_BUCKET.get(sm.boss_state, "working")
+    if bucket == "done" and (sm.turn_active or sm.agents):
+        return "working"
+    return bucket
+
+
 @dataclass
 class _SessionEntry:
     session_id: str
@@ -305,7 +321,7 @@ def build_overview(sessions: dict[str, StateMachine]) -> OverviewState:
         entries.append(
             OverviewEntry(
                 session_id=session_id,
-                bucket=_BOSS_TO_BUCKET.get(sm.boss_state, "working"),
+                bucket=_overview_bucket(sm),
                 state=sm.boss_state,
                 current_task=sm.boss_current_task,
                 todo_done=todo_done,
