@@ -274,7 +274,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
     if project_root:
         git_service.configure(session_id=session_id, project_root=project_root)
 
-    git_status = git_service.get_status()
+    git_status = git_service.get_status(session_id=session_id)
     if git_status:
         await manager.send_personal_message(
             {

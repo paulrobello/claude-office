@@ -422,6 +422,10 @@ const plugin: Plugin = async (ctx: PluginInput): Promise<Hooks> => {
                   })
                 );
               }
+              // session.deleted is terminal for this child — drop its marker so
+              // the childStopped Set doesn't grow unbounded over the process
+              // lifetime (the marker only needs to survive the idle→deleted gap).
+              childStopped.delete(session.id);
             } else {
               await sendEvent(
                 makeEvent("session_end", session.id, {

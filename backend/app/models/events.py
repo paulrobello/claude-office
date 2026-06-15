@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
@@ -101,8 +102,6 @@ class Event(BaseModel):
     @field_validator("session_id")
     @classmethod
     def validate_session_id(cls, v: str) -> str:
-        import re
-
         if not re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", v):
             raise ValueError("session_id must be alphanumeric/dash/underscore, max 128 chars")
         return v

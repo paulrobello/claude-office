@@ -4,11 +4,22 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
+from app.config import get_settings
 from app.core.event_processor import event_processor
 from app.main import app
 from app.models.events import Event, EventData, EventType
 
 client = TestClient(app)
+
+
+def _auth_headers() -> dict[str, str]:
+    """Per-launch API key header required for state-changing endpoints.
+
+    Session DELETE/PATCH are guarded by ``_is_state_changing`` even when no
+    explicit key is configured, so these tests must present the auto-generated
+    ``effective_api_key``.
+    """
+    return {"X-API-Key": get_settings().effective_api_key}
 
 
 def _seed_session(session_id: str | None = None) -> str:
@@ -45,7 +56,7 @@ def test_delete_single_session():
     assert list_response.status_code == 200
     assert any(session["id"] == session_id for session in list_response.json())
 
-    delete_response = client.delete(f"/api/v1/sessions/{session_id}")
+    delete_response = client.delete(f"/api/v1/sessions/{session_id}", headers=_auth_headers())
     assert delete_response.status_code == 200
     assert delete_response.json()["status"] == "success"
 
@@ -62,6 +73,7 @@ def test_update_session_label():
     response = client.patch(
         f"/api/v1/sessions/{session_id}/label",
         json={"label": "My Test Session"},
+        headers=_auth_headers(),
     )
     assert response.status_code == 200
     assert response.json()["status"] == "success"
@@ -81,12 +93,14 @@ def test_update_session_label_clear():
     client.patch(
         f"/api/v1/sessions/{session_id}/label",
         json={"label": "temporary"},
+        headers=_auth_headers(),
     )
 
     # Clear it
     response = client.patch(
         f"/api/v1/sessions/{session_id}/label",
         json={"label": None},
+        headers=_auth_headers(),
     )
     assert response.status_code == 200
 
@@ -100,6 +114,7 @@ def test_update_session_label_not_found():
     response = client.patch(
         "/api/v1/sessions/nonexistent-session/label",
         json={"label": "test"},
+        headers=_auth_headers(),
     )
     assert response.status_code == 404
 

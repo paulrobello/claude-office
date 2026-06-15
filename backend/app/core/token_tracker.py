@@ -70,7 +70,11 @@ class TokenTracker:
     @property
     def context_utilization(self) -> float:
         """Return 0.0-1.0 ratio of tokens used vs. context window."""
-        return min(1.0, self.total_tokens / self.max_context_tokens) if self.max_context_tokens else 0.0
+        return (
+            min(1.0, self.total_tokens / self.max_context_tokens)
+            if self.max_context_tokens
+            else 0.0
+        )
 
     def update_from_event(self, event: Event) -> None:
         """Update token counts from an incoming event.

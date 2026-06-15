@@ -514,6 +514,7 @@ class StateMachine:
 
     MAX_AGENTS = 8
     MAX_CONTEXT_TOKENS = 200_000
+    MAX_CONVERSATION_ENTRIES = 500
 
     phase: OfficePhase = OfficePhase.EMPTY
     boss_state: BossState = BossState.IDLE
@@ -675,6 +676,20 @@ class StateMachine:
     # ---------------------------------------------------------------------------
     # Core methods
     # ---------------------------------------------------------------------------
+
+    def append_capped(
+        self,
+        entry: ConversationEntry,
+        max_len: int = MAX_CONVERSATION_ENTRIES,
+    ) -> None:
+        """Append a conversation entry, capping history to *max_len* entries.
+
+        Keeps the most recent ``max_len`` entries so the conversation list does
+        not grow without bound during long-running or restored sessions.
+        """
+        self.conversation.append(entry)
+        if len(self.conversation) > max_len:
+            self.conversation = self.conversation[-max_len:]
 
     def to_game_state(self, session_id: str) -> GameState:
         """Convert current state to a GameState for frontend consumption.

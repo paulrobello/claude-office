@@ -59,9 +59,7 @@ async def handle_user_prompt_submit(
             "text": event.data.prompt,
             "timestamp": event.timestamp.isoformat(),
         }
-        sm.conversation.append(conv_entry)
-        if len(sm.conversation) > 500:
-            sm.conversation = sm.conversation[-500:]
+        sm.append_capped(conv_entry)
 
     await broadcast_state(event.session_id, sm)
 
@@ -105,9 +103,7 @@ async def handle_stop(
             "text": full_response,
             "timestamp": event.timestamp.isoformat(),
         }
-        sm.conversation.append(assistant_entry)
-        if len(sm.conversation) > 500:
-            sm.conversation = sm.conversation[-500:]
+        sm.append_capped(assistant_entry)
 
     await detect_and_set_print_report(sm)
     logger.info(f"STOP event: print_report = {sm.print_report}")
