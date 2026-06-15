@@ -25,26 +25,26 @@ interface OverviewState {
 // ============================================================================
 
 /**
- * Shallow-equal two entry lists on only the fields consumers read. Lets the
- * store skip a state update (and the resulting re-render of every consumer)
- * when a WS frame carries no meaningful change.
+ * Shallow-equal two entry lists so the store can skip a state update (and the
+ * resulting re-render of every consumer) when a WS frame carries no meaningful
+ * change.
+ *
+ * Compares *every* field present on either entry rather than a hardcoded list,
+ * so a newly-added OverviewEntry field can't silently fail to trigger a
+ * re-render. All current fields are primitives, so a value comparison is
+ * enough (a future nested field would over-render — safe, just less optimal).
+ * Using the union of keys lets an omitted optional field compare equal to an
+ * explicit undefined.
  */
-function entriesEqual(a: OverviewEntry[], b: OverviewEntry[]): boolean {
+export function entriesEqual(a: OverviewEntry[], b: OverviewEntry[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     const x = a[i];
     const y = b[i];
-    if (
-      x.sessionId !== y.sessionId ||
-      x.bucket !== y.bucket ||
-      x.state !== y.state ||
-      x.currentTask !== y.currentTask ||
-      x.todoDone !== y.todoDone ||
-      x.todoTotal !== y.todoTotal ||
-      x.subagentCount !== y.subagentCount
-    ) {
-      return false;
+    const keys = new Set<string>([...Object.keys(x), ...Object.keys(y)]);
+    for (const key of keys) {
+      if (x[key] !== y[key]) return false;
     }
   }
   return true;

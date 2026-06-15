@@ -10,6 +10,8 @@ import {
   GridPosition,
   PathGrid,
   TILE_SIZE,
+  GRID_WIDTH,
+  GRID_HEIGHT,
   getNavigationGrid,
 } from "./navigationGrid";
 
@@ -234,8 +236,11 @@ function findNearestWalkable(
   pos: GridPosition,
   ignoreAgentId?: string,
 ): GridPosition | null {
-  // Spiral search outward
-  const maxRadius = 5;
+  // Spiral search outward. Scale to the grid dimensions so a blocked endpoint
+  // always snaps to the nearest walkable tile if one exists anywhere on the
+  // grid — a fixed small radius could miss it and leave the caller to snap
+  // straight through furniture. Both grids share GRID_WIDTH/GRID_HEIGHT.
+  const maxRadius = Math.max(GRID_WIDTH, GRID_HEIGHT);
 
   for (let radius = 1; radius <= maxRadius; radius++) {
     for (let dx = -radius; dx <= radius; dx++) {
@@ -252,6 +257,9 @@ function findNearestWalkable(
     }
   }
 
+  console.warn(
+    `[astar] findNearestWalkable: no walkable tile within ${maxRadius} of (${pos.gx}, ${pos.gy})`,
+  );
   return null;
 }
 

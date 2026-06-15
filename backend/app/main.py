@@ -182,6 +182,8 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
 
     yield
 
+    # Cancel any pending debounced overview broadcast so shutdown is clean.
+    await event_processor.shutdown()
     await git_service.stop()
     await get_engine().dispose()
 
@@ -268,12 +270,13 @@ async def websocket_overview(websocket: WebSocket) -> None:
 
     # Cap concurrent overview watchers: each connection amplifies the per-event
     # overview rebuild cost, so refuse beyond the limit instead of letting it
-    # grow unbounded.
-    if len(manager.overview_connections) >= _MAX_OVERVIEW_CONNECTIONS:
+    # grow unbounded. The check is enforced atomically with the registration
+    # inside connect_overview (under the manager lock) so a burst of concurrent
+    # handshakes can't each pass the limit before any registers.
+    accepted = await manager.connect_overview(websocket, max_connections=_MAX_OVERVIEW_CONNECTIONS)
+    if not accepted:
         await websocket.close(code=4013, reason="Too many overview connections")
         return
-
-    await manager.connect_overview(websocket)
     try:
         # Send the current overview snapshot on connect. Built under the same
         # ``_sessions_lock`` used by the per-event broadcast so it reads a

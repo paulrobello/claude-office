@@ -366,12 +366,19 @@ class EventProcessor:
 
         await self._persist_event(event, resolved_floor_id, resolved_room_id)
 
+        # Replay from DB *before* acquiring the lock: the restore is async I/O
+        # that can take hundreds of ms for a long session, and holding the lock
+        # across it stalls the debounced overview broadcast and /ws/overview
+        # connects. Only the dict insertion below needs the lock.
+        restored: StateMachine | None = None
+        if event.session_id not in self.sessions:
+            restored = await self._build_restored_state_machine(event.session_id)
+
         async with self._sessions_lock:
             if event.session_id not in self.sessions:
-                await self._restore_session(event.session_id)
-
-            if event.session_id not in self.sessions:
-                self.sessions[event.session_id] = StateMachine()
+                self.sessions[event.session_id] = (
+                    restored if restored is not None else StateMachine()
+                )
 
             # Capture the StateMachine reference while still holding the lock so a
             # concurrent clear_all_sessions()/remove_session() can't drop the key
@@ -576,6 +583,18 @@ class EventProcessor:
         except Exception as e:
             logger.exception(f"Error broadcasting overview state: {e}")
 
+    async def shutdown(self) -> None:
+        """Cancel a pending debounced overview broadcast on app shutdown.
+
+        Without this the flush task is left pending at loop close and asyncio
+        logs "Task was destroyed but it is pending!".
+        """
+        task = self._overview_flush_task
+        if task is not None and not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
     async def build_overview_snapshot(self) -> OverviewState:
         """Build a cross-session overview under ``_sessions_lock``.
 
@@ -622,11 +641,14 @@ class EventProcessor:
             db.add(event_rec)
             await db.commit()
 
-    async def _restore_session(self, session_id: str) -> None:
+    async def _build_restored_state_machine(self, session_id: str) -> StateMachine | None:
         """Reconstruct a StateMachine from persisted DB events.
 
         Replays all events for the session through a fresh StateMachine,
-        rebuilding agent state, conversation history, and task lists.
+        rebuilding agent state, conversation history, and task lists. Performs
+        only async DB I/O against a locally-built machine, so it is safe to call
+        without holding ``_sessions_lock``; the caller inserts the result under
+        the lock. Returns ``None`` when the session has no persisted events.
 
         Args:
             session_id: The session to restore.
@@ -640,7 +662,7 @@ class EventProcessor:
             events = result.scalars().all()
 
             if not events:
-                return
+                return None
 
             logger.info(f"Restoring session {session_id} from {len(events)} events in DB")
 
@@ -750,7 +772,19 @@ class EventProcessor:
             sm.todos = await load_tasks(session_id)
             logger.debug(f"Restored {len(sm.todos)} tasks for session {session_id}")
 
-            self.sessions[session_id] = sm
+            return sm
+
+    async def _restore_session(self, session_id: str) -> None:
+        """Reconstruct and insert a session's StateMachine, if it has events.
+
+        Builds the machine (async DB I/O) without holding the lock, then inserts
+        it under ``_sessions_lock`` so the registry stays consistent with
+        readers such as ``build_overview``.
+        """
+        sm = await self._build_restored_state_machine(session_id)
+        if sm is not None:
+            async with self._sessions_lock:
+                self.sessions[session_id] = sm
 
     async def _persist_event(
         self,

@@ -204,11 +204,20 @@ class ConnectionManager:
     # Overview-level WebSocket support (Command Center — cross-session)
     # ------------------------------------------------------------------
 
-    async def connect_overview(self, websocket: WebSocket) -> None:
-        """Accept a WebSocket connection and register it for the overview feed."""
-        await websocket.accept()
+    async def connect_overview(self, websocket: WebSocket, *, max_connections: int) -> bool:
+        """Accept a WebSocket connection and register it for the overview feed.
+
+        Returns False (without accepting) when adding the connection would
+        exceed ``max_connections``. The cap check and the append both run under
+        the lock to close the TOCTOU window where a burst of concurrent
+        handshakes each pass the limit before any registers.
+        """
         async with self._lock:
+            if len(self.overview_connections) >= max_connections:
+                return False
+            await websocket.accept()
             self.overview_connections.append(websocket)
+            return True
 
     async def disconnect_overview(self, websocket: WebSocket) -> None:
         """Remove a WebSocket connection from the overview feed."""

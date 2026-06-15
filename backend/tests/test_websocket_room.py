@@ -51,7 +51,7 @@ class TestOverviewConnections:
         mgr = ConnectionManager()
         ws = AsyncMock()
         ws.client_state = MagicMock()
-        await mgr.connect_overview(ws)
+        await mgr.connect_overview(ws, max_connections=16)
         assert ws in mgr.overview_connections
 
     @pytest.mark.asyncio
@@ -59,7 +59,7 @@ class TestOverviewConnections:
         mgr = ConnectionManager()
         ws = AsyncMock()
         ws.client_state = MagicMock()
-        await mgr.connect_overview(ws)
+        await mgr.connect_overview(ws, max_connections=16)
         await mgr.disconnect_overview(ws)
         assert ws not in mgr.overview_connections
 
@@ -70,7 +70,7 @@ class TestOverviewConnections:
         from starlette.websockets import WebSocketState
 
         ws.client_state = WebSocketState.CONNECTED
-        await mgr.connect_overview(ws)
+        await mgr.connect_overview(ws, max_connections=16)
         await mgr.broadcast_overview({"type": "test"})
         ws.send_json.assert_called_once_with({"type": "test"})
 
@@ -79,6 +79,23 @@ class TestOverviewConnections:
         mgr = ConnectionManager()
         # Should not raise
         await mgr.broadcast_overview({"type": "test"})
+
+    @pytest.mark.asyncio
+    async def test_connect_overview_enforces_cap_atomically(self) -> None:
+        """connect_overview rejects (returns False) once the cap is reached, so a
+        burst of concurrent handshakes can't each register past the limit."""
+        mgr = ConnectionManager()
+        # Fill up to the cap.
+        for _ in range(2):
+            ws = AsyncMock()
+            ws.client_state = MagicMock()
+            assert await mgr.connect_overview(ws, max_connections=2) is True
+        # The next one must be refused without being accepted or registered.
+        extra = AsyncMock()
+        extra.client_state = MagicMock()
+        assert await mgr.connect_overview(extra, max_connections=2) is False
+        assert extra not in mgr.overview_connections
+        extra.accept.assert_not_called()
 
 
 class TestOverviewRouteOrder:
@@ -116,7 +133,7 @@ class TestBroadcastOverviewState:
 
         ws = AsyncMock()
         ws.client_state = WebSocketState.CONNECTED
-        await ws_module.manager.connect_overview(ws)
+        await ws_module.manager.connect_overview(ws, max_connections=16)
         try:
             sm = StateMachine()
             sm.boss_state = BossState.WAITING_PERMISSION
