@@ -10,7 +10,6 @@ import {
   selectOverviewConnected,
 } from "@/stores/overviewStore";
 import { useNavigationStore } from "@/stores/navigationStore";
-import type { FloorConfig } from "@/types/navigation";
 import type { Session } from "@/hooks/useSessions";
 import {
   useCommandCenterPeers,
@@ -18,18 +17,7 @@ import {
 } from "./useCommandCenterPeers";
 import { PeerPopup, type PeerPopupState } from "./PeerPopup";
 import { ZONE_BY_KEY, ZONE_ORDER } from "./layout";
-
-/** Whether a session belongs to a configured floor (repo-name match). */
-function sessionMatchesFloor(session: Session, floor: FloorConfig): boolean {
-  return floor.rooms.some((room) => {
-    if (!room.repoName) return false;
-    if (session.projectRoot) {
-      const basename = session.projectRoot.split(/[/\\]/).pop();
-      if (basename === room.repoName) return true;
-    }
-    return session.projectName === room.repoName;
-  });
-}
+import { sessionMatchesFloor } from "./sessionMatchesFloor";
 
 function CommandCenterLoading(): ReactNode {
   const { t } = useTranslation();
@@ -91,10 +79,11 @@ export function CommandCenterView({
   );
 
   // Drill into a session: select it, then land in its floor (if configured) or
-  // the single office view.
+  // the single office view. Await the select so the target view mounts on the
+  // new session instead of reading the old one for a frame.
   const handleDrillIn = useCallback(
-    (sid: string) => {
-      void onSessionSelect(sid);
+    async (sid: string) => {
+      await onSessionSelect(sid);
       const nav = useNavigationStore.getState();
       const session = sessions.find((s) => s.id === sid);
       const floor = session

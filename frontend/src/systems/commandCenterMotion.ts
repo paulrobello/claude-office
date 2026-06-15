@@ -6,6 +6,8 @@ import type { Position } from "@/types";
 import { findWorldPath } from "./astar";
 import { smoothPath } from "./pathSmoothing";
 import { getCommandCenterGrid } from "./commandCenterGrid";
+import { resetExit } from "./exitAnimation";
+import { resetSlotAlloc } from "@/components/command/useCommandCenterPeers";
 
 /**
  * Walks Command Center agents to their (fixed) slot positions, pathing AROUND
@@ -44,9 +46,12 @@ let rafId: number | null = null;
 let lastTime = 0;
 
 function computePath(from: Position, to: Position, id: string): Position[] {
-  const raw = findWorldPath(from, to, id, getCommandCenterGrid());
-  if (raw.length < 2) return [{ ...from }, { ...to }]; // fallback: straight
-  const sm = smoothPath(raw);
+  const grid = getCommandCenterGrid();
+  const raw = findWorldPath(from, to, id, grid);
+  // No valid route: return empty so the caller snaps the peer to its slot
+  // instead of animating a straight line through CC furniture.
+  if (raw.length < 2) return [];
+  const sm = smoothPath(raw, grid);
   if (sm.length >= 2) {
     sm[0] = { ...from };
     sm[sm.length - 1] = { ...to };
@@ -126,7 +131,9 @@ function ensureRaf(): void {
 }
 
 /** Reconcile the desired agents + their fixed slot targets. */
-export function setMotionTargets(items: { id: string; target: Position }[]): void {
+export function setMotionTargets(
+  items: { id: string; target: Position }[],
+): void {
   const wanted = new Set(items.map((i) => i.id));
   for (const id of [...current.keys()]) {
     if (!wanted.has(id)) {
@@ -145,11 +152,16 @@ export function setMotionTargets(items: { id: string; target: Position }[]): voi
       const t = target.get(id);
       if (!t || Math.abs(t.x - tgt.x) > 1 || Math.abs(t.y - tgt.y) > 1) {
         target.set(id, { x: tgt.x, y: tgt.y });
-        paths.set(id, {
-          waypoints: computePath(current.get(id)!, tgt, id),
-          index: 0,
-        });
-        needsRaf = true;
+        const waypoints = computePath(current.get(id)!, tgt, id);
+        if (waypoints.length < 2) {
+          // No walkable route: snap straight to the slot (no wall-crossing
+          // animation) so the peer still reaches its destination.
+          current.set(id, { x: tgt.x, y: tgt.y });
+          paths.delete(id);
+        } else {
+          paths.set(id, { waypoints, index: 0 });
+          needsRaf = true;
+        }
       }
     }
   }
@@ -167,6 +179,10 @@ export function useMotionCleanup(): void {
       target.clear();
       paths.clear();
       useMotionStore.getState()._set(new Map());
+      // Clear sibling module-level state so a re-mount starts clean (no stale
+      // slot reservations, no exit flash at the elevator).
+      resetSlotAlloc();
+      resetExit();
     };
   }, []);
 }

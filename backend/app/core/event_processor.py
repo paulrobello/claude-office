@@ -18,6 +18,7 @@ from typing import Any
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
+from app.api.websocket import manager
 from app.config import get_settings
 from app.core.beads_poller import get_beads_poller, has_beads, init_beads_poller
 from app.core.broadcast_service import (
@@ -56,6 +57,7 @@ from app.db.models import EventRecord, SessionRecord
 from app.models.agents import AgentState
 from app.models.common import TodoItem
 from app.models.events import Event, EventData, EventType
+from app.models.overview import OverviewState
 from app.models.sessions import ConversationEntry, GameState, HistoryEntry
 from app.services.git_service import git_service
 
@@ -167,6 +169,11 @@ class EventProcessor:
         self._task_poller_initialized = False
         self._beads_poller_initialized = False
         self._beads_sessions: set[str] = set()  # Sessions with active beads polling
+        # Coalesces Command Center overview broadcasts: bursts of events schedule
+        # a single deferred flush instead of rebuilding the full peer-merge once
+        # per event (O(N x events/sec)). See ``_schedule_overview_broadcast``.
+        self._overview_flush_task: asyncio.Task[None] | None = None
+        self._overview_flush_interval = 0.05  # 50 ms debounce window
 
     # ------------------------------------------------------------------
     # Poller lifecycle helpers
@@ -532,12 +539,54 @@ class EventProcessor:
             await handle_teammate_idle(sm, event)
 
         # ------------------------------------------------------------------
-        # Cross-session overview broadcast (Command Center). Fired LAST so it
-        # reflects the field mutations applied by the event-type-specific
-        # handlers above (e.g. boss_current_task, agents) instead of lagging by
-        # one event. No-op when no one is watching /ws/overview.
+        # Cross-session overview broadcast (Command Center). Scheduled LAST so
+        # it reflects the field mutations applied by the event-type-specific
+        # handlers above (e.g. boss_current_task, agents). Debounced so a burst
+        # of events produces at most one broadcast per ~50 ms instead of one per
+        # event. No-op when no one is watching /ws/overview.
         # ------------------------------------------------------------------
-        await broadcast_overview_state(self.sessions)
+        self._schedule_overview_broadcast()
+
+    # ------------------------------------------------------------------
+    # Command Center overview (debounced cross-session broadcast)
+    # ------------------------------------------------------------------
+
+    def _schedule_overview_broadcast(self) -> None:
+        """Coalesce overview broadcasts into one deferred flush per ~50 ms.
+
+        Without watchers the build is skipped entirely (cheap no-op), so the
+        early ``overview_connections`` guard is preserved. When a flush is
+        already pending we let it run instead of stacking tasks: the pending
+        flush rebuilds from ``self.sessions`` at fire time, so it always
+        captures the final state of the burst (no dropped updates).
+        """
+        if not manager.overview_connections:
+            return
+        if self._overview_flush_task is not None and not self._overview_flush_task.done():
+            return
+        self._overview_flush_task = asyncio.create_task(self._flush_overview_broadcast())
+
+    async def _flush_overview_broadcast(self) -> None:
+        """Wait out the debounce window, then broadcast a single overview."""
+        try:
+            await asyncio.sleep(self._overview_flush_interval)
+            await broadcast_overview_state(self.sessions, self._sessions_lock)
+        except asyncio.CancelledError:  # pragma: no cover - shutdown path
+            raise
+        except Exception as e:
+            logger.exception(f"Error broadcasting overview state: {e}")
+
+    async def build_overview_snapshot(self) -> OverviewState:
+        """Build a cross-session overview under ``_sessions_lock``.
+
+        Used by the ``/ws/overview`` connect path so the initial snapshot reads a
+        consistent registry (no concurrent resize) without the caller touching
+        the private lock directly.
+        """
+        from app.core.room_orchestrator import build_overview
+
+        async with self._sessions_lock:
+            return build_overview(self.sessions)
 
     # ------------------------------------------------------------------
     # DB helpers

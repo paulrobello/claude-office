@@ -66,6 +66,11 @@ function labelFor(session: Session | undefined, sessionId: string): string {
 // ---------------------------------------------------------------------------
 const slotAlloc = new Map<string, { bucket: ZoneKey; slot: number }>();
 
+/** Clear all slot reservations (call on Command Center unmount). */
+export function resetSlotAlloc(): void {
+  slotAlloc.clear();
+}
+
 function assignSlots(
   presentByBucket: Map<ZoneKey, string[]>,
 ): Map<string, number> {

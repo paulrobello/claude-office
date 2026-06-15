@@ -2,9 +2,11 @@
 
 import { useMemo } from "react";
 import { useNavigationStore } from "@/stores/navigationStore";
+import { useTranslation } from "@/hooks/useTranslation";
 import { LOBBY_FLOOR_ID } from "@/types/navigation";
 import type { FloorConfig } from "@/types/navigation";
 import type { Session } from "@/hooks/useSessions";
+import { sessionMatchesFloor } from "@/components/command/sessionMatchesFloor";
 
 // ============================================================================
 // FLOOR ROW
@@ -70,18 +72,6 @@ function FloorRow({
 // MATCHING HELPERS
 // ============================================================================
 
-/** Check if a session belongs to a specific floor's rooms. */
-function sessionMatchesFloor(session: Session, floor: FloorConfig): boolean {
-  return floor.rooms.some((room) => {
-    if (!room.repoName) return false;
-    if (session.projectRoot) {
-      const basename = session.projectRoot.split("/").pop();
-      if (basename === room.repoName) return true;
-    }
-    return session.projectName === room.repoName;
-  });
-}
-
 /** Check if a session belongs to ANY floor. */
 function sessionMatchesAnyFloor(
   session: Session,
@@ -99,6 +89,7 @@ export interface BuildingViewProps {
 }
 
 export function BuildingView({ sessions }: BuildingViewProps): React.ReactNode {
+  const { t } = useTranslation();
   const buildingConfig = useNavigationStore((s) => s.buildingConfig);
   const goToFloor = useNavigationStore((s) => s.goToFloor);
   const goToCommand = useNavigationStore((s) => s.goToCommand);
@@ -135,123 +126,123 @@ export function BuildingView({ sessions }: BuildingViewProps): React.ReactNode {
       <div className="m-auto w-full max-w-2xl flex flex-col">
         {/* Building header */}
         <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-white tracking-tight mb-1">
-          {buildingConfig.buildingName}
-        </h2>
-        <div className="flex items-center justify-center gap-3">
-          <p className="text-sm text-slate-500 font-mono">
-            {buildingConfig.floors.length} floor
-            {buildingConfig.floors.length !== 1 ? "s" : ""}
-          </p>
-          <button
-            type="button"
-            onClick={requestEditBuilding}
-            className="text-xs text-slate-500 hover:text-purple-400 font-mono px-2 py-0.5 border border-slate-700 hover:border-purple-500 rounded transition-colors"
-          >
-            Edit
-          </button>
+          <h2 className="text-3xl font-bold text-white tracking-tight mb-1">
+            {buildingConfig.buildingName}
+          </h2>
+          <div className="flex items-center justify-center gap-3">
+            <p className="text-sm text-slate-500 font-mono">
+              {buildingConfig.floors.length} floor
+              {buildingConfig.floors.length !== 1 ? "s" : ""}
+            </p>
+            <button
+              type="button"
+              onClick={requestEditBuilding}
+              className="text-xs text-slate-500 hover:text-purple-400 font-mono px-2 py-0.5 border border-slate-700 hover:border-purple-500 rounded transition-colors"
+            >
+              Edit
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Building cross-section */}
-      <div className="w-full max-w-2xl flex flex-col gap-2">
-        {/* Roof */}
-        <div className="h-2 bg-slate-800 rounded-t-lg mx-4" />
+        {/* Building cross-section */}
+        <div className="w-full max-w-2xl flex flex-col gap-2">
+          {/* Roof */}
+          <div className="h-2 bg-slate-800 rounded-t-lg mx-4" />
 
-        {/* Command Center — penthouse tile gathering every terminal's boss */}
-        <button
-          onClick={(e) => {
-            useNavigationStore
-              .getState()
-              .setTransitionOrigin({ x: e.clientX, y: e.clientY });
-            goToCommand();
-          }}
-          data-tour-id="command-center-tile"
-          className="group flex items-stretch w-full rounded-lg border border-sky-700/60 bg-sky-950/40 hover:border-sky-500 hover:bg-sky-900/40 transition-all duration-200"
-        >
-          {/* Badge */}
-          <div className="flex items-center justify-center w-16 rounded-l-lg text-2xl">
-            {"\u{1F6F0}\u{FE0F}"}
-          </div>
-
-          {/* Info */}
-          <div className="flex-grow flex items-center gap-4 px-5 py-3">
-            <div className="flex flex-col items-start">
-              <span className="text-sm font-bold text-sky-300 group-hover:text-sky-200 transition-colors">
-                Command Center
-              </span>
-              <span className="text-xs text-slate-500 font-mono">
-                {activeSessionCount > 0
-                  ? `${activeSessionCount} active terminal${activeSessionCount !== 1 ? "s" : ""}`
-                  : "Overview of every terminal"}
-              </span>
+          {/* Command Center — penthouse tile gathering every terminal's boss */}
+          <button
+            onClick={(e) => {
+              useNavigationStore
+                .getState()
+                .setTransitionOrigin({ x: e.clientX, y: e.clientY });
+              goToCommand();
+            }}
+            data-tour-id="command-center-tile"
+            className="group flex items-stretch w-full rounded-lg border border-sky-700/60 bg-sky-950/40 hover:border-sky-500 hover:bg-sky-900/40 transition-all duration-200"
+          >
+            {/* Badge */}
+            <div className="flex items-center justify-center w-16 rounded-l-lg text-2xl">
+              {"\u{1F6F0}\u{FE0F}"}
             </div>
-          </div>
 
-          {/* Arrow */}
-          <div className="flex items-center px-4 text-sky-700 group-hover:text-sky-400 transition-colors">
-            &rarr;
-          </div>
-        </button>
-
-        {/* Floors sorted top-down by floor number (highest first) */}
-        {sortedFloors.map((floor) => {
-          const floorSessions = sessions.filter((s) =>
-            sessionMatchesFloor(s, floor),
-          );
-          return (
-            <FloorRow
-              key={floor.id}
-              floor={floor}
-              activeSessionCount={
-                floorSessions.filter((s) => s.status === "active").length
-              }
-              onClick={(origin) => {
-                useNavigationStore.getState().setTransitionOrigin(origin);
-                goToFloor(floor.id);
-              }}
-            />
-          );
-        })}
-
-        {/* Lobby / Ground — click to view unmatched sessions */}
-        <button
-          onClick={(e) => {
-            useNavigationStore.getState().setTransitionOrigin({
-              x: e.clientX,
-              y: e.clientY,
-            });
-            goToFloor(LOBBY_FLOOR_ID);
-          }}
-          className="group flex items-stretch w-full rounded-lg border border-dashed border-slate-800 hover:border-slate-600 bg-slate-900/30 hover:bg-slate-900/60 transition-all duration-200"
-        >
-          {/* Badge */}
-          <div className="flex items-center justify-center w-16 rounded-l-lg text-2xl">
-            {"\u{1F6AA}"}
-          </div>
-
-          {/* Info */}
-          <div className="flex-grow flex items-center gap-4 px-5 py-3">
-            <div className="flex flex-col items-start">
-              <span className="text-sm text-slate-400 font-bold group-hover:text-slate-300 transition-colors">
-                Lobby
-              </span>
-              <span className="text-xs text-slate-600 font-mono">
-                {unmatchedSessions.length > 0
-                  ? `${unmatchedSessions.length} active unassigned`
-                  : "All sessions assigned"}
-              </span>
+            {/* Info */}
+            <div className="flex-grow flex items-center gap-4 px-5 py-3">
+              <div className="flex flex-col items-start">
+                <span className="text-sm font-bold text-sky-300 group-hover:text-sky-200 transition-colors">
+                  {t("commandCenter.title")}
+                </span>
+                <span className="text-xs text-slate-500 font-mono">
+                  {activeSessionCount > 0
+                    ? `${activeSessionCount} active terminal${activeSessionCount !== 1 ? "s" : ""}`
+                    : "Overview of every terminal"}
+                </span>
+              </div>
             </div>
-          </div>
 
-          {/* Arrow */}
-          <div className="flex items-center px-4 text-slate-700 group-hover:text-slate-500 transition-colors">
-            &rarr;
-          </div>
-        </button>
+            {/* Arrow */}
+            <div className="flex items-center px-4 text-sky-700 group-hover:text-sky-400 transition-colors">
+              &rarr;
+            </div>
+          </button>
 
-        {/* Foundation */}
-        <div className="h-2 bg-slate-800 rounded-b-lg mx-4" />
+          {/* Floors sorted top-down by floor number (highest first) */}
+          {sortedFloors.map((floor) => {
+            const floorSessions = sessions.filter((s) =>
+              sessionMatchesFloor(s, floor),
+            );
+            return (
+              <FloorRow
+                key={floor.id}
+                floor={floor}
+                activeSessionCount={
+                  floorSessions.filter((s) => s.status === "active").length
+                }
+                onClick={(origin) => {
+                  useNavigationStore.getState().setTransitionOrigin(origin);
+                  goToFloor(floor.id);
+                }}
+              />
+            );
+          })}
+
+          {/* Lobby / Ground — click to view unmatched sessions */}
+          <button
+            onClick={(e) => {
+              useNavigationStore.getState().setTransitionOrigin({
+                x: e.clientX,
+                y: e.clientY,
+              });
+              goToFloor(LOBBY_FLOOR_ID);
+            }}
+            className="group flex items-stretch w-full rounded-lg border border-dashed border-slate-800 hover:border-slate-600 bg-slate-900/30 hover:bg-slate-900/60 transition-all duration-200"
+          >
+            {/* Badge */}
+            <div className="flex items-center justify-center w-16 rounded-l-lg text-2xl">
+              {"\u{1F6AA}"}
+            </div>
+
+            {/* Info */}
+            <div className="flex-grow flex items-center gap-4 px-5 py-3">
+              <div className="flex flex-col items-start">
+                <span className="text-sm text-slate-400 font-bold group-hover:text-slate-300 transition-colors">
+                  Lobby
+                </span>
+                <span className="text-xs text-slate-600 font-mono">
+                  {unmatchedSessions.length > 0
+                    ? `${unmatchedSessions.length} active unassigned`
+                    : "All sessions assigned"}
+                </span>
+              </div>
+            </div>
+
+            {/* Arrow */}
+            <div className="flex items-center px-4 text-slate-700 group-hover:text-slate-500 transition-colors">
+              &rarr;
+            </div>
+          </button>
+
+          {/* Foundation */}
+          <div className="h-2 bg-slate-800 rounded-b-lg mx-4" />
         </div>
       </div>
     </div>

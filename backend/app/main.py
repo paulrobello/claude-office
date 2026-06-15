@@ -33,6 +33,10 @@ _SERVE_STATIC = os.environ.get("SERVE_STATIC", "").lower() in ("1", "true", "yes
 
 _LOCALHOST_HOSTS = frozenset({"127.0.0.1", "::1", "localhost", "testclient"})
 
+# Upper bound on concurrent /ws/overview (Command Center) watchers. Each one
+# amplifies the per-event overview rebuild cost, so refuse new ones past this.
+_MAX_OVERVIEW_CONNECTIONS = 16
+
 
 class LocalhostOnlyMiddleware(BaseHTTPMiddleware):
     """Reject HTTP requests from non-localhost origins.
@@ -257,16 +261,25 @@ async def websocket_overview(websocket: WebSocket) -> None:
     id, accept, find no state, and silently idle).
     """
     from app.api.websocket import validate_websocket_origin
-    from app.core.room_orchestrator import build_overview
 
     if not validate_websocket_origin(websocket):
         await websocket.close(code=4003, reason="Origin not allowed")
         return
 
+    # Cap concurrent overview watchers: each connection amplifies the per-event
+    # overview rebuild cost, so refuse beyond the limit instead of letting it
+    # grow unbounded.
+    if len(manager.overview_connections) >= _MAX_OVERVIEW_CONNECTIONS:
+        await websocket.close(code=4013, reason="Too many overview connections")
+        return
+
     await manager.connect_overview(websocket)
     try:
-        # Send the current overview snapshot on connect.
-        overview = build_overview(event_processor.sessions)
+        # Send the current overview snapshot on connect. Built under the same
+        # ``_sessions_lock`` used by the per-event broadcast so it reads a
+        # consistent registry snapshot and can't race a concurrent event handler
+        # resizing ``sessions`` mid-iteration.
+        overview = await event_processor.build_overview_snapshot()
         await websocket.send_json(
             {
                 "type": "state_update",

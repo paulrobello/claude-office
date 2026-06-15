@@ -8,6 +8,7 @@
 
 import { Position } from "@/types";
 import { getNavigationGrid, TILE_SIZE } from "./navigationGrid";
+import type { PathGrid } from "./navigationGrid";
 
 /**
  * Simplify path by removing collinear points.
@@ -55,9 +56,11 @@ export function removeCollinearPoints(path: Position[]): Position[] {
  * Check if a straight line between two points is walkable.
  * Uses Bresenham-like line sampling.
  */
-function isLineWalkable(start: Position, end: Position): boolean {
-  const grid = getNavigationGrid();
-
+function isLineWalkable(
+  start: Position,
+  end: Position,
+  grid: PathGrid = getNavigationGrid(),
+): boolean {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const distance = Math.sqrt(dx * dx + dy * dy);
@@ -83,7 +86,10 @@ function isLineWalkable(start: Position, end: Position): boolean {
  * Apply funnel algorithm to remove unnecessary waypoints.
  * Greedily tries to skip waypoints while maintaining valid path.
  */
-export function applyFunnelAlgorithm(path: Position[]): Position[] {
+export function applyFunnelAlgorithm(
+  path: Position[],
+  grid: PathGrid = getNavigationGrid(),
+): Position[] {
   if (path.length <= 2) return path;
 
   const result: Position[] = [path[0]];
@@ -94,7 +100,7 @@ export function applyFunnelAlgorithm(path: Position[]): Position[] {
     let furthest = current + 1;
 
     for (let i = path.length - 1; i > current + 1; i--) {
-      if (isLineWalkable(path[current], path[i])) {
+      if (isLineWalkable(path[current], path[i], grid)) {
         furthest = i;
         break;
       }
@@ -126,8 +132,10 @@ function quadraticBezier(
 /**
  * Check if a single point is walkable.
  */
-function isPointWalkable(point: Position): boolean {
-  const grid = getNavigationGrid();
+function isPointWalkable(
+  point: Position,
+  grid: PathGrid = getNavigationGrid(),
+): boolean {
   const gridPos = grid.worldToGrid(point.x, point.y);
   return grid.isWalkable(gridPos.gx, gridPos.gy);
 }
@@ -140,11 +148,12 @@ function isCurveWalkable(
   controlPoint: Position,
   curveEnd: Position,
   samples: number,
+  grid: PathGrid = getNavigationGrid(),
 ): boolean {
   for (let j = 0; j <= samples; j++) {
     const t = j / samples;
     const point = quadraticBezier(curveStart, controlPoint, curveEnd, t);
-    if (!isPointWalkable(point)) {
+    if (!isPointWalkable(point, grid)) {
       return false;
     }
   }
@@ -159,6 +168,7 @@ function isCurveWalkable(
 export function applyBezierSmoothing(
   path: Position[],
   cornerRadius: number = TILE_SIZE * 0.75,
+  grid: PathGrid = getNavigationGrid(),
 ): Position[] {
   if (path.length <= 2) return path;
 
@@ -208,7 +218,7 @@ export function applyBezierSmoothing(
 
     // Check if all curve points are walkable before applying smoothing
     const samples = 4; // Number of intermediate points
-    if (!isCurveWalkable(curveStart, curr, curveEnd, samples)) {
+    if (!isCurveWalkable(curveStart, curr, curveEnd, samples, grid)) {
       // Curve would pass through obstacle, keep original waypoint
       result.push(curr);
       continue;
@@ -230,19 +240,24 @@ export function applyBezierSmoothing(
  * Full path smoothing pipeline.
  *
  * @param path - Raw grid-aligned path from A*
+ * @param grid - Grid to validate cut corners against (defaults to the office
+ *   navigation grid so existing office callers are unchanged)
  * @returns Smoothed path suitable for animation
  */
-export function smoothPath(path: Position[]): Position[] {
+export function smoothPath(
+  path: Position[],
+  grid: PathGrid = getNavigationGrid(),
+): Position[] {
   if (path.length <= 1) return path;
 
   // Step 1: Remove collinear points
   let smoothed = removeCollinearPoints(path);
 
   // Step 2: Apply funnel algorithm to skip unnecessary waypoints
-  smoothed = applyFunnelAlgorithm(smoothed);
+  smoothed = applyFunnelAlgorithm(smoothed, grid);
 
   // Step 3: Apply bezier smoothing at corners
-  smoothed = applyBezierSmoothing(smoothed);
+  smoothed = applyBezierSmoothing(smoothed, undefined, grid);
 
   // Step 4: Final cleanup - remove any duplicate adjacent points
   return removeDuplicatePoints(smoothed);

@@ -68,8 +68,14 @@ export function useOverviewWebSocket({ enabled }: { enabled: boolean }): void {
           type?: string;
           state?: { entries?: OverviewEntry[] };
         };
-        if (msg.type === "state_update" && msg.state?.entries) {
-          setEntries(msg.state.entries);
+        if (msg.type === "state_update") {
+          // Validate the shape before applying so a malformed payload can't
+          // throw at render time.
+          if (Array.isArray(msg.state?.entries)) {
+            setEntries(msg.state.entries);
+          } else {
+            console.warn("[overview WS] ignoring malformed state_update frame");
+          }
         }
       } catch {
         // Ignore malformed frames.
@@ -85,10 +91,13 @@ export function useOverviewWebSocket({ enabled }: { enabled: boolean }): void {
       if (connectionIdRef.current !== thisConnectionId) return;
       setConnected(false);
       if (enabledRef.current) {
-        const delay = Math.min(
+        // Exponential backoff with random jitter (0–500ms) so many clients
+        // don't reconnect in lockstep after a backend restart.
+        const baseDelay = Math.min(
           1000 * Math.pow(2, retryCountRef.current),
           30000,
         );
+        const delay = baseDelay + Math.random() * 500;
         retryCountRef.current++;
         reconnectTimeoutRef.current = setTimeout(() => {
           reconnectTimeoutRef.current = null;

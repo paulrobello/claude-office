@@ -10,9 +10,9 @@ equal "peer".
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, cast
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from app.models.agents import BossState
@@ -48,5 +48,5 @@ class OverviewState(BaseModel):
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
-    entries: list[OverviewEntry] = []
+    entries: list[OverviewEntry] = Field(default_factory=lambda: cast(list[OverviewEntry], []))
     last_updated: datetime

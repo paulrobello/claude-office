@@ -72,7 +72,12 @@ def _overview_bucket(sm: StateMachine) -> OverviewBucket:
     its turn is in progress (``turn_active``) or it has live subagents — only a
     genuinely finished/waiting turn lands in "done".
     """
-    bucket = _BOSS_TO_BUCKET.get(sm.boss_state, "working")
+    bucket = _BOSS_TO_BUCKET.get(sm.boss_state)
+    if bucket is None:
+        # An unknown BossState should fail safe to "done" rather than silently
+        # masking the session as "working"; flag it so the map can be updated.
+        logger.warning("No overview bucket for BossState %s; defaulting to 'done'", sm.boss_state)
+        bucket = "done"
     if bucket == "done" and (sm.turn_active or sm.agents):
         return "working"
     return bucket
@@ -313,11 +318,16 @@ def build_overview(sessions: dict[str, StateMachine]) -> OverviewState:
     "ended" bucket from its session list, so neither is included here.
     """
     entries: list[OverviewEntry] = []
-    # Snapshot: the live session registry may be mutated concurrently while
-    # events are processed for other sessions.
+    # Snapshot the registry up front: the caller holds ``_sessions_lock`` so the
+    # dict can't be resized mid-iteration here, but copy defensively in case a
+    # caller passes an unlocked registry.
     for session_id, sm in list(sessions.items()):
-        todo_total = len(sm.todos)
-        todo_done = sum(1 for t in sm.todos if t.status == TodoStatus.COMPLETED)
+        # Snapshot each StateMachine's mutable collections so an in-place
+        # mutation by that session's handlers (e.g. ``del sm.agents[id]``)
+        # can't raise "dict changed size during iteration" / torn counts.
+        todos = list(sm.todos)
+        todo_total = len(todos)
+        todo_done = sum(1 for t in todos if t.status == TodoStatus.COMPLETED)
         entries.append(
             OverviewEntry(
                 session_id=session_id,
@@ -326,7 +336,7 @@ def build_overview(sessions: dict[str, StateMachine]) -> OverviewState:
                 current_task=sm.boss_current_task,
                 todo_done=todo_done,
                 todo_total=todo_total,
-                subagent_count=len(sm.agents),
+                subagent_count=len(list(sm.agents)),
             )
         )
     return OverviewState(entries=entries, last_updated=datetime.now(UTC))
