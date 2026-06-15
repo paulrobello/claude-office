@@ -21,6 +21,7 @@ import {
 } from "@/systems/commandCenterMotion";
 import { LoadingScreen } from "../game/LoadingScreen";
 import { WallClock } from "../game/WallClock";
+import { ZoomControls } from "../game/ZoomControls";
 import { CommandCenterBackground } from "./CommandCenterBackground";
 import { CommandCenterZones } from "./CommandCenterZones";
 import { CommandCenterDecor } from "./CommandCenterDecor";
@@ -75,18 +76,37 @@ export function CommandCenterCanvas({
     useExitStore.getState().registerEnded(exiting, performance.now());
   }, [peers]);
 
+  // Reset pan/zoom only on actual window resize — mirrors OfficeGame so the
+  // Command Center camera behaves identically to the floor views.
+  useEffect(() => {
+    const handleResize = () => transformRef.current?.resetTransform(0);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   return (
     <div className="w-full h-full overflow-hidden relative">
       <TransformWrapper
         ref={transformRef}
         initialScale={1}
-        minScale={0.5}
+        minScale={1}
         maxScale={3}
-        centerOnInit
+        centerZoomedOut={false}
         limitToBounds={false}
         wheel={{ step: 0.1 }}
+        pinch={{ step: 5 }}
         doubleClick={{ mode: "reset" }}
+        onTransform={(ref, state) => {
+          // Auto-reset pan offset when zooming back out to 1:1
+          if (
+            state.scale <= 1 &&
+            (state.positionX !== 0 || state.positionY !== 0)
+          ) {
+            ref.resetTransform(0);
+          }
+        }}
       >
+        <ZoomControls />
         <TransformComponent
           wrapperClass="w-full h-full"
           contentClass="w-full h-full"
