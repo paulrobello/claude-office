@@ -242,10 +242,15 @@ export function BuildingTab({
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       } else {
-        setSaveError(`Save failed: ${res.status} ${res.statusText}`);
+        setSaveError(
+          t("settings.building.saveFailed", {
+            status: res.status,
+            statusText: res.statusText,
+          }),
+        );
       }
     } catch {
-      setSaveError("Cannot reach backend — is the server running?");
+      setSaveError(t("settings.building.saveUnreachable"));
     } finally {
       setSaving(false);
     }

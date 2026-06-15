@@ -12,7 +12,10 @@ import {
 import { useNavigationStore } from "@/stores/navigationStore";
 import type { FloorConfig } from "@/types/navigation";
 import type { Session } from "@/hooks/useSessions";
-import { useCommandCenterPeers, type CommandPeer } from "./useCommandCenterPeers";
+import {
+  useCommandCenterPeers,
+  type CommandPeer,
+} from "./useCommandCenterPeers";
 import { PeerPopup, type PeerPopupState } from "./PeerPopup";
 import { ZONE_BY_KEY, ZONE_ORDER } from "./layout";
 
@@ -21,23 +24,31 @@ function sessionMatchesFloor(session: Session, floor: FloorConfig): boolean {
   return floor.rooms.some((room) => {
     if (!room.repoName) return false;
     if (session.projectRoot) {
-      const basename = session.projectRoot.split("/").pop();
+      const basename = session.projectRoot.split(/[/\\]/).pop();
       if (basename === room.repoName) return true;
     }
     return session.projectName === room.repoName;
   });
 }
 
+function CommandCenterLoading(): ReactNode {
+  const { t } = useTranslation();
+  return (
+    <div className="w-full h-full bg-slate-900 animate-pulse flex items-center justify-center text-white font-mono text-center">
+      {t("commandCenter.initializing")}
+    </div>
+  );
+}
+
 // Canvas is PixiJS/WebGL — load client-side only.
 const CommandCenterCanvas = dynamic(
-  () => import("./CommandCenterCanvas").then((m) => ({ default: m.CommandCenterCanvas })),
+  () =>
+    import("./CommandCenterCanvas").then((m) => ({
+      default: m.CommandCenterCanvas,
+    })),
   {
     ssr: false,
-    loading: () => (
-      <div className="w-full h-full bg-slate-900 animate-pulse flex items-center justify-center text-white font-mono text-center">
-        Initializing Command Center...
-      </div>
-    ),
+    loading: () => <CommandCenterLoading />,
   },
 );
 

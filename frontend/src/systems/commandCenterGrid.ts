@@ -72,11 +72,11 @@ class CommandCenterGrid implements PathGrid {
   gridToWorld(gx: number, gy: number): Position {
     return { x: gx * TILE + TILE / 2, y: gy * TILE + TILE / 2 };
   }
-  isWalkable(gx: number, gy: number): boolean {
+  isWalkable(gx: number, gy: number, _ignoreAgentId?: string): boolean {
     if (!this.valid(gx, gy)) return false;
     return this.blocked[this.idx(gx, gy)] === 0;
   }
-  getCost(): number {
+  getCost(_gx?: number, _gy?: number, _ignoreAgentId?: string): number {
     return 1;
   }
   getNeighbors(gx: number, gy: number): GridPosition[] {

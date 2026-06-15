@@ -221,7 +221,10 @@ class WhiteboardTracker:
         if existing_task:
             existing_task.status = status
             existing_task.summary = summary
-            existing_task.completed_at = datetime.now(UTC).isoformat()
+            # Only stamp completed_at when the task reaches a terminal status.
+            # A "running" update must not mark an active background task finished.
+            if status != "running":
+                existing_task.completed_at = datetime.now(UTC).isoformat()
         else:
             new_task = BackgroundTask(
                 task_id=task_id,

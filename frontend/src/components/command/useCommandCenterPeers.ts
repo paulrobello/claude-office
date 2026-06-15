@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useOverviewStore, selectOverviewEntries } from "@/stores/overviewStore";
+import {
+  useOverviewStore,
+  selectOverviewEntries,
+} from "@/stores/overviewStore";
 import type { BossState, Position } from "@/types";
 import type { Session } from "@/hooks/useSessions";
 import {
@@ -112,15 +115,12 @@ export function useCommandCenterPeers(sessions: Session[]): CommandCenterPeers {
   const entries = useOverviewStore(selectOverviewEntries);
 
   // Ticking clock (kept out of render for purity) used to age out ended peers.
-  // setState only fires from timer callbacks, never synchronously in render.
-  const [now, setNow] = useState(0);
+  // Initialized to the current time so the first render correctly ages out old
+  // ended sessions; the interval keeps it fresh thereafter.
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const id0 = setTimeout(() => setNow(Date.now()), 0);
     const id = setInterval(() => setNow(Date.now()), 30000);
-    return () => {
-      clearTimeout(id0);
-      clearInterval(id);
-    };
+    return () => clearInterval(id);
   }, []);
 
   return useMemo(() => {

@@ -13,11 +13,14 @@ export function EmployeeOfTheMonth(): ReactNode {
   const [photoTexture, setPhotoTexture] = useState<Texture | null>(null);
 
   useEffect(() => {
-    Assets.load("/sprites/employee-of-month.png")
+    const assetPath = "/sprites/employee-of-month.png";
+    Assets.load(assetPath)
       .then((texture) => {
         setPhotoTexture(texture as Texture);
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn(`[EmployeeOfTheMonth] Failed to load ${assetPath}:`, err);
+      });
   }, []);
 
   const drawFrame = useCallback((g: Graphics) => {

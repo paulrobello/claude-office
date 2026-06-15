@@ -36,6 +36,11 @@ const ptBR: Record<TranslationKey, string> = {
   "commandCenter.popup.employees": "Funcionários",
   "commandCenter.popup.terminal": "Terminal",
   "commandCenter.popup.drillIn": "Abrir",
+  "commandCenter.initializing": "Inicializando Central de Comando...",
+  "commandCenter.board.allSessions": "TODAS AS SESSÕES",
+  "commandCenter.board.terminals": "Terminais",
+  "commandCenter.board.employees": "Funcionários",
+  "commandCenter.board.todos": "Tarefas",
 
   // Modals
   "modal.confirmDbWipe": "Confirmar Limpeza do Banco",
@@ -92,6 +97,9 @@ const ptBR: Record<TranslationKey, string> = {
     "Adicione andares e mapeie nomes de pastas de projetos para ativar a visualização de edifício",
   "settings.building.unsavedWarning":
     "Você tem alterações não salvas no edifício. Descartá-las?",
+  "settings.building.saveFailed": "Falha ao salvar: {status} {statusText}",
+  "settings.building.saveUnreachable":
+    "Não foi possível conectar ao servidor — ele está em execução?",
 
   // Sessions
   "sessions.title": "Sessões",

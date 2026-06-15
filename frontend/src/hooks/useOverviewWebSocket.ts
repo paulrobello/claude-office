@@ -15,7 +15,9 @@ import type { OverviewEntry } from "@/types";
 export function useOverviewWebSocket({ enabled }: { enabled: boolean }): void {
   const wsRef = useRef<WebSocket | null>(null);
   const connectionIdRef = useRef(0);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const retryCountRef = useRef(0);
   const enabledRef = useRef(enabled);
   // Holds the latest `connect` so the reconnect timer can call it without a
@@ -43,8 +45,10 @@ export function useOverviewWebSocket({ enabled }: { enabled: boolean }): void {
       reconnectTimeoutRef.current = null;
     }
 
+    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
     const wsUrl =
-      process.env.NEXT_PUBLIC_WS_URL || `ws://${window.location.hostname}:8000`;
+      process.env.NEXT_PUBLIC_WS_URL ||
+      `${wsScheme}://${window.location.hostname}:8000`;
     const ws = new WebSocket(`${wsUrl}/ws/overview`);
     wsRef.current = ws;
 
@@ -81,7 +85,10 @@ export function useOverviewWebSocket({ enabled }: { enabled: boolean }): void {
       if (connectionIdRef.current !== thisConnectionId) return;
       setConnected(false);
       if (enabledRef.current) {
-        const delay = Math.min(1000 * Math.pow(2, retryCountRef.current), 30000);
+        const delay = Math.min(
+          1000 * Math.pow(2, retryCountRef.current),
+          30000,
+        );
         retryCountRef.current++;
         reconnectTimeoutRef.current = setTimeout(() => {
           reconnectTimeoutRef.current = null;

@@ -125,10 +125,18 @@ export function MarqueeText({
     setMaskGraphics(ref);
   }, []);
 
-  // Callback ref for text container
-  const textContainerRefCallback = useCallback((ref: Container | null) => {
-    textContainerRef.current = ref;
-  }, []);
+  // Callback ref for text container. Reapply the mask here too, so clipping
+  // survives the container instance being recreated while maskGraphics is stable
+  // (the [maskGraphics]-only effect above wouldn't re-run in that case).
+  const textContainerRefCallback = useCallback(
+    (ref: Container | null) => {
+      textContainerRef.current = ref;
+      if (ref && maskGraphics) {
+        ref.mask = maskGraphics;
+      }
+    },
+    [maskGraphics],
+  );
 
   return (
     <pixiContainer>

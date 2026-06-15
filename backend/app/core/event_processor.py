@@ -366,7 +366,10 @@ class EventProcessor:
             if event.session_id not in self.sessions:
                 self.sessions[event.session_id] = StateMachine()
 
-        sm = self.sessions[event.session_id]
+            # Capture the StateMachine reference while still holding the lock so a
+            # concurrent clear_all_sessions()/remove_session() can't drop the key
+            # between this lookup and use (which would raise KeyError).
+            sm = self.sessions[event.session_id]
 
         sm.transition(event)
 
@@ -470,12 +473,6 @@ class EventProcessor:
             await broadcast_room_state(sm.room_id, orchestrator)
 
         # ------------------------------------------------------------------
-        # Cross-session overview broadcast (Command Center). No-op when no one
-        # is watching /ws/overview.
-        # ------------------------------------------------------------------
-        await broadcast_overview_state(self.sessions)
-
-        # ------------------------------------------------------------------
         # SUBAGENT_START
         # ------------------------------------------------------------------
         if event.event_type == EventType.SUBAGENT_START:
@@ -533,6 +530,14 @@ class EventProcessor:
 
         if event.event_type == EventType.TEAMMATE_IDLE:
             await handle_teammate_idle(sm, event)
+
+        # ------------------------------------------------------------------
+        # Cross-session overview broadcast (Command Center). Fired LAST so it
+        # reflects the field mutations applied by the event-type-specific
+        # handlers above (e.g. boss_current_task, agents) instead of lagging by
+        # one event. No-op when no one is watching /ws/overview.
+        # ------------------------------------------------------------------
+        await broadcast_overview_state(self.sessions)
 
     # ------------------------------------------------------------------
     # DB helpers

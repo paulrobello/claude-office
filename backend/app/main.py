@@ -62,15 +62,18 @@ _NO_AUTH_PATHS = frozenset({"/health", "/docs", "/redoc"})
 
 
 def _is_state_changing(path: str, method: str) -> bool:
-    """Return True if the request targets a state-changing endpoint."""
+    """Return True if the request targets a destructive global endpoint.
+
+    When no explicit ``CLAUDE_OFFICE_API_KEY`` is configured, only the
+    destructive *global* operations (clearing all sessions, running a
+    simulation) require the auto-generated token.  Per-session mutations
+    (delete, label, focus) and preferences writes remain open in the default
+    configuration; they are still fully gated whenever an explicit key is set
+    (handled by ``settings.has_explicit_key`` in the middleware).
+    """
     prefix = settings.API_V1_STR + "/sessions"
-    prefs_prefix = settings.API_V1_STR + "/preferences"
-    return (
-        (path == prefix and method == "DELETE")
-        or (path == f"{prefix}/simulate" and method == "POST")
-        or (path.startswith(f"{prefix}/") and path.endswith("/focus") and method == "POST")
-        or (path.startswith(f"{prefix}/") and method in ("DELETE", "PATCH"))
-        or (path.startswith(f"{prefs_prefix}/") and method in ("PUT", "DELETE"))
+    return (path == prefix and method == "DELETE") or (
+        path == f"{prefix}/simulate" and method == "POST"
     )
 
 

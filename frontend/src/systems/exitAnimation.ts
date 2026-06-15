@@ -69,6 +69,7 @@ export function selectDoorOpen(s: ExitState): boolean {
 /** Drives the per-frame clock while the Command Center is mounted. */
 export function useExitDriver(): void {
   const rafRef = useRef<number | null>(null);
+  const wasActiveRef = useRef(false);
   useEffect(() => {
     const tick = () => {
       const now = performance.now();
@@ -76,13 +77,20 @@ export function useExitDriver(): void {
       // Only advance the clock while an exit is actually mid-animation, so we
       // don't spam store updates (and re-renders) when nobody is leaving.
       let active = false;
+      let latestFinish = 0;
       for (const st of s.startTimes.values()) {
-        if ((now - st) / EXIT_DURATION < 1) {
-          active = true;
-          break;
-        }
+        if ((now - st) / EXIT_DURATION < 1) active = true;
+        latestFinish = Math.max(latestFinish, st + EXIT_DURATION);
       }
-      if (active) s.setNow(now);
+      if (active) {
+        s.setNow(now);
+      } else if (wasActiveRef.current && s.now < latestFinish) {
+        // The frame where exits cross the finish line: pin the clock to (or
+        // past) the last finish boundary so exitProgress reaches exactly 1 and
+        // exited peers don't linger.
+        s.setNow(latestFinish);
+      }
+      wasActiveRef.current = active;
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);

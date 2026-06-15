@@ -2,6 +2,7 @@
 
 import { useCallback, type ReactNode } from "react";
 import { Graphics } from "pixi.js";
+import { useTranslation } from "@/hooks/useTranslation";
 import { ZONE_BY_KEY, type ZoneKey } from "./layout";
 import type { CommandSummary } from "./useCommandCenterPeers";
 
@@ -22,6 +23,7 @@ export function CommandCenterBoard({
   counts,
   summary,
 }: CommandCenterBoardProps): ReactNode {
+  const { t } = useTranslation();
   const drawBoard = useCallback((g: Graphics) => {
     g.clear();
     // Frame.
@@ -37,7 +39,10 @@ export function CommandCenterBoard({
     g.fill({ color: 0x475569 });
   }, []);
 
-  const todoRatio = summary.todoTotal > 0 ? summary.todoDone / summary.todoTotal : 0;
+  const todoRatio =
+    summary.todoTotal > 0
+      ? Math.max(0, Math.min(1, summary.todoDone / summary.todoTotal))
+      : 0;
   const drawTodoBar = useCallback(
     (g: Graphics) => {
       g.clear();
@@ -64,7 +69,7 @@ export function CommandCenterBoard({
       {/* Title */}
       <pixiContainer x={0} y={-H / 2 + 16} scale={0.5}>
         <pixiText
-          text={`\u{1F4CB} ALL SESSIONS`}
+          text={`\u{1F4CB} ${t("commandCenter.board.allSessions")}`}
           anchor={{ x: 0.5, y: 0.5 }}
           resolution={2}
           style={{
@@ -79,7 +84,7 @@ export function CommandCenterBoard({
       {/* Terminals + employees */}
       <pixiContainer x={left} y={-H / 2 + 38} scale={0.5}>
         <pixiText
-          text={`Terminals: ${summary.terminals}    Employees: ${summary.subagents}`}
+          text={`${t("commandCenter.board.terminals")}: ${summary.terminals}    ${t("commandCenter.board.employees")}: ${summary.subagents}`}
           anchor={{ x: 0, y: 0.5 }}
           resolution={2}
           style={{ fontFamily: "monospace", fontSize: 22, fill: 0x334155 }}
@@ -92,7 +97,12 @@ export function CommandCenterBoard({
           text={`⚠ ${counts.needs_you ?? 0}`}
           anchor={{ x: 0, y: 0.5 }}
           resolution={2}
-          style={{ fontFamily: "monospace", fontSize: 22, fill: ZONE_BY_KEY.needs_you.color, fontWeight: "bold" }}
+          style={{
+            fontFamily: "monospace",
+            fontSize: 22,
+            fill: ZONE_BY_KEY.needs_you.color,
+            fontWeight: "bold",
+          }}
         />
       </pixiContainer>
       <pixiContainer x={left + 56} y={-H / 2 + 58} scale={0.5}>
@@ -100,7 +110,12 @@ export function CommandCenterBoard({
           text={`\u{1F7E2} ${counts.working ?? 0}`}
           anchor={{ x: 0, y: 0.5 }}
           resolution={2}
-          style={{ fontFamily: "monospace", fontSize: 22, fill: ZONE_BY_KEY.working.color, fontWeight: "bold" }}
+          style={{
+            fontFamily: "monospace",
+            fontSize: 22,
+            fill: ZONE_BY_KEY.working.color,
+            fontWeight: "bold",
+          }}
         />
       </pixiContainer>
       <pixiContainer x={left + 112} y={-H / 2 + 58} scale={0.5}>
@@ -108,14 +123,19 @@ export function CommandCenterBoard({
           text={`✅ ${counts.done ?? 0}`}
           anchor={{ x: 0, y: 0.5 }}
           resolution={2}
-          style={{ fontFamily: "monospace", fontSize: 22, fill: ZONE_BY_KEY.done.color, fontWeight: "bold" }}
+          style={{
+            fontFamily: "monospace",
+            fontSize: 22,
+            fill: ZONE_BY_KEY.done.color,
+            fontWeight: "bold",
+          }}
         />
       </pixiContainer>
 
       {/* Aggregate todo progress */}
       <pixiContainer x={left} y={-H / 2 + 76} scale={0.5}>
         <pixiText
-          text={`Todos ${summary.todoDone}/${summary.todoTotal}`}
+          text={`${t("commandCenter.board.todos")} ${summary.todoDone}/${summary.todoTotal}`}
           anchor={{ x: 0, y: 0.5 }}
           resolution={2}
           style={{ fontFamily: "monospace", fontSize: 20, fill: 0x334155 }}

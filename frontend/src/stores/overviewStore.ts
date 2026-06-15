@@ -31,7 +31,7 @@ export const useOverviewStore = create<OverviewState>()((set) => ({
 
   setEntries: (entries) => set({ entries, lastUpdated: Date.now() }),
   setConnected: (connected) => set({ connected }),
-  clear: () => set({ entries: [], lastUpdated: null }),
+  clear: () => set({ entries: [], lastUpdated: null, connected: false }),
 }));
 
 export const selectOverviewEntries = (s: OverviewState): OverviewEntry[] =>

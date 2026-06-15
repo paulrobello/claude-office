@@ -36,6 +36,11 @@ const es: Record<TranslationKey, string> = {
   "commandCenter.popup.employees": "Empleados",
   "commandCenter.popup.terminal": "Terminal",
   "commandCenter.popup.drillIn": "Abrir",
+  "commandCenter.initializing": "Inicializando Centro de Mando...",
+  "commandCenter.board.allSessions": "TODAS LAS SESIONES",
+  "commandCenter.board.terminals": "Terminales",
+  "commandCenter.board.employees": "Empleados",
+  "commandCenter.board.todos": "Tareas",
 
   // Modals
   "modal.confirmDbWipe": "Confirmar borrado de base de datos",
@@ -92,6 +97,9 @@ const es: Record<TranslationKey, string> = {
     "Agrega pisos y mapea nombres de carpetas de proyectos para habilitar la vista de edificio",
   "settings.building.unsavedWarning":
     "Tienes cambios sin guardar en el edificio. ¿Descartarlos?",
+  "settings.building.saveFailed": "Error al guardar: {status} {statusText}",
+  "settings.building.saveUnreachable":
+    "No se puede conectar con el servidor — ¿está en ejecución?",
 
   // Sessions
   "sessions.title": "Sesiones",

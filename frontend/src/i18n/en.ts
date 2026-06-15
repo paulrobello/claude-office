@@ -34,6 +34,11 @@ const en = {
   "commandCenter.popup.employees": "Employees",
   "commandCenter.popup.terminal": "Terminal",
   "commandCenter.popup.drillIn": "Open",
+  "commandCenter.initializing": "Initializing Command Center...",
+  "commandCenter.board.allSessions": "ALL SESSIONS",
+  "commandCenter.board.terminals": "Terminals",
+  "commandCenter.board.employees": "Employees",
+  "commandCenter.board.todos": "Todos",
 
   // Modals
   "modal.confirmDbWipe": "Confirm Database Wipe",
@@ -90,6 +95,9 @@ const en = {
     "Add floors and map project folder names to enable building navigation view",
   "settings.building.unsavedWarning":
     "You have unsaved building changes. Discard them?",
+  "settings.building.saveFailed": "Save failed: {status} {statusText}",
+  "settings.building.saveUnreachable":
+    "Cannot reach backend — is the server running?",
 
   // Sessions
   "sessions.title": "Sessions",
