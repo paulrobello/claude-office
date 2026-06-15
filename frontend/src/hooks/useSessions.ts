@@ -81,8 +81,9 @@ export function useSessions(
     return null;
   }, []);
 
-  // Fetch sessions on mount and periodically
+  // Fetch sessions on mount and periodically.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount; state updates land in fetchSessions' async resolution, not synchronously
     fetchSessions();
     const interval = setInterval(fetchSessions, 5000);
     return () => clearInterval(interval);
@@ -139,6 +140,7 @@ export function useSessions(
         candidates[0],
       );
       if (bestSession) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time auto-select of the initial session once sessions load (guarded by hasAutoSelected)
         setSessionId(bestSession.id);
         showStatus(
           t("status.connectedTo", {

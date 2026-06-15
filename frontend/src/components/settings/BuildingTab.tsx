@@ -157,7 +157,8 @@ export function BuildingTab({
     floors: FloorFormData[];
   } | null>(null);
 
-  // Initialize form from store config
+  // Initialize form from store config.
+  /* eslint-disable react-hooks/set-state-in-effect -- seeding form state from the loaded building config */
   useEffect(() => {
     if (buildingConfig) {
       const name = buildingConfig.buildingName;
@@ -167,6 +168,7 @@ export function BuildingTab({
       setInitialData({ buildingName: name, floors: fl });
     }
   }, [buildingConfig]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Detect dirty state
   useEffect(() => {
