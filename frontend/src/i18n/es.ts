@@ -21,6 +21,9 @@ const es: Record<TranslationKey, string> = {
   "header.agents": "agentes",
   "header.tour": "TOUR",
   "header.commandCenter": "MANDO",
+  "header.more": "MÁS",
+  "header.moreMenu": "Más acciones",
+  "help.tour": "Hacer el tour",
 
   // Command Center
   "commandCenter.title": "Centro de Mando",

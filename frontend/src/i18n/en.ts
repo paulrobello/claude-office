@@ -19,6 +19,9 @@ const en = {
   "header.agents": "agents",
   "header.tour": "TOUR",
   "header.commandCenter": "COMMAND",
+  "header.more": "MORE",
+  "header.moreMenu": "More actions",
+  "help.tour": "Take the Tour",
 
   // Command Center
   "commandCenter.title": "Command Center",
