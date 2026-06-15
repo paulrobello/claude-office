@@ -508,7 +508,10 @@ export function useWebSocketEvents({
       setConnected(false);
 
       if (enabled && sessionId === currentSessionIdRef.current) {
-        const delay = Math.min(1000 * Math.pow(2, retryCountRef.current), 30000);
+        const delay = Math.min(
+          1000 * Math.pow(2, retryCountRef.current),
+          30000,
+        );
         retryCountRef.current++;
         reconnectTimeoutRef.current = setTimeout(() => {
           reconnectTimeoutRef.current = null;
@@ -534,6 +537,11 @@ export function useWebSocketEvents({
 
     connect();
 
+    // Capture refs into locals at effect-run time so the cleanup uses stable
+    // values (per react-hooks/exhaustive-deps guidance).
+    const timeouts = typingTimeoutsRef.current;
+    const startTimes = typingStartTimesRef.current;
+
     return () => {
       // Clean up on unmount
       if (wsRef.current) {
@@ -544,9 +552,9 @@ export function useWebSocketEvents({
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
-      typingTimeoutsRef.current.forEach((t) => clearTimeout(t));
-      typingTimeoutsRef.current.clear();
-      typingStartTimesRef.current.clear();
+      timeouts.forEach((t) => clearTimeout(t));
+      timeouts.clear();
+      startTimes.clear();
     };
   }, [sessionId, enabled, connect]);
 }

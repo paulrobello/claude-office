@@ -106,7 +106,13 @@ export interface EventDetail {
  * WebSocket message types sent from the backend over the /ws endpoint.
  */
 export interface WebSocketMessage {
-  type: "state_update" | "event" | "reload" | "git_status" | "session_deleted" | "error";
+  type:
+    | "state_update"
+    | "event"
+    | "reload"
+    | "git_status"
+    | "session_deleted"
+    | "error";
   timestamp: string;
   state?: import("./generated").GameState;
   event?: {

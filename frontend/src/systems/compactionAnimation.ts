@@ -9,7 +9,7 @@
  * 5. Boss walks back to desk
  */
 
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   useGameStore,
   selectCompactionPhase,
@@ -138,18 +138,13 @@ export function useCompactionAnimation(): CompactionAnimationState {
   const lastStompJumpRef = useRef<number>(0);
   const contextUtilizationRef = useRef<number>(contextUtilization);
 
-  // Keep contextUtilizationRef in sync every render
-  contextUtilizationRef.current = contextUtilization;
+  // Keep contextUtilizationRef in sync (refs must not be mutated during render)
+  useEffect(() => {
+    contextUtilizationRef.current = contextUtilization;
+  }, [contextUtilization]);
 
-  // Calculate target positions (memoized to prevent unnecessary recalculations)
+  // Boss desk position is used by the animation effect below
   const bossDesk = boss.position;
-  const trashCanPosition = useMemo<Position>(
-    () => ({
-      x: bossDesk.x + TRASH_CAN_OFFSET.x,
-      y: bossDesk.y + TRASH_CAN_OFFSET.y - 30, // Stand above trash can
-    }),
-    [bossDesk.x, bossDesk.y],
-  );
 
   // Store tick function in a ref to avoid circular dependency
   const tickRef = useRef<() => void>(() => {});
@@ -171,7 +166,9 @@ export function useCompactionAnimation(): CompactionAnimationState {
 
       if (currentPhase === "walking_to_trash") {
         const progress = Math.min(elapsed / WALK_DURATION, 1);
-        setAnimatedPosition(lerpPosition(currentBossDesk, currentTrashCanPosition, progress));
+        setAnimatedPosition(
+          lerpPosition(currentBossDesk, currentTrashCanPosition, progress),
+        );
 
         if (progress >= 1) {
           // Transition to jumping
@@ -266,7 +263,9 @@ export function useCompactionAnimation(): CompactionAnimationState {
         }
       } else if (currentPhase === "walking_back") {
         const progress = Math.min(elapsed / WALK_DURATION, 1);
-        setAnimatedPosition(lerpPosition(currentTrashCanPosition, currentBossDesk, progress));
+        setAnimatedPosition(
+          lerpPosition(currentTrashCanPosition, currentBossDesk, progress),
+        );
 
         if (progress >= 1) {
           // Animation complete - return to idle

@@ -128,11 +128,7 @@ export function useSessions(
   // Auto-select most active session on initial mount only
   useEffect(() => {
     // Only auto-select once on initial load, not when user manually selects sim session
-    if (
-      !hasAutoSelected.current &&
-      sessions.length > 0 &&
-      sessionId === ""
-    ) {
+    if (!hasAutoSelected.current && sessions.length > 0 && sessionId === "") {
       hasAutoSelected.current = true;
       // Pick the active session with the most events — this is always the long-running
       // main session, not short-lived child sessions which have few events.

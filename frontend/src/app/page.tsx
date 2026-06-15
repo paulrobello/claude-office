@@ -157,16 +157,18 @@ export default function V2TestPage(): React.ReactNode {
   // ------------------------------------------------------------------
   useFloorConfig();
 
-  // Watch for edit-building requests from BuildingView
-  const pendingEditBuilding = useNavigationStore((s) => s.pendingEditBuilding);
-  const consumeEditBuilding = useNavigationStore((s) => s.consumeEditBuilding);
+  // Watch for edit-building requests from BuildingView. Subscribe to the
+  // store so the modal-opening setState runs in an event callback (the store
+  // notification) rather than in the effect body.
   useEffect(() => {
-    if (pendingEditBuilding) {
-      consumeEditBuilding();
-      setSettingsInitialTab("building");
-      setIsSettingsModalOpen(true);
-    }
-  }, [pendingEditBuilding, consumeEditBuilding]);
+    return useNavigationStore.subscribe((state) => {
+      if (state.pendingEditBuilding) {
+        state.consumeEditBuilding();
+        setSettingsInitialTab("building");
+        setIsSettingsModalOpen(true);
+      }
+    });
+  }, []);
 
   const loadTourSeen = useTourStore((s) => s.loadTourSeen);
   useEffect(() => {

@@ -388,7 +388,9 @@ export function BuildingTab({
       {/* Save button */}
       <div className="pt-4 border-t border-slate-800 space-y-2">
         {saveError && (
-          <p className="text-xs font-mono text-rose-400 text-center">{saveError}</p>
+          <p className="text-xs font-mono text-rose-400 text-center">
+            {saveError}
+          </p>
         )}
         <button
           type="button"
