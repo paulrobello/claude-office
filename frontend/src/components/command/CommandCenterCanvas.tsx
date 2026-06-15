@@ -86,20 +86,28 @@ export function CommandCenterCanvas({
 
   return (
     <div className="w-full h-full overflow-hidden relative">
-      {/* Same controls/feel as the floor views (shared ZoomControls, pinch,
-          resize-reset), but the Command Center area is taller than a single
-          office, so allow zooming out below 1:1 to reveal the bottom edge —
-          centerZoomedOut keeps the shrunk board centred in the viewport. */}
+      {/* Identical zoom behaviour to the floor views (OfficeGame): the whole
+          board fits at 1:1 — the global .react-transform-* fill rule lets
+          object-fit: contain letterbox it so no edge is clipped. */}
       <TransformWrapper
         ref={transformRef}
         initialScale={1}
-        minScale={0.5}
+        minScale={1}
         maxScale={3}
-        centerZoomedOut={true}
+        centerZoomedOut={false}
         limitToBounds={false}
         wheel={{ step: 0.1 }}
         pinch={{ step: 5 }}
         doubleClick={{ mode: "reset" }}
+        onTransform={(ref, state) => {
+          // Auto-reset pan offset when zooming back out to 1:1
+          if (
+            state.scale <= 1 &&
+            (state.positionX !== 0 || state.positionY !== 0)
+          ) {
+            ref.resetTransform(0);
+          }
+        }}
       >
         <ZoomControls />
         <TransformComponent

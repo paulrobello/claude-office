@@ -79,6 +79,17 @@ body {
 }
 
 @layer utilities {
+  /* react-zoom-pan-pinch sizes its wrapper/content to fit-content by default,
+     so a wide canvas column makes the content taller than its container and the
+     bottom gets clipped by overflow-hidden. Force them to fill the container so
+     object-fit: contain can letterbox the canvas and keep every edge visible
+     (otherwise the Command Center's wide canvas crops the bottom of the room). */
+  .react-transform-wrapper,
+  .react-transform-component {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
   /* PixiJS Canvas Scaling — anchored to top-left to prevent drift from
      flex centering recalculations during frequent WebSocket re-renders */
   .pixi-canvas-container canvas {
