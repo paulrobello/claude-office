@@ -558,3 +558,37 @@ export const addTaskNote = (
     note,
     created_by: createdBy,
   });
+
+// ── Agent Functions ───────────────────────────────────────────────────────────
+
+export interface AgentJobStatus {
+  job_id: string
+  agent_nome: string
+  function_id: string
+  status: 'running' | 'done' | 'failed'
+  progress: number
+  message: string
+  error?: string
+}
+
+export async function execAgentFunction(
+  agentNome: string,
+  functionId: string,
+): Promise<{ job_id: string }> {
+  const resp = await fetch('/api/v1/coordination/agent-functions/exec', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agent_nome: agentNome, function_id: functionId }),
+  })
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}))
+    throw new Error(err.detail ?? `HTTP ${resp.status}`)
+  }
+  return resp.json()
+}
+
+export async function getAgentJob(jobId: string): Promise<AgentJobStatus> {
+  const resp = await fetch(`/api/v1/coordination/agent-functions/jobs/${jobId}`)
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+  return resp.json()
+}
