@@ -115,10 +115,15 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
         if not exists:
             _s.add(
                 OpsDestination(
-                    id="alocalizai", label="alocalizai (flt)", ssh_alias="flt",
-                    remote_base="/root/project", compose_file="docker-compose.alocalizai.yml",
+                    id="alocalizai",
+                    label="alocalizai (flt)",
+                    ssh_alias="flt",
+                    remote_base="/root/project",
+                    compose_file="docker-compose.alocalizai.yml",
                     front_api_url="https://core.alocalizai.com.br/v1/",
-                    registry="ghcr.io/isakielsouza", image_tag="alocalizai", enabled=True,
+                    image_registry="ghcr.io/isakielsouza",
+                    image_tag="alocalizai",
+                    enabled=True,
                 )
             )
             await _s.commit()

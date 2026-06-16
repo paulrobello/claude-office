@@ -107,13 +107,13 @@ class OpsDestination(Base):
 
     __tablename__ = "ops_destinations"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True)            # slug
+    id: Mapped[str] = mapped_column(String, primary_key=True)  # slug
     label: Mapped[str] = mapped_column(String)
     ssh_alias: Mapped[str] = mapped_column(String)
     remote_base: Mapped[str] = mapped_column(String, default="/root/project")
     compose_file: Mapped[str] = mapped_column(String, default="docker-compose.alocalizai.yml")
     front_api_url: Mapped[str] = mapped_column(String)
-    registry: Mapped[str] = mapped_column(String)
+    image_registry: Mapped[str] = mapped_column("registry", String)
     image_tag: Mapped[str] = mapped_column(String)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
