@@ -16,7 +16,7 @@ from sqlalchemy import text, update
 from sqlalchemy.ext.asyncio import AsyncConnection
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.api.routes import coordination, events, floors, ops, preferences, sessions
+from app.api.routes import agent_functions, coordination, events, floors, ops, preferences, sessions
 from app.api.websocket import (
     manager,
 )
@@ -192,6 +192,7 @@ app.include_router(floors.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(preferences.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(sessions.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(coordination.router, prefix=f"{settings.API_V1_STR}")
+app.include_router(agent_functions.router, prefix=f"{settings.API_V1_STR}")
 app.include_router(ops.router, prefix=f"{settings.API_V1_STR}")
 
 
