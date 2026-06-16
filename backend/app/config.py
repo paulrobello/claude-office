@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     # catching zombies quickly.
     ZOMBIE_SUBAGENT_TIMEOUT_SECONDS: int = 90
 
+    # Ops > Servidores (caminhos fixos da máquina de dev; o por-destino vem do DB)
+    OPS_BUILD_SCRIPT: str = str(Path.home() / "projects/zartoo/build-push-alocalizai.sh")
+    OPS_ZARTOO_DIR: str = str(Path.home() / "projects/zartoo")
+    OPS_LOG_DIR: str = str(Path.home() / ".claude-office/ops")
+
     model_config = SettingsConfigDict(env_file=".env")
 
     def translate_path(self, path: str) -> str:
