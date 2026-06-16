@@ -40,6 +40,13 @@ export function OpsPanel(): React.ReactNode {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status?.running]);
 
+  // Quando o run termina (ops.result chega pelo WS), re-sincroniza o status
+  // pra limpar o `status.running` stale e reabilitar o botão.
+  useEffect(() => {
+    if (stream.result) void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream.result]);
+
   const onConfirm = async (dryRun: boolean): Promise<void> => {
     setConfirming(false);
     if (!current) return;
