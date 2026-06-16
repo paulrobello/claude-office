@@ -109,8 +109,7 @@ export function DestinationEditModal({
             className="flex items-center justify-between py-2 text-sm text-slate-200"
           >
             <span>
-              {d.label}{" "}
-              <span className="text-slate-500">({d.ssh_alias})</span>
+              {d.label} <span className="text-slate-500">({d.ssh_alias})</span>
             </span>
             <span className="flex gap-3">
               <button

@@ -8,9 +8,10 @@ describe("opsApi", () => {
   });
 
   it("listDestinations GETs the destinations endpoint", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: true, json: async () => [{ id: "alocalizai" }] });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{ id: "alocalizai" }],
+    });
     vi.stubGlobal("fetch", fetchMock);
     const out = await listDestinations();
     expect(fetchMock).toHaveBeenCalledWith(

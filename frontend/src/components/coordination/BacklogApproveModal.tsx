@@ -82,7 +82,9 @@ export default function BacklogApproveModal({
       )}
       <p className="text-sm text-slate-400">{t("tasks.backlogModalHint")}</p>
       {!hasArea && (
-        <p className="mt-2 text-xs text-amber-400">{t("tasks.backlogNoArea")}</p>
+        <p className="mt-2 text-xs text-amber-400">
+          {t("tasks.backlogNoArea")}
+        </p>
       )}
       {task.url && (
         <a

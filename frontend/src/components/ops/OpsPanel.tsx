@@ -26,7 +26,9 @@ export function OpsPanel(): React.ReactNode {
 
   const busy = Boolean(status?.running) || running;
   const current =
-    items.find((d) => d.id === (selected ?? status?.dest_id)) ?? items[0] ?? null;
+    items.find((d) => d.id === (selected ?? status?.dest_id)) ??
+    items[0] ??
+    null;
 
   useEffect(() => {
     // seleção default = primeiro destino, só até o usuário escolher.

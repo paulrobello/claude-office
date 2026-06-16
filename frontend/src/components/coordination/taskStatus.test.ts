@@ -148,7 +148,9 @@ describe("deriveStatus — parked tem status PRÓPRIO (não é done)", () => {
 
   it("não-regressão: done/backlog/epic seguem como antes", () => {
     expect(deriveStatus(makeTask({ state: "CLOSED" }), [])).toBe("done");
-    expect(deriveStatus(makeTask({ labels: ["backlogs"] }), [])).toBe("backlog");
+    expect(deriveStatus(makeTask({ labels: ["backlogs"] }), [])).toBe(
+      "backlog",
+    );
     expect(deriveStatus(makeTask({ labels: ["epic"] }), [])).toBe("epic");
   });
 });

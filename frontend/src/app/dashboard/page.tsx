@@ -505,7 +505,16 @@ export default function DashboardPage(): React.ReactNode {
       .filter(({ tasks }) => !filterActive || tasks.length > 0);
     const queue = boardTasks.filter((t) => !shown.has(t.source_ref));
     return { columns, queue };
-  }, [data, filtered, filters.agent, search, filterActive, showClosed, showParked, statusByRef]);
+  }, [
+    data,
+    filtered,
+    filters.agent,
+    search,
+    filterActive,
+    showClosed,
+    showParked,
+    statusByRef,
+  ]);
 
   // clicar "responder" numa task pending: abre o modal HITL se houver prompt no DB
   // (canal hitl_prompts → web); senão (label hitl sem prompt) cai na issue.
@@ -2057,7 +2066,8 @@ function TaskCard({
   // Epic/backlog (guarda-chuva/someday) e parked (tirada da fila pelo CEO): não
   // despacham. Aparecem semi-transparentes (mesma de-ênfase) — não são trabalho
   // ativo nem têm Play. Parked gate por STATUS (label parked num CLOSED já é done).
-  const muted = isEpic(t) || st === "backlog" || (isParked(t) && st === "parked");
+  const muted =
+    isEpic(t) || st === "backlog" || (isParked(t) && st === "parked");
   return (
     <div
       className={`rounded-xl px-3.5 py-3 bg-white/5 border border-white/10 hover:bg-[rgba(168,85,247,0.06)] transition-colors${

@@ -37,12 +37,7 @@ export function DeployConfirmModal({
   );
 
   return (
-    <Modal
-      isOpen
-      onClose={onCancel}
-      title="Atualizar servidor"
-      footer={footer}
-    >
+    <Modal isOpen onClose={onCancel} title="Atualizar servidor" footer={footer}>
       <p className="text-sm text-slate-300 mb-4">
         ⚠️ Isso vai <b>buildar as 14 imagens</b> e atualizar o servidor{" "}
         <b>{label}</b>. Confirmar?
