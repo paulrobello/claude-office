@@ -49,6 +49,15 @@ export function OpsPanel(): React.ReactNode {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.result]);
 
+  // A página /servidores NÃO monta o WebSocket de sessão (só /office monta), então
+  // as mensagens `ops.*` nunca chegam aqui. Enquanto há um run ativo, poll do
+  // /status (que carrega o log_tail autoritativo) garante log ao vivo sem WS.
+  useEffect(() => {
+    if (!busy) return;
+    const id = setInterval(() => void refresh(), 1500);
+    return () => clearInterval(id);
+  }, [busy, refresh]);
+
   const onConfirm = async (dryRun: boolean): Promise<void> => {
     setConfirming(false);
     if (!current) return;
@@ -63,7 +72,21 @@ export function OpsPanel(): React.ReactNode {
     await remove(id);
   };
 
-  const stepLabel = stream.step !== "" ? stream.step : (status?.step ?? "");
+  // Fontes de exibição: prefere o stream WS (real-time) e cai pro /status polled
+  // quando o WS não está entregando (caso da página /servidores).
+  const displayLines =
+    stream.lines.length > 0 ? stream.lines : (status?.log_tail ?? []);
+  const displayStep =
+    stream.step !== "idle" && stream.step !== ""
+      ? stream.step
+      : (status?.step ?? "idle");
+  const displayResult =
+    stream.result ??
+    (status && (status.step === "done" || status.step === "failed")
+      ? { status: status.step, exit_code: status.exit_code ?? -1 }
+      : null);
+
+  const stepLabel = displayStep !== "idle" ? displayStep : "";
 
   return (
     <div className="max-w-3xl">
@@ -86,11 +109,11 @@ export function OpsPanel(): React.ReactNode {
         </button>
       </div>
       {msg && <p className="text-amber-400 text-sm mb-2">{msg}</p>}
-      {(stream.lines.length > 0 || busy || stream.result) && (
+      {(displayLines.length > 0 || busy || displayResult) && (
         <OpsLogPanel
-          lines={stream.lines}
-          step={stream.step}
-          result={stream.result}
+          lines={displayLines}
+          step={displayStep}
+          result={displayResult}
         />
       )}
       {confirming && current && (
