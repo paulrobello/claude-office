@@ -23,6 +23,10 @@
 
 ## Screenshots
 
+The **Command Center** gathers the boss of every live terminal into one cross-session office — at a glance you can see which terminals need you, which are working, and which are done:
+
+![Command Center](https://raw.githubusercontent.com/paulrobello/claude-office/main/screenshots/sc_command_center.png)
+
 | | |
 |---|---|
 | ![Office View](https://raw.githubusercontent.com/paulrobello/claude-office/main/screenshot.png) | ![Multi-Floor Building](https://raw.githubusercontent.com/paulrobello/claude-office/main/screenshots/sc_floor_office.png) |
