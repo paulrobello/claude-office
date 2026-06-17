@@ -20,8 +20,6 @@ interface ExitState {
   setNow: (now: number) => void;
   /** Register the current ended sessions; new ones start their exit now. */
   registerEnded: (ids: string[], t: number) => void;
-  /** Drop sessions whose exit animation has finished by `now`. */
-  pruneCompleted: (now: number) => void;
 }
 
 export const useExitStore = create<ExitState>()((set) => ({
@@ -51,18 +49,6 @@ export const useExitStore = create<ExitState>()((set) => ({
     // Re-arm the self-gating driver loop when a new exit begins.
     if (added) ensureExitRaf();
   },
-  pruneCompleted: (now) =>
-    set((s) => {
-      const next = new Map(s.startTimes);
-      let changed = false;
-      for (const [id, st] of s.startTimes)
-        if ((now - st) / EXIT_DURATION >= 1) {
-          next.delete(id);
-          changed = true;
-        }
-      // Preserve Map identity when nothing changed (avoids re-render churn).
-      return changed ? { startTimes: next } : {};
-    }),
 }));
 
 /** Clear all exit state (call on Command Center unmount). */
@@ -117,9 +103,11 @@ function tick(): void {
   if (active) {
     rafId = requestAnimationFrame(tick);
   } else {
-    // Nothing animating: drop finished exits and stop the loop. It re-arms
-    // from registerEnded when the next session leaves.
-    s.pruneCompleted(now);
+    // Nothing animating: stop the loop. Finished exits stay in startTimes as
+    // the "already walked out" memory so an ended peer that lingers in the
+    // Ended zone (RECENT_ENDED_MS) isn't re-registered and made to walk out on
+    // a loop. registerEnded drops them when the session leaves the zone, so the
+    // map stays bounded. The loop re-arms from registerEnded on the next exit.
     rafId = null;
   }
 }
