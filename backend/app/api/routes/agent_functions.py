@@ -80,7 +80,8 @@ async def exec_function(body: ExecBody) -> dict[str, str]:
     job = JobState(body.agent_nome, body.function_id)
     JOBS[job.job_id] = job
 
-    asyncio.create_task(_dispatch(job))
+    task = asyncio.create_task(_dispatch(job))
+    task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
     return {"job_id": job.job_id}
 
 
@@ -175,8 +176,10 @@ WITH COMPRESSION, STATS = 10, FORMAT, INIT
             pass
 
         cur = conn.cursor()
-        cur.execute(sql)
-        conn.close()
+        try:
+            cur.execute(sql)
+        finally:
+            conn.close()
 
     job.message = "Iniciando backup no servidor..."
     await loop.run_in_executor(None, _run_sql)

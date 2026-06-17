@@ -47,7 +47,7 @@ export const useJobStore = create<JobStoreState>((set, get) => ({
       // para quando terminar
       const current = get().job;
       if (current && current.status !== "running") {
-        clearInterval(get()._pollInterval!);
+        clearInterval(interval);
         set({ _pollInterval: null });
       }
     }, 2000);
