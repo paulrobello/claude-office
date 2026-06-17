@@ -13,7 +13,7 @@ export function AgentFunctionsModal({
 }: {
   agent: CoordAgent;
   onClose: () => void;
-}): React.ReactNode {
+}): React.ReactElement {
   const functions: AgentFunction[] = AGENT_FUNCTIONS_REGISTRY[agent.nome] ?? [];
   const startJob = useJobStore((s) => s.startJob);
   const [executing, setExecuting] = useState<string | null>(null);
@@ -25,6 +25,7 @@ export function AgentFunctionsModal({
     try {
       const { job_id } = await execAgentFunction(agent.nome, fn.id);
       startJob(job_id, agent.nome, fn.label);
+      setExecuting(null);
       onClose();
     } catch (err) {
       setExecError(err instanceof Error ? err.message : "Erro desconhecido");
