@@ -39,6 +39,37 @@ try:
     _config = load_config()
     DEBUG = _config.get("CLAUDE_OFFICE_DEBUG", "0") == "1"
 
+    def _open_request(req: "urllib.request.Request") -> Any:
+        """Open *req* without ever creating an SSL context for http URLs.
+
+        On some Windows setups the bundled OpenSSL aborts the whole process
+        (``OPENSSL_Uplink: no OPENSSL_Applink``) the moment an SSL context is
+        created, because reading the OpenSSL config/cert file via stdio needs
+        an applink shim the standalone python launcher does not export. The
+        default backend is local plain http, so for http URLs we build an
+        opener with urllib's standard HTTP handlers **except** ``HTTPSHandler``
+        — that keeps proxy support (``ProxyHandler``) and redirect following
+        (``HTTPRedirectHandler``) for remote http backends while never
+        constructing an SSL context, so the crash can't happen. ``https`` URLs
+        keep the standard opener (SSL expected) so remote deployments still
+        work.
+
+        ``build_opener()`` is intentionally avoided: it always adds
+        ``HTTPSHandler``, which would re-trigger the context creation.
+        """
+        if API_URL.lower().startswith("https"):
+            return urllib.request.urlopen(req, timeout=TIMEOUT)
+        opener = urllib.request.OpenerDirector()
+        for handler in (
+            urllib.request.ProxyHandler(),
+            urllib.request.HTTPHandler(),
+            urllib.request.HTTPDefaultErrorHandler(),
+            urllib.request.HTTPRedirectHandler(),
+            urllib.request.HTTPErrorProcessor(),
+        ):
+            opener.add_handler(handler)
+        return opener.open(req, timeout=TIMEOUT)
+
     def send_event(payload: dict[str, Any]) -> None:
         """POST *payload* as JSON to the backend API.
 
@@ -51,7 +82,7 @@ try:
             if api_key:
                 headers["X-API-Key"] = api_key
             req = urllib.request.Request(API_URL, data=json_data, headers=headers)
-            with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
+            with _open_request(req) as response:
                 if response.status >= 300:
                     log_error(
                         RuntimeError(f"backend returned HTTP {response.status}"),
