@@ -47,14 +47,27 @@ try:
         created, because reading the OpenSSL config/cert file via stdio needs
         an applink shim the standalone python launcher does not export. The
         default backend is local plain http, so for http URLs we build an
-        opener with only ``HTTPHandler`` — no ``HTTPSHandler``, no ssl import
-        side effects, no crash. https URLs keep the standard opener so remote
-        deployments still work.
+        opener with urllib's standard HTTP handlers **except** ``HTTPSHandler``
+        — that keeps proxy support (``ProxyHandler``) and redirect following
+        (``HTTPRedirectHandler``) for remote http backends while never
+        constructing an SSL context, so the crash can't happen. ``https`` URLs
+        keep the standard opener (SSL expected) so remote deployments still
+        work.
+
+        ``build_opener()`` is intentionally avoided: it always adds
+        ``HTTPSHandler``, which would re-trigger the context creation.
         """
         if API_URL.lower().startswith("https"):
             return urllib.request.urlopen(req, timeout=TIMEOUT)
         opener = urllib.request.OpenerDirector()
-        opener.add_handler(urllib.request.HTTPHandler())
+        for handler in (
+            urllib.request.ProxyHandler(),
+            urllib.request.HTTPHandler(),
+            urllib.request.HTTPDefaultErrorHandler(),
+            urllib.request.HTTPRedirectHandler(),
+            urllib.request.HTTPErrorProcessor(),
+        ):
+            opener.add_handler(handler)
         return opener.open(req, timeout=TIMEOUT)
 
     def send_event(payload: dict[str, Any]) -> None:

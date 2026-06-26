@@ -11,6 +11,7 @@ All notable changes to Claude Office Visualizer are documented here.
 ### Fixed
 
 - **Hook crash on Windows with a conflicting system OpenSSL (`OPENSSL_Uplink: no OPENSSL_Applink`)**: `send_event` posts only to the local backend over plain HTTP, but Python 3.14's `urllib.request.urlopen` builds an SSL-capable opener (an `HTTPSHandler` whose context is created eagerly). On machines where a foreign OpenSSL config/cert is in play (e.g. `SSL_CERT_FILE`/`SSL_CERT_DIR` set by another install, or a `libcrypto` in `System32`), creating that context aborts the whole process at the C level — so no event was ever sent and the office stayed empty. The hook now builds an `OpenerDirector` with only `HTTPHandler` for `http://` URLs (no SSL context, no crash) and keeps the standard SSL-capable opener for `https://` backends, so remote deployments are unaffected
+- **Hook http opener proxy/redirect support (follow-up to #53)**: the crash-fix's `HTTPHandler`-only opener also dropped `ProxyHandler` and `HTTPRedirectHandler`, so a remote `http://` backend behind a corporate proxy or a redirecting reverse-proxy would silently fail; the opener now carries the standard urllib HTTP handlers (proxy, redirect, error processing) while still excluding `HTTPSHandler`, so no SSL context is created and the Windows crash can't recur
 
 ## [0.21.0] - 2026-06-17
 
