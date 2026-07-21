@@ -5,13 +5,14 @@ Not part of the public API — import from ``scripts.scenarios`` instead.
 
 from __future__ import annotations
 
+import os
 import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 import requests
 
-API_URL = "http://localhost:8000/api/v1/events"
+API_URL = os.environ.get("CLAUDE_OFFICE_API_URL", "http://localhost:8000/api/v1/events")
 
 # Context window constants
 MAX_CONTEXT_TOKENS = 200_000
