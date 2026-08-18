@@ -381,4 +381,4 @@ Contributions are welcome! Please ensure that all pull requests:
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=paulrobello/claude-office&type=Date)](https://star-history.com/#paulrobello/claude-office&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=paulrobello/claude-office&type=Date)](https://star-history.dera.page/#paulrobello/claude-office&Date)
