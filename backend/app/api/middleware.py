@@ -9,6 +9,7 @@ inline version in ``main.py``.
 """
 
 import hmac
+import os
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -22,6 +23,9 @@ from app.config import get_settings
 settings = get_settings()
 
 _LOCALHOST_HOSTS = frozenset({"127.0.0.1", "::1", "localhost", "testclient"})
+# ponytail: inside Docker every request arrives from the NAT gateway (e.g. 192.168.65.1),
+# so the IP check is meaningless there; the loopback boundary is the host port binding.
+_LOCALHOST_ONLY = os.environ.get("LOCALHOST_ONLY", "1").lower() not in ("0", "false", "no")
 
 
 class LocalhostOnlyMiddleware(BaseHTTPMiddleware):
@@ -37,7 +41,7 @@ class LocalhostOnlyMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):  # type: ignore[override]
         client_host = request.client.host if request.client else None
-        if client_host not in _LOCALHOST_HOSTS:
+        if _LOCALHOST_ONLY and client_host not in _LOCALHOST_HOSTS:
             return JSONResponse(
                 status_code=403,
                 content={"detail": "Access denied: localhost only"},

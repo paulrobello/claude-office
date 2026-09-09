@@ -27,6 +27,7 @@ try:
     import json
     import os
     import urllib.request
+    from pathlib import Path
     from typing import Any, cast
 
     from claude_office_hooks.config import API_URL, TIMEOUT, get_api_key, load_config
@@ -78,10 +79,11 @@ try:
             opener.add_handler(handler)
         return opener.open(req, timeout=TIMEOUT)
 
-    def send_event(payload: dict[str, Any]) -> None:
+    def send_event(payload: dict[str, Any]) -> bool:
         """POST *payload* as JSON to the backend API.
 
         Silently ignores all errors so the hook never blocks Claude.
+        Returns True only when the backend acknowledged the event.
         """
         try:
             json_data = json.dumps(payload).encode("utf-8")
@@ -96,9 +98,12 @@ try:
                         RuntimeError(f"backend returned HTTP {response.status}"),
                         "send_event",
                     )
+                    return False
+                return True
         except Exception as exc:
             # Record the failure but never disrupt the user (always swallow).
             log_error(exc, "send_event failed")
+            return False
 
     def main() -> None:
         """Parse arguments, read stdin, map the event, and POST to backend."""
@@ -180,7 +185,36 @@ try:
             return
 
         debug_log(args.event_type, raw_data, payload, enabled=DEBUG)
+
+        # The backend lists only sessions whose session_start it received. If the
+        # office was started after this session (or was down at the time), replay a
+        # synthetic session_start once, then remember that the backend knows us.
+        marker = _start_marker(payload.get("session_id", session_id))
+        if args.event_type == "session_start":
+            if send_event(payload):
+                _touch(marker)
+            return
+        if args.event_type != "session_end" and not marker.exists():
+            recovered = map_event(
+                "session_start", {**raw_data, "source": "recovered"}, session_id, strip_prefixes
+            )
+            if recovered is not None and send_event(recovered):
+                _touch(marker)
         send_event(payload)
+
+    def _start_marker(sid: str) -> Path:
+        """Per-(backend, session) marker: session_start was delivered to API_URL."""
+        import hashlib
+
+        digest = hashlib.sha1(f"{API_URL}\n{sid}".encode()).hexdigest()
+        return Path.home() / ".claude" / "claude-office-hooks" / "started" / digest
+
+    def _touch(marker: Path) -> None:
+        try:
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.touch()
+        except Exception as exc:
+            log_error(exc, "start marker")
 
     if __name__ == "__main__":
         try:

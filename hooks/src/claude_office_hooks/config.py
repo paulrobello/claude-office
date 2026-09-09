@@ -58,8 +58,22 @@ def _log_clamp(host: str | None) -> None:
         pass
 
 
+def _config_file_value(key: str) -> str | None:
+    """Read one key from CONFIG_FILE without importing anything (safe at import time)."""
+    try:
+        for line in (Path.home() / ".claude" / "claude-office-config.env").read_text().splitlines():
+            k, _, v = line.strip().partition("=")
+            if k.strip() == key and not line.lstrip().startswith("#"):
+                return v.strip().strip('"').strip("'")
+    except Exception:
+        pass
+    return None
+
+
 API_URL = _resolve_api_url(
-    os.environ.get("CLAUDE_OFFICE_API_URL", _DEFAULT_API_URL),
+    os.environ.get("CLAUDE_OFFICE_API_URL")
+    or _config_file_value("CLAUDE_OFFICE_API_URL")
+    or _DEFAULT_API_URL,
     os.environ.get("CLAUDE_OFFICE_ALLOW_REMOTE", "") == "1",
     _log_clamp,
 )
