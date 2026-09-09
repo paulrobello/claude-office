@@ -13,9 +13,11 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: claude-office
-    # Loopback-only: this is a localhost tool (SEC-004)
+    # Loopback-only on the HOST: this is a localhost tool (SEC-004).
+    # Inside the container requests come from the Docker gateway, so the
+    # in-app IP check is disabled via LOCALHOST_ONLY=0 below.
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8050:8000"
     volumes:
       # Mount Claude data directory (read-only for security)
       # The hooks write JSONL transcripts here; backend reads them for token usage
@@ -34,6 +36,9 @@ services:
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
       - SUMMARY_ENABLED=${SUMMARY_ENABLED:-true}
       - SERVE_STATIC=1
+      - LOCALHOST_ONLY=0
+      # Browser WS handshakes are origin-checked against this list (QA-014)
+      - BACKEND_CORS_ORIGINS=["http://localhost:8050","http://127.0.0.1:8050"]
       # Plain tracebacks in containers (SEC-006)
       - LOG_RICH_TRACEBACKS=0
     restart: unless-stopped

@@ -1,6 +1,7 @@
 """Path compression and validation utilities."""
 
 import logging
+import os
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -10,11 +11,15 @@ DEFAULT_WORD_MAX_LEN = 30
 
 
 def is_safe_transcript_path(path: str | Path) -> bool:
-    """Return True if *path* is under ~/.claude/ and has a .jsonl extension."""
+    """Return True if *path* is a .jsonl under ~/.claude/ (or the Docker mount)."""
     try:
         resolved = Path(path).expanduser().resolve()
-        claude_dir = Path.home().joinpath(".claude").resolve()
-        return resolved.suffix == ".jsonl" and resolved.is_relative_to(claude_dir)
+        roots = [Path.home().joinpath(".claude").resolve()]
+        # Docker: transcripts live under CLAUDE_PATH_CONTAINER, not $HOME/.claude
+        container_root = os.environ.get("CLAUDE_PATH_CONTAINER")
+        if container_root:
+            roots.append(Path(container_root).resolve())
+        return resolved.suffix == ".jsonl" and any(resolved.is_relative_to(r) for r in roots)
     except Exception:
         return False
 

@@ -14,6 +14,7 @@
 
 "use client";
 
+import { WS_BASE } from "@/utils/api";
 import { useCallback, useEffect, useRef } from "react";
 import { useGameStore } from "@/stores/gameStore";
 import { useAttentionStore } from "@/stores/attentionStore";
@@ -202,11 +203,7 @@ export function useWebSocketEvents({
   // ---- WebSocket transport controller (created once, opts synced each render) ----
   const controllerRef = useRef<WebSocketController | null>(null);
   if (controllerRef.current === null) {
-    const baseUrl =
-      process.env.NEXT_PUBLIC_WS_URL ||
-      (typeof window !== "undefined"
-        ? `ws://${window.location.hostname}:8000`
-        : "ws://localhost:8000");
+    const baseUrl = WS_BASE;
     controllerRef.current = new WebSocketController({
       sessionId,
       enabled,

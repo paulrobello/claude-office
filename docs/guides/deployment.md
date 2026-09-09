@@ -105,6 +105,7 @@ For production or shared-host deployments, set an explicit `CLAUDE_OFFICE_API_KE
 | `SUMMARY_ENABLED` | No | `true` | Enable/disable AI summaries |
 | `DATABASE_URL` | No | `sqlite+aiosqlite:////app/data/visualizer.db` | Database connection string |
 | `SERVE_STATIC` | No | `1` (in `docker-compose.yml`) | Set to `1`/`true`/`yes` to serve the built frontend from `backend/static/`. The compose file sets this; a raw `docker run` must set it explicitly or the root URL serves no frontend. |
+| `LOCALHOST_ONLY` | No | `0` (in `docker-compose.yml`) | Set to `0` to skip the in-app client-IP check. Required in Docker, where every request arrives from the bridge gateway; the host port binding (`127.0.0.1:8050`) is the loopback boundary there. |
 | `CLAUDE_OFFICE_API_KEY` | No | (auto-generated per launch) | Explicit API key; when set, all state-changing endpoints require the `X-API-Key` header |
 
 > **Note:** Additional backend settings like `SUMMARY_MODEL`, `SUMMARY_MAX_TOKENS`, and `GIT_POLL_INTERVAL` can be configured in the backend's `config.py` defaults or by extending the docker-compose environment section. See `backend/app/config.py` for all available settings.

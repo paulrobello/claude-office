@@ -1,9 +1,10 @@
 "use client";
 
+import { API_BASE } from "@/utils/api";
 import { useEffect } from "react";
 import { useNavigationStore } from "@/stores/navigationStore";
 
-const API_URL = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1`;
+const API_URL = `${API_BASE}/api/v1`;
 
 /**
  * Fetches building configuration from the backend and stores it

@@ -1,5 +1,6 @@
 "use client";
 
+import { WS_BASE } from "@/utils/api";
 import { useCallback, useEffect, useRef } from "react";
 import { useOverviewStore } from "@/stores/overviewStore";
 import type { OverviewEntry } from "@/types";
@@ -45,11 +46,7 @@ export function useOverviewWebSocket({ enabled }: { enabled: boolean }): void {
       reconnectTimeoutRef.current = null;
     }
 
-    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
-    const wsUrl =
-      process.env.NEXT_PUBLIC_WS_URL ||
-      `${wsScheme}://${window.location.hostname}:8000`;
-    const ws = new WebSocket(`${wsUrl}/ws/overview`);
+    const ws = new WebSocket(`${WS_BASE}/ws/overview`);
     wsRef.current = ws;
 
     ws.onopen = () => {
