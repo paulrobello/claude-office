@@ -69,7 +69,9 @@ class TranscriptPoller(BasePoller[PolledAgent]):
         """Start polling a subagent's transcript file."""
         settings = get_settings()
         translated_path = settings.translate_path(transcript_path)
-        path = Path(transcript_path).expanduser()
+        # Validate and poll the TRANSLATED path: hooks report host-form paths,
+        # and the container only accepts paths under its own roots (Docker).
+        path = Path(translated_path).expanduser()
 
         if not is_safe_transcript_path(path):
             logger.warning(f"Rejected transcript path outside ~/.claude/: {translated_path}")

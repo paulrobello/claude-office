@@ -16,6 +16,8 @@ from urllib.parse import urlparse
 _LOCALHOST_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1", None})
 _DEFAULT_API_URL = "http://localhost:8000/api/v1/events"
 
+CONFIG_FILE = Path.home() / ".claude" / "claude-office-config.env"
+
 
 def _resolve_api_url(
     raw_url: str,
@@ -61,7 +63,7 @@ def _log_clamp(host: str | None) -> None:
 def _config_file_value(key: str) -> str | None:
     """Read one key from CONFIG_FILE without importing anything (safe at import time)."""
     try:
-        for line in (Path.home() / ".claude" / "claude-office-config.env").read_text().splitlines():
+        for line in CONFIG_FILE.read_text().splitlines():
             k, _, v = line.strip().partition("=")
             if k.strip() == key and not line.lstrip().startswith("#"):
                 return v.strip().strip('"').strip("'")
@@ -91,12 +93,6 @@ def get_api_key() -> str:
 def _set_api_key(key: str) -> None:
     _api_key_holder[0] = key
 
-
-# ---------------------------------------------------------------------------
-# Config file location
-# ---------------------------------------------------------------------------
-
-CONFIG_FILE = Path.home() / ".claude" / "claude-office-config.env"
 
 # ---------------------------------------------------------------------------
 # Default project-name prefix stripping

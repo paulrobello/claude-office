@@ -81,6 +81,8 @@ class EventData(BaseModel):
     project_name: str | None = None
     project_dir: str | None = None
     working_dir: str | None = None
+    # Producer tag (mirrors EventDataBase.source; see that class for values).
+    source: str | None = None
     tool_name: str | None = None
     tool_use_id: str | None = None
     tool_input: dict[str, Any] | None = None
@@ -187,6 +189,11 @@ class EventDataBase(BaseModel):
     project_name: str | None = None
     project_dir: str | None = None
     working_dir: str | None = None
+    # Producer tag: "recovered" marks a synthetic SESSION_START the backend
+    # builds when the real one never arrived (see EventProcessor._process_event_internal);
+    # "opencode" marks plugin events, whose child @agent sessions must stay
+    # excluded from that recovery. Old producers omit it (extra="ignore").
+    source: str | None = None
     # Agent identity (read across many event types).
     agent_id: str | None = None
     native_agent_id: str | None = None

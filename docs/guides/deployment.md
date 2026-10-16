@@ -88,7 +88,22 @@ graph TD
 
 4. **Access the visualizer**
 
-   Open [http://localhost:8000](http://localhost:8000) in your browser.
+   Open [http://localhost:8050](http://localhost:8050) in your browser.
+
+5. **Connect the hooks**
+
+   The hooks on the host still default to `http://localhost:8000`, which is not
+   published in Docker mode. Point them at :8050 once via the shared config
+   file (`make docker-config` writes it for you):
+
+   ```bash
+   make docker-config
+   # or manually:
+   printf 'CLAUDE_OFFICE_API_URL=http://localhost:8050/api/v1/events\n' >> ~/.claude/claude-office-config.env
+   ```
+
+   The OpenCode plugin reads the same file, so OpenCode-produced sessions
+   follow the same setting.
 
 ## Configuration
 
@@ -98,14 +113,14 @@ For production or shared-host deployments, set an explicit `CLAUDE_OFFICE_API_KE
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `CLAUDE_PATH_HOST` | Yes | - | Absolute path to `~/.claude` on host system |
+| `CLAUDE_PATH_HOST` | No | `$HOME/.claude` (in `docker-compose.yml`) | Absolute path to `~/.claude` on host system |
 | `CLAUDE_PATH_CONTAINER` | No | `/claude-data` | Mount point inside container (hardcoded in compose) |
 | `CLAUDE_DATA_DIR` | No | `~/.claude` | Host directory to mount (used in volume mount only) |
 | `CLAUDE_CODE_OAUTH_TOKEN` | No | - | OAuth token for AI-powered summaries |
 | `SUMMARY_ENABLED` | No | `true` | Enable/disable AI summaries |
 | `DATABASE_URL` | No | `sqlite+aiosqlite:////app/data/visualizer.db` | Database connection string |
 | `SERVE_STATIC` | No | `1` (in `docker-compose.yml`) | Set to `1`/`true`/`yes` to serve the built frontend from `backend/static/`. The compose file sets this; a raw `docker run` must set it explicitly or the root URL serves no frontend. |
-| `LOCALHOST_ONLY` | No | `0` (in `docker-compose.yml`) | Set to `0` to skip the in-app client-IP check. Required in Docker, where every request arrives from the bridge gateway; the host port binding (`127.0.0.1:8050`) is the loopback boundary there. |
+| `LOCALHOST_ONLY` | No | `1` (code default; compose sets `0`) | Set to `0` to skip the in-app client-IP check. Required in Docker, where every request arrives from the bridge gateway; the host port binding (`127.0.0.1:8050`) is the loopback boundary there. Note: other containers on the same Docker network can then reach the API unauthenticated — keep the compose network private. |
 | `CLAUDE_OFFICE_API_KEY` | No | (auto-generated per launch) | Explicit API key; when set, all state-changing endpoints require the `X-API-Key` header |
 
 > **Note:** Additional backend settings like `SUMMARY_MODEL`, `SUMMARY_MAX_TOKENS`, and `GIT_POLL_INTERVAL` can be configured in the backend's `config.py` defaults or by extending the docker-compose environment section. See `backend/app/config.py` for all available settings.

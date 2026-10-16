@@ -4,7 +4,7 @@
 	opencode-install opencode-uninstall opencode-reinstall opencode-build \
 	dev-tmux dev-tmux-kill dev-tmux-backend dev-tmux-frontend \
 	build-static frontend-build-static \
-	docker-build docker-up docker-down docker-logs docker-shell \
+	docker-build docker-up docker-down docker-logs docker-shell docker-config \
 	pre-commit pre-commit-update depsupdate depsshow uv-lock uv-sync setup resetup remove-venv \
 	bump-version version-check help
 
@@ -168,7 +168,16 @@ docker-build:
 
 docker-up:
 	docker compose up -d
-	@echo "Claude Office running at http://localhost:8000"
+	@echo "Claude Office running at http://localhost:8050"
+
+# Point the host hooks/plugin at the Docker-published port. Idempotent: the
+# grep guard keeps it from appending a second line on re-runs.
+docker-config:
+	@mkdir -p $(HOME)/.claude
+	@grep -q 'CLAUDE_OFFICE_API_URL' $(HOME)/.claude/claude-office-config.env 2>/dev/null \
+		&& echo "claude-office-config.env already sets CLAUDE_OFFICE_API_URL" \
+		|| (printf 'CLAUDE_OFFICE_API_URL=http://localhost:8050/api/v1/events\n' >> $(HOME)/.claude/claude-office-config.env \
+			&& echo "Wrote CLAUDE_OFFICE_API_URL=http://localhost:8050/api/v1/events to ~/.claude/claude-office-config.env")
 
 docker-down:
 	docker compose down

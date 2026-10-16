@@ -8,14 +8,18 @@
 
 /**
  * Backend origin. Explicit env wins; otherwise derive from the page itself:
- * `next dev` on :3000 talks to the backend on :8000, anything else (Docker,
+ * `next dev` talks to the backend on :8000 regardless of the port Next picked
+ * (3000 may be taken and auto-incremented); built output (Docker,
  * SERVE_STATIC) is same-origin so the port never needs configuring.
  */
 function backendOrigin(): string {
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
   if (typeof window === "undefined") return "http://localhost:8000";
-  const { protocol, hostname, port, origin } = window.location;
-  return port === "3000" ? `${protocol}//${hostname}:8000` : origin;
+  const { protocol, hostname, origin } = window.location;
+  if (process.env.NODE_ENV === "development") {
+    return `${protocol}//${hostname}:8000`;
+  }
+  return origin;
 }
 
 export const API_BASE = backendOrigin();

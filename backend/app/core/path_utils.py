@@ -1,8 +1,9 @@
 """Path compression and validation utilities."""
 
 import logging
-import os
 from pathlib import Path
+
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ def is_safe_transcript_path(path: str | Path) -> bool:
         resolved = Path(path).expanduser().resolve()
         roots = [Path.home().joinpath(".claude").resolve()]
         # Docker: transcripts live under CLAUDE_PATH_CONTAINER, not $HOME/.claude
-        container_root = os.environ.get("CLAUDE_PATH_CONTAINER")
+        container_root = get_settings().CLAUDE_PATH_CONTAINER
         if container_root:
             roots.append(Path(container_root).resolve())
         return resolved.suffix == ".jsonl" and any(resolved.is_relative_to(r) for r in roots)

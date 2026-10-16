@@ -25,9 +25,12 @@ services:
       # Persist SQLite database
       - claude-office-db:/app/data
     environment:
-      # Path translation for Docker
+      # Path translation for Docker. Defaults to the standard Claude config
+      # location so transcript paths reported by the host hooks are translated
+      # into container paths by default. Override when CLAUDE_DATA_DIR moves
+      # ~/.claude elsewhere.
       # Host path prefix that appears in transcript_path from hooks
-      - CLAUDE_PATH_HOST=${CLAUDE_PATH_HOST:-}
+      - CLAUDE_PATH_HOST=${CLAUDE_PATH_HOST:-$HOME/.claude}
       # Container path where ~/.claude is mounted
       - CLAUDE_PATH_CONTAINER=/claude-data
       # Database location (use mounted volume for persistence)

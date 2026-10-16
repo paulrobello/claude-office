@@ -3,10 +3,14 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
+from app.config import get_settings
 from app.core.path_utils import (
     DEFAULT_PATH_MAX_LEN,
     compress_path,
     compress_paths_in_text,
+    is_safe_transcript_path,
     truncate_long_words,
 )
 
@@ -121,3 +125,19 @@ class TestTruncateLongWords:
         result = truncate_long_words(word, max_len=10)
         assert len(result) == 10
         assert result.endswith("...")
+
+
+class TestContainerRootFromSettings:
+    """The Docker mount root comes from Settings, not raw os.environ."""
+
+    def test_container_root_accepted_when_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(get_settings(), "CLAUDE_PATH_CONTAINER", "/claude-data")
+        assert is_safe_transcript_path("/claude-data/projects/x/file.jsonl") is True
+
+    def test_container_root_rejected_when_unset(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(get_settings(), "CLAUDE_PATH_CONTAINER", "")
+        assert is_safe_transcript_path("/claude-data/projects/x/file.jsonl") is False
+
+    def test_non_jsonl_under_container_root_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(get_settings(), "CLAUDE_PATH_CONTAINER", "/claude-data")
+        assert is_safe_transcript_path("/claude-data/projects/x/file.txt") is False

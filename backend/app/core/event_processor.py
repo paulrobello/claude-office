@@ -67,6 +67,8 @@ from app.models.events import (
     EventType,
     LifecycleEvent,
     PromptEvent,
+    SessionEvent,
+    SessionEventData,
     TaskEvent,
     ToolEvent,
 )
@@ -188,6 +190,10 @@ class EventProcessor:
         self._task_poller_initialized = False
         self._beads_poller_initialized = False
         self._beads_sessions: set[str] = set()  # Sessions with active beads polling
+        # Sessions whose session_start-presence has been checked for recovery
+        # (see ``_process_event_internal``). Cleared whenever the DB is wiped
+        # so wiped sessions are re-checked on their next event.
+        self._recovery_checked: set[str] = set()
         # Coalesces Command Center overview broadcasts: bursts of events schedule
         # a single deferred flush instead of rebuilding the full peer-merge once
         # per event (O(N x events/sec)). See ``_schedule_overview_broadcast``.
@@ -315,11 +321,15 @@ class EventProcessor:
                     if orchestrator.is_empty:
                         del self.orchestrators[sm.room_id]
             self.sessions.pop(session_id, None)
+        self._recovery_checked.discard(session_id)
 
     async def clear_all_sessions(self) -> None:
         """Clear all in-memory session state."""
         async with self._sessions_lock:
             self.sessions.clear()
+        # A wiped DB no longer knows any session_start, so previously checked
+        # sessions must be re-evaluated for recovery on their next event.
+        self._recovery_checked.clear()
 
     async def evict_idle_sessions(self, max_idle_seconds: float) -> int:
         """Drop in-memory StateMachines idle longer than ``max_idle_seconds``.
@@ -480,6 +490,23 @@ class EventProcessor:
         Args:
             event: The incoming hook event.
         """
+        # Recover sessions whose real session_start never reached the backend
+        # (office started late, backend restarted with a wiped DB). The first
+        # event of such a session gets a synthetic SESSION_START carrying
+        # source="recovered", which ``_persist_event`` stores WITHOUT the
+        # destructive history wipe a real session_start performs. OpenCode
+        # child @agent sessions are excluded: they also start without a
+        # session_start by design, so their producer tags them "opencode".
+        if (
+            event.event_type != EventType.SESSION_START
+            and event.data.source not in ("recovered", "opencode")
+            and not event.session_id.startswith("sim_")
+            and event.session_id not in self._recovery_checked
+        ):
+            self._recovery_checked.add(event.session_id)
+            if not await self._session_has_start_record(event.session_id):
+                await self._process_event_internal(self._build_recovered_start(event))
+
         # Resolve floor/room assignment BEFORE persisting so the assignment
         # is written in the same DB session (avoids StaleDataError from a
         # separate _sync_room_to_db call).
@@ -506,6 +533,7 @@ class EventProcessor:
         # that can take hundreds of ms for a long session, and holding the lock
         # across it stalls the debounced overview broadcast and /ws/overview
         # connects. Only the dict insertion below needs the lock.
+        sm_preexisting = event.session_id in self.sessions
         restored: StateMachine | None = None
         if event.session_id not in self.sessions:
             restored = await self._build_restored_state_machine(event.session_id)
@@ -524,7 +552,11 @@ class EventProcessor:
             # ``evict_idle_sessions`` sees a consistent timestamp for this slot.
             sm.last_event_at = datetime.now(UTC)
 
-        sm.transition(event)
+        # A recovered session_start must not reset a live session's in-memory
+        # state (upgrade scenario: the DB already knows the session, only the
+        # event row was missing). Fresh/unknown sessions transition normally.
+        if not (event.data.source == "recovered" and sm_preexisting):
+            sm.transition(event)
 
         # Apply resolved floor/room to in-memory state machine.
         if resolved_floor_id:
@@ -976,9 +1008,10 @@ class EventProcessor:
                 session_rec.is_lead = True
 
             if is_session_start:
-                await db.execute(
-                    delete(EventRecord).where(EventRecord.session_id == event.session_id)
-                )
+                if event.data.source != "recovered":
+                    await db.execute(
+                        delete(EventRecord).where(EventRecord.session_id == event.session_id)
+                    )
                 session_rec.status = "active"
                 session_rec.updated_at = datetime.now(UTC)
                 # SESSION_START always reflects the freshest metadata.
@@ -1009,6 +1042,33 @@ class EventProcessor:
             )
             db.add(event_rec)
             await db.commit()
+
+    async def _session_has_start_record(self, session_id: str) -> bool:
+        """Return True if the session has a session_start EventRecord."""
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                select(EventRecord.id)
+                .where(
+                    EventRecord.session_id == session_id,
+                    EventRecord.event_type == EventType.SESSION_START.value,
+                )
+                .limit(1)
+            )
+            return result.first() is not None
+
+    def _build_recovered_start(self, event: AnyEvent) -> SessionEvent:
+        """Build a synthetic SESSION_START carrying over the event's session context."""
+        context: dict[str, Any] = {
+            name: value
+            for name in EventDataBase.model_fields
+            if (value := getattr(event.data, name, None)) is not None
+        }
+        context["source"] = "recovered"
+        return SessionEvent(
+            event_type=EventType.SESSION_START,
+            session_id=event.session_id,
+            data=SessionEventData(**context),
+        )
 
     # ------------------------------------------------------------------
     # State update helpers

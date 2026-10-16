@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.config import get_settings
 from app.core.transcript_poller import TranscriptPoller
 from app.models.events import EventType
 
@@ -252,3 +253,26 @@ class TestTranscriptPoller:
         finally:
             Path(path1).unlink(missing_ok=True)
             Path(path2).unlink(missing_ok=True)
+
+
+class TestTranslatedPathPolling:
+    """Docker: start_polling validates and polls the TRANSLATED path (F6)."""
+
+    @pytest.mark.asyncio
+    async def test_polls_translated_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        settings = get_settings()
+        monkeypatch.setattr(settings, "CLAUDE_PATH_HOST", "/host/claude")
+        monkeypatch.setattr(settings, "CLAUDE_PATH_CONTAINER", "/container/claude")
+
+        callback = AsyncMock()
+        poller = TranscriptPoller(callback)
+        host_path = "/host/claude/projects/myproj/subagents/agent-7.jsonl"
+        translated = Path("/container/claude/projects/myproj/subagents/agent-7.jsonl")
+
+        with patch("app.core.transcript_poller.POLL_INTERVAL_SECONDS", TEST_POLL_INTERVAL):
+            await poller.start_polling("agentX", "sessionX", host_path)
+            try:
+                state = poller._sessions["agentX"]
+                assert state.transcript_path == translated
+            finally:
+                await poller.stop_polling("agentX")

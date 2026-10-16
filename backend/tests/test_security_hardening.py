@@ -5,7 +5,11 @@ from typing import Any
 from unittest.mock import patch
 from urllib.parse import urlparse
 
+import pytest
+from fastapi import Request
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
+from starlette.responses import Response
 
 from app.api.websocket import validate_websocket_origin
 from app.config import get_settings
@@ -633,3 +637,48 @@ class TestEventsEndpointAuthRegression:
             assert resp.status_code == 401
         finally:
             settings.CLAUDE_OFFICE_API_KEY = original
+
+
+class TestLocalhostOnlySetting:
+    """LOCALHOST_ONLY routes through Settings (PR #61 review remediation)."""
+
+    @staticmethod
+    def _dispatch(client_host: str) -> tuple[bool, Response | None]:
+        import asyncio
+
+        from app.api import middleware as mw
+
+        mw_instance = mw.LocalhostOnlyMiddleware(app=None)  # pyright: ignore[reportArgumentType]
+        scope: dict[str, Any] = {
+            "type": "http",
+            "client": (client_host, 50000),
+            "method": "GET",
+            "path": "/",
+            "headers": [],
+        }
+        request = Request(scope)
+        called = False
+
+        async def call_next(request: Request) -> JSONResponse:
+            nonlocal called
+            called = True
+            return JSONResponse({"ok": True})
+
+        response = asyncio.run(mw_instance.dispatch(request, call_next))
+        return called, response if isinstance(response, JSONResponse) else None
+
+    def test_disabled_allows_non_loopback_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """LOCALHOST_ONLY=0 (Docker) admits bridge-gateway client addresses."""
+        from app.api import middleware as mw
+
+        monkeypatch.setattr(mw.settings, "LOCALHOST_ONLY", False)
+        called, _response = self._dispatch("192.168.65.1")
+        assert called, "request must reach the app when the IP check is disabled"
+
+    def test_enabled_rejects_non_loopback_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.api import middleware as mw
+
+        monkeypatch.setattr(mw.settings, "LOCALHOST_ONLY", True)
+        called, response = self._dispatch("192.168.65.1")
+        assert not called
+        assert response is not None and response.status_code == 403

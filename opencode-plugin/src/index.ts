@@ -15,6 +15,7 @@
  *   - experimental.session.compacting — session compaction starts
  */
 
+import { readFileSync } from "node:fs";
 import type { Plugin, PluginInput, Hooks } from "@opencode-ai/plugin";
 import type {
   Event,
@@ -31,6 +32,29 @@ import { SessionTracker } from "./sessionTracker";
 // ---------------------------------------------------------------------------
 
 const DEFAULT_API_URL = "http://localhost:8000/api/v1/events";
+
+/**
+ * Read CLAUDE_OFFICE_API_URL from ~/.claude/claude-office-config.env, mirroring
+ * the hooks' `_config_file_value` so both producers resolve the URL with
+ * identical precedence (env var wins, then the config file, then the default).
+ */
+function config_file_api_url(): string | null {
+  try {
+    const home = process.env.HOME || process.env.USERPROFILE || "";
+    const lines = readFileSync(`${home}/.claude/claude-office-config.env`, "utf8").split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+      const eq = trimmed.indexOf("=");
+      if (trimmed.slice(0, eq).trim() !== "CLAUDE_OFFICE_API_URL") continue;
+      const value = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
+      if (value) return value;
+    }
+  } catch {
+    // Missing/unreadable config file is the normal case.
+  }
+  return null;
+}
 
 /**
  * Resolve the backend event endpoint, applying the loopback clamp (ARC-020).
@@ -68,7 +92,7 @@ export function resolveApiUrl(
 }
 
 const API_URL = resolveApiUrl(
-  process.env.CLAUDE_OFFICE_API_URL ?? DEFAULT_API_URL,
+  process.env.CLAUDE_OFFICE_API_URL ?? config_file_api_url() ?? DEFAULT_API_URL,
   process.env.CLAUDE_OFFICE_ALLOW_REMOTE === "1",
   (host) => {
     // Read the env directly: the DEBUG const below is initialized AFTER this
@@ -123,6 +147,7 @@ type EventType =
   | "background_task_notification";
 
 interface EventData {
+  source?: string;
   project_name?: string;
   project_dir?: string;
   working_dir?: string;
@@ -278,10 +303,15 @@ const plugin: Plugin = async (ctx: PluginInput): Promise<Hooks> => {
   debug("Plugin loaded for project:", projectName, "dir:", projectDir);
 
   /**
-   * Build the common base data payload included in every event.
+   * Build the common base data payload included in every event. `source`
+   * tells the backend these are plugin events: their child @agent sessions
+   * start without a session_start BY DESIGN and must stay excluded from the
+   * backend's session-start recovery (they would otherwise surface in the
+   * sidebar).
    */
   function baseData(): EventData {
     return {
+      source: "opencode",
       project_name: projectName,
       project_dir: projectDir,
       working_dir: worktree,

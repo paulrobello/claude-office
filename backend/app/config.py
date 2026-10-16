@@ -110,6 +110,11 @@ class Settings(BaseSettings):
     # Useful in development; disable for shared/production deployments (SEC-006).
     LOG_RICH_TRACEBACKS: bool = True
 
+    # Loopback-only client-IP check (SEC-004). Docker deployments set this False
+    # (compose: LOCALHOST_ONLY=0): every request arrives from the bridge gateway,
+    # so the loopback boundary moves to the host port binding (127.0.0.1:8050).
+    LOCALHOST_ONLY: bool = True
+
     @property
     def effective_api_key(self) -> str:
         """Return the configured API key, or the per-launch auto-generated token."""
