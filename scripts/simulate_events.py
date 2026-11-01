@@ -23,10 +23,14 @@ Usage::
 
     # Suppress progress output
     python scripts/simulate_events.py basic --quiet
+
+    # Backend started with an explicit CLAUDE_OFFICE_API_KEY: export the key
+    # through a prompt so its value never appears on a command line
+    read -rs CLAUDE_OFFICE_API_KEY && export CLAUDE_OFFICE_API_KEY
+    python scripts/simulate_events.py quick
 """
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
@@ -65,18 +69,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Suppress progress output",
     )
-    parser.add_argument(
-        "--api-key",
-        default=os.environ.get("CLAUDE_OFFICE_API_KEY", ""),
-        metavar="KEY",
-        help=(
-            "API key for the backend. Required when the backend was started with an "
-            "explicit CLAUDE_OFFICE_API_KEY (every endpoint then requires it). "
-            "Defaults to $CLAUDE_OFFICE_API_KEY, which is the safer option: a key "
-            "passed on the command line also shows up in process listings and shell "
-            "history."
-        ),
-    )
     return parser
 
 
@@ -85,10 +77,14 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
+    # ``SimulationContext`` picks the key up from ``CLAUDE_OFFICE_API_KEY``
+    # (``scripts.scenarios._base.API_KEY``). It is deliberately not a CLI flag:
+    # argv is readable through ``ps`` for the whole run, and a value typed on the
+    # command line is also kept in shell history. An exported variable is
+    # inherited by every later child of that shell, so unset it when done.
     ctx = SimulationContext(
         session_id=args.session,
         verbose=not args.quiet,
-        api_key=args.api_key,
     )
 
     print(f"Running scenario '{args.scenario}' with session '{args.session}'...")
@@ -96,8 +92,9 @@ def main() -> None:
 
     if ctx.failures:
         print(
-            f"Done with {ctx.failures} failed event(s) — the backend rejected them "
-            f"(check CLAUDE_OFFICE_API_KEY, or that the backend is running).",
+            f"Done with {ctx.failures} failed event(s) — check "
+            f"CLAUDE_OFFICE_API_KEY, CLAUDE_OFFICE_API_URL, or that the backend "
+            f"is running.",
             file=sys.stderr,
         )
         sys.exit(1)
