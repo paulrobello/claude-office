@@ -23,6 +23,11 @@ Usage::
 
     # Suppress progress output
     python scripts/simulate_events.py basic --quiet
+
+    # Backend started with an explicit CLAUDE_OFFICE_API_KEY: export the key
+    # through a prompt so its value never appears on a command line
+    read -rs CLAUDE_OFFICE_API_KEY && export CLAUDE_OFFICE_API_KEY
+    python scripts/simulate_events.py quick
 """
 
 import argparse
@@ -72,6 +77,11 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
+    # ``SimulationContext`` picks the key up from ``CLAUDE_OFFICE_API_KEY``
+    # (``scripts.scenarios._base.API_KEY``). It is deliberately not a CLI flag:
+    # argv is readable through ``ps`` for the whole run, and a value typed on the
+    # command line is also kept in shell history. An exported variable is
+    # inherited by every later child of that shell, so unset it when done.
     ctx = SimulationContext(
         session_id=args.session,
         verbose=not args.quiet,
@@ -79,6 +89,15 @@ def main() -> None:
 
     print(f"Running scenario '{args.scenario}' with session '{args.session}'...")
     SCENARIOS[args.scenario](ctx)
+
+    if ctx.failures:
+        print(
+            f"Done with {ctx.failures} failed event(s) — check "
+            f"CLAUDE_OFFICE_API_KEY, CLAUDE_OFFICE_API_URL, or that the backend "
+            f"is running.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     print("Done.")
 
 

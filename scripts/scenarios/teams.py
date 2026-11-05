@@ -29,6 +29,7 @@ def run(ctx: SimulationContext) -> None:
         team_name=team_name,
         project_name="TeamProject",
         verbose=ctx.verbose,
+        api_key=ctx.api_key,
     )
 
     # Create sessions
@@ -154,5 +155,9 @@ def run(ctx: SimulationContext) -> None:
     )
     lead.send_event("stop", {"speech_content": {"boss_phone": "All done!"}})
     lead.send_event("session_end")
+
+    # Member contexts send the events, so their failures have to be folded back
+    # into *ctx* — otherwise a fully rejected run still exits 0.
+    ctx.failures += team.total_failures
 
     team.log(f"[teams] Team scenario complete: {team_name}")

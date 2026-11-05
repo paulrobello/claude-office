@@ -5,13 +5,13 @@ description = "Real-time pixel art visualization of Claude Code operations"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi>=0.143.2",
+    "fastapi>=0.162.0",
     "uvicorn[standard]>=0.54.0",
-    "websockets>=17.2",
-    "sqlalchemy>=2.1.4",
-    "pydantic>=2.14.1",
-    "pydantic-settings>=2.16.0",
-    "python-multipart>=0.0.32",
+    "websockets>=17.4",
+    "sqlalchemy>=2.1.8",
+    "pydantic>=2.14.3",
+    "pydantic-settings>=2.16.2",
+    "python-multipart>=0.0.33",
     "httpx>=0.28.1",
     "aiosqlite>=0.22.1",
     "rich>=15.0.0",
@@ -20,10 +20,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.4.0",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1.post1",
     "pytest-cov>=7.1.0",
-    "ruff>=0.17.1",
+    "ruff>=0.17.3",
     "pyright>=1.1.414",
     "pre-commit>=4.7.0",
 ]
@@ -73,17 +73,20 @@ packages = [
 [dependency-groups]
 dev = [
     "pyright>=1.1.414",
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.4.0",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1.post1",
     "pytest-cov>=7.1.0",
     "pytest-timeout>=2.4.0",
-    "ruff>=0.17.1",
+    "ruff>=0.17.3",
     "pre-commit>=4.7.0",
     # ARC-010: contract test imports hooks' event_mapper, which depends on
     # defusedxml for <task-notification> parsing. Test-only; not a runtime dep.
     "defusedxml>=0.7.1",
+    # The simulation-script auth tests import scripts/scenarios/_base.py, which
+    # posts with ``requests``. Test-only; the backend itself uses httpx.
+    "requests>=2.34.2",
     # Stub-only peer dep for Starlette/FastAPI TestClient typing (pyright).
     # NOT unused: removing it makes `make typecheck` fail on TestClient.get/post
     # in the test suite. Kept intentionally. (Re-evaluates ARC-022's "unused" call.)
-    "httpx2>=2.13.1",
+    "httpx2>=2.16.0",
 ]
