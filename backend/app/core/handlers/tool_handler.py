@@ -24,6 +24,7 @@ async def handle_pre_tool_use(
     event: ToolEvent,
     agent_id: str,
     event_summary: str,
+    entry_id: str,
 ) -> None:
     """Handle a PRE_TOOL_USE event.
 
@@ -35,6 +36,10 @@ async def handle_pre_tool_use(
         event: The PRE_TOOL_USE event.
         agent_id: The resolved agent ID (``"main"`` for the boss).
         event_summary: Human-readable summary already computed by the router.
+        entry_id: Unique id for this event's entry, built by the processor from
+            the persisted event row (see ``EventProcessor._entry_id``). The
+            thinking / tool entries derive their ids from it, so two tool events
+            that share a timestamp no longer collide on the ``_tool`` key.
     """
     ts = event.timestamp.isoformat()
     aid = agent_id or "main"
@@ -42,7 +47,7 @@ async def handle_pre_tool_use(
     # Capture thinking block if present.
     if event.data.thinking:
         thinking_entry: ConversationEntry = {
-            "id": f"{event.timestamp.timestamp()}_thinking",
+            "id": f"{entry_id}_thinking",
             "role": "thinking",
             "agentId": aid,
             "text": event.data.thinking,
@@ -53,7 +58,7 @@ async def handle_pre_tool_use(
     # Capture the tool call itself.
     if event.data.tool_name:
         tool_entry: ConversationEntry = {
-            "id": f"{event.timestamp.timestamp()}_tool",
+            "id": f"{entry_id}_tool",
             "role": "tool",
             "agentId": aid,
             "text": event_summary,

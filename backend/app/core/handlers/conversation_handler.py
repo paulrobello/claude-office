@@ -33,6 +33,7 @@ async def handle_user_prompt_submit(
     sm: StateMachine,
     event: PromptEvent,
     agent_id: str,
+    entry_id: str,
 ) -> None:
     """Handle a USER_PROMPT_SUBMIT event.
 
@@ -43,6 +44,9 @@ async def handle_user_prompt_submit(
         sm: The StateMachine for this session.
         event: The USER_PROMPT_SUBMIT event.
         agent_id: The resolved agent ID (``"main"`` for the boss).
+        entry_id: Unique id for this event's entry, built by the processor from
+            the persisted event row (see ``EventProcessor._entry_id``), so
+            repeated prompts sharing a timestamp stay distinct.
     """
     if not event.data.prompt:
         return
@@ -54,7 +58,7 @@ async def handle_user_prompt_submit(
     # Skip task-notification messages from the conversation history.
     if "<task-notification>" not in event.data.prompt:
         conv_entry: ConversationEntry = {
-            "id": str(event.timestamp.timestamp()),
+            "id": entry_id,
             "role": "user",
             "agentId": agent_id or "main",
             "text": event.data.prompt,
@@ -69,6 +73,7 @@ async def handle_stop(
     sm: StateMachine,
     event: LifecycleEvent,
     agent_id: str,
+    entry_id: str,
 ) -> None:
     """Handle a STOP event.
 
@@ -80,6 +85,9 @@ async def handle_stop(
         sm: The StateMachine for this session.
         event: The STOP event.
         agent_id: The resolved agent ID (``"main"`` for the boss).
+        entry_id: Unique id for this event's entry, built by the processor from
+            the persisted event row (see ``EventProcessor._entry_id``), so
+            repeated responses sharing a timestamp stay distinct.
     """
     logger.info(
         f"STOP event: boss_bubble before extract = "
@@ -95,7 +103,7 @@ async def handle_stop(
 
     if full_response:
         assistant_entry: ConversationEntry = {
-            "id": str(event.timestamp.timestamp()),
+            "id": entry_id,
             "role": "assistant",
             "agentId": agent_id or "main",
             "text": full_response,
