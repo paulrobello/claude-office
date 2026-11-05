@@ -18,9 +18,9 @@ from pathlib import Path
 import pytest
 
 # The simulation scripts live outside the backend package and post with
-# ``requests``, which the backend environment does not install. Skip this module
-# where that dependency is absent (e.g. the backend-only CI job) — it is meant
-# to run from the repository environment the scripts themselves use.
+# ``requests``, which is a backend dev dependency precisely so this module runs
+# in the backend gate. The importorskip stays as a guard for environments that
+# sync only the runtime dependencies.
 pytest.importorskip("requests")
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -51,9 +51,7 @@ def _capture_post(monkeypatch: pytest.MonkeyPatch, status_code: int) -> list[dic
         timeout: int = 0,
         **kwargs: object,
     ) -> _FakeResponse:
-        calls.append(
-            {"url": url, "json": json, "headers": headers or {}, "kwargs": kwargs}
-        )
+        calls.append({"url": url, "json": json, "headers": headers or {}, "kwargs": kwargs})
         return _FakeResponse(status_code)
 
     monkeypatch.setattr(_base.requests, "post", fake_post)

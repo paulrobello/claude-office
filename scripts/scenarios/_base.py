@@ -111,6 +111,14 @@ class SimulationContext:
     def send_event(self, event_type: str, data: dict | None = None) -> None:
         """POST an event to the backend API.
 
+        Redirects are refused on purpose: ``requests`` re-sends custom headers
+        (including ``X-API-Key``) to the redirect target, so an unexpected
+        ``CLAUDE_OFFICE_API_URL`` could hand the key to another host. The
+        configured URL must therefore be the exact canonical endpoint — no
+        trailing slash (Starlette answers a trailing-slash request with a 307
+        to the canonical path) — and a 3xx response counts as a failed event
+        instead of being followed.
+
         Args:
             event_type: The event type string (e.g. ``"session_start"``).
             data: Optional event-specific payload dict.
@@ -121,12 +129,9 @@ class SimulationContext:
             "timestamp": datetime.now(UTC).isoformat(),
             "data": data or {},
         }
-        headers = {"X-API-Key": self.api_key or API_KEY} if (self.api_key or API_KEY) else {}
+        key = self.api_key or API_KEY
+        headers = {"X-API-Key": key} if key else {}
         try:
-            # Redirects stay disabled on purpose: ``requests`` re-sends custom
-            # headers (including ``X-API-Key``) to the redirect target, so an
-            # unexpected ``CLAUDE_OFFICE_API_URL`` could hand the key to another
-            # host. A 3xx therefore counts as a failed event, not as success.
             response = requests.post(
                 API_URL, json=payload, headers=headers, timeout=10, allow_redirects=False
             )
