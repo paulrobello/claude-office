@@ -247,6 +247,16 @@ Defined in `scripts/scenarios/_base.py`:
 | `COMPACTION_THRESHOLD` | `0.80` | Trigger at 80% |
 | `COMPACTION_ANIMATION_DURATION` | `10` | Seconds for animation |
 
+### Backend URL and redirects
+
+Events are posted with redirects disabled on purpose: `requests` re-sends custom
+headers (including `X-API-Key`) to the redirect target, so following a redirect
+could hand the API key to another host. A 3xx response therefore counts as a
+failed event instead of being followed. Configure `CLAUDE_OFFICE_API_URL` as the
+exact canonical endpoint — no trailing slash. Starlette answers a
+trailing-slash request with a 307 to the canonical path, and that 307 is counted
+as a failure rather than silently resolved.
+
 ### Agent Names
 
 Creative job titles used across all scenarios:

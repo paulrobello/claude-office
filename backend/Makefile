@@ -15,7 +15,10 @@ lint:
 fmt:
 	uv run ruff format .
 
+# No positional path: `pyright .` overrides the declared include list (app
+# only) and trips over backend/tests' import of the out-of-tree scripts/
+# package, which is unresolvable from this config root.
 typecheck:
-	uv run pyright .
+	uv run pyright
 
 checkall: fmt lint typecheck test

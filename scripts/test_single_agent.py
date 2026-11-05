@@ -14,29 +14,30 @@ Current coordinates (from frontend/src/systems/queuePositions.ts):
 - Boss slots: Left (520, 868), Right (760, 868)
 """
 
+import sys
 import time
-from datetime import UTC, datetime
+from pathlib import Path
 
-import requests
+# Make the scripts/ directory importable so ``scripts.scenarios`` resolves.
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-API_URL = "http://localhost:8000/api/v1/events"
+from scripts.scenarios._base import SimulationContext  # noqa: E402
+
 SESSION_ID = "test_single_agent"
+
+# Shared context so this script posts through the same authed path as the
+# scenarios: it resolves CLAUDE_OFFICE_API_URL / CLAUDE_OFFICE_API_KEY, refuses
+# redirects, and counts rejected events so main() can exit non-zero instead of
+# printing success over a wall of 401s.
+ctx = SimulationContext(session_id=SESSION_ID)
 
 
 def send_event(event_type: str, data: dict | None = None) -> None:
-    """Send an event to the backend API."""
-    payload = {
-        "event_type": event_type,
-        "session_id": SESSION_ID,
-        "timestamp": datetime.now(UTC).isoformat(),
-        "data": data or {},
-    }
-    try:
-        response = requests.post(API_URL, json=payload, timeout=10)
-        response.raise_for_status()
+    """Send an event through the shared authed event path."""
+    before = ctx.failures
+    ctx.send_event(event_type, data)
+    if ctx.failures == before:
         print(f"Sent: {event_type}")
-    except Exception as e:
-        print(f"Error sending {event_type}: {e}")
 
 
 def main() -> None:
@@ -100,6 +101,15 @@ def main() -> None:
     print("\nStep 7: Ending session...")
     send_event("session_end")
     print("\n=== Test Complete ===")
+
+    if ctx.failures:
+        print(
+            f"Done with {ctx.failures} failed event(s) — check "
+            f"CLAUDE_OFFICE_API_KEY, CLAUDE_OFFICE_API_URL, or that the backend "
+            f"is running.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":

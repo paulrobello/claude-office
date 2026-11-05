@@ -82,6 +82,9 @@ dev = [
     # ARC-010: contract test imports hooks' event_mapper, which depends on
     # defusedxml for <task-notification> parsing. Test-only; not a runtime dep.
     "defusedxml>=0.7.1",
+    # The simulation-script auth tests import scripts/scenarios/_base.py, which
+    # posts with ``requests``. Test-only; the backend itself uses httpx.
+    "requests>=2.34.2",
     # Stub-only peer dep for Starlette/FastAPI TestClient typing (pyright).
     # NOT unused: removing it makes `make typecheck` fail on TestClient.get/post
     # in the test suite. Kept intentionally. (Re-evaluates ARC-022's "unused" call.)

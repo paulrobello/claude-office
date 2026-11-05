@@ -14,6 +14,11 @@ import requests
 
 API_URL = os.environ.get("CLAUDE_OFFICE_API_URL", "http://localhost:8000/api/v1/events")
 
+# When the backend is started with an explicit ``CLAUDE_OFFICE_API_KEY``, every
+# non-public path (including ``POST /api/v1/events``) requires the key in the
+# ``X-API-Key`` header. Without this the whole scenario fails with 401.
+API_KEY = os.environ.get("CLAUDE_OFFICE_API_KEY", "").strip()
+
 # Context window constants
 MAX_CONTEXT_TOKENS = 200_000
 COMPACTION_THRESHOLD = 0.80  # Trigger compaction at 80%
@@ -69,6 +74,11 @@ class SimulationContext:
 
     session_id: str = "sim_session_123"
     verbose: bool = True
+    api_key: str = ""
+    # Number of events the backend rejected (HTTP error, timeout, ...). The
+    # entry point turns this into a non-zero exit code so scripted runs cannot
+    # mistake a fully-failed scenario for a successful one.
+    failures: int = 0
 
     # Token counters (protected by ``lock``)
     input_tokens: int = 0
@@ -101,6 +111,14 @@ class SimulationContext:
     def send_event(self, event_type: str, data: dict | None = None) -> None:
         """POST an event to the backend API.
 
+        Redirects are refused on purpose: ``requests`` re-sends custom headers
+        (including ``X-API-Key``) to the redirect target, so an unexpected
+        ``CLAUDE_OFFICE_API_URL`` could hand the key to another host. The
+        configured URL must therefore be the exact canonical endpoint — no
+        trailing slash (Starlette answers a trailing-slash request with a 307
+        to the canonical path) — and a 3xx response counts as a failed event
+        instead of being followed.
+
         Args:
             event_type: The event type string (e.g. ``"session_start"``).
             data: Optional event-specific payload dict.
@@ -111,10 +129,21 @@ class SimulationContext:
             "timestamp": datetime.now(UTC).isoformat(),
             "data": data or {},
         }
+        key = self.api_key or API_KEY
+        headers = {"X-API-Key": key} if key else {}
         try:
-            response = requests.post(API_URL, json=payload, timeout=10)
+            response = requests.post(
+                API_URL, json=payload, headers=headers, timeout=10, allow_redirects=False
+            )
+            if 300 <= response.status_code < 400:
+                raise requests.HTTPError(
+                    f"refused redirect ({response.status_code}) - following it would "
+                    "send X-API-Key to another host; check CLAUDE_OFFICE_API_URL",
+                    response=response,
+                )
             response.raise_for_status()
         except Exception as e:
+            self.failures += 1
             self.log(f"Error sending {event_type}: {e}")
 
     def increment_context(self, input_delta: int = 0, output_delta: int = 0) -> dict[str, int]:
@@ -206,19 +235,35 @@ class TeamSimulationContext:
         team_name: Identifier shared by every member's ``team_name`` field.
         project_name: Shared ``project_name`` sent on ``session_start``.
         verbose: Forwarded to each member ``SimulationContext``.
+        api_key: Forwarded to each member ``SimulationContext``; without it
+                 every member event would be rejected by a key-protected
+                 backend even when the CLI key is set.
         members: Member contexts in creation order (lead first).
     """
 
     team_name: str
     project_name: str = "TeamProject"
     verbose: bool = True
+    api_key: str = ""
     members: list[SimulationContext] = field(default_factory=list)
 
     def _add(self, session_id: str) -> SimulationContext:
         """Create a member context, register it, and return it."""
-        ctx = SimulationContext(session_id=session_id, verbose=self.verbose)
+        ctx = SimulationContext(
+            session_id=session_id, verbose=self.verbose, api_key=self.api_key
+        )
         self.members.append(ctx)
         return ctx
+
+    @property
+    def total_failures(self) -> int:
+        """Number of rejected events summed over every member context.
+
+        Each member sends events through its own ``SimulationContext``, so the
+        scenario's parent context never sees their failures; the scenario adds
+        this total back to the parent before the entry point inspects it.
+        """
+        return sum(member.failures for member in self.members)
 
     def add_lead(self, session_id: str) -> SimulationContext:
         """Create and register the lead session context."""
