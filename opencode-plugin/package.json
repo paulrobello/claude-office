@@ -30,14 +30,20 @@
     "agent"
   ],
   "license": "MIT",
+  "//": [
+    "`typescript` held at ^6.0.3 (latest 6.x): typescript-eslint has no TS 7",
+    "support yet (peer range <6.1.0; TS >=7.1 tracked in typescript-eslint",
+    "issue #10940). Lint crashes on TS 7.0. Re-evaluate on the next",
+    "typescript-eslint upgrade."
+  ],
   "dependencies": {
-    "@opencode-ai/plugin": "1.19.3"
+    "@opencode-ai/plugin": "1.19.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^26.6.5",
-    "eslint": "^10.12.0",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.14.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.71.2"
+    "typescript-eslint": "^8.72.1"
   }
 }
