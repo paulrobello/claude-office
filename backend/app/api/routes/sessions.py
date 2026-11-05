@@ -426,10 +426,12 @@ async def get_session_replay(
     """
     # Fetch ALL events — no SQL .offset()/.limit() here, because the
     # StateMachine must see the full prefix to reconstruct state correctly.
+    # Row id tiebreak keeps the order deterministic for equal timestamps
+    # (same-second bursts), matching the restore path.
     stmt = (
         select(EventRecord)
         .where(EventRecord.session_id == session_id)
-        .order_by(EventRecord.timestamp.asc())
+        .order_by(EventRecord.timestamp.asc(), EventRecord.id.asc())
     )
     result = await db.execute(stmt)
     events = result.scalars().all()
@@ -498,7 +500,10 @@ async def get_session_replay(
         replay_data.append(
             {
                 "event": {
-                    "id": str(rec.timestamp.timestamp()),
+                    # Same ``_entry_id`` scheme as the live and restore paths:
+                    # the bare timestamp collided for same-second events, and
+                    # one DB row must not carry two id schemes.
+                    "id": get_event_processor().get_entry_id(evt, rec.id),
                     "type": rec.event_type,
                     "agentId": str(agent_id),
                     "summary": get_event_processor().get_event_summary(evt),

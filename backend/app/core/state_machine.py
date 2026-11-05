@@ -72,6 +72,10 @@ def _empty_conversation() -> list[ConversationEntry]:
     return cast(list[ConversationEntry], [])
 
 
+def _empty_str_set() -> set[str]:
+    return cast(set[str], set())
+
+
 def _parse_linear_id(subject: str) -> str | None:
     """Extract a Linear-style ID like REC-42 from a subject string."""
     m = re.search(r"\[([A-Z]+-\d+)\]", subject)
@@ -597,6 +601,14 @@ class StateMachine:
     # remains the source of truth, so an evicted session replays on next access.
     # Not part of ``to_game_state`` output — internal eviction metadata only.
     last_event_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    # Entry ids (built by ``EventProcessor._entry_id``) already reflected in
+    # this machine — appended by the live pipeline or rebuilt during a DB
+    # restore. The event pipeline consults and updates it under
+    # ``_sessions_lock`` so an event whose row the restore replayed is not
+    # applied live a second time (which would duplicate the history entry and
+    # double the transition). Internal bookkeeping, like ``last_event_at``.
+    applied_entry_ids: set[str] = field(default_factory=_empty_str_set)
 
     # ---------------------------------------------------------------------------
     # Core methods

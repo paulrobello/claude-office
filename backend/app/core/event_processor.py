@@ -199,6 +199,13 @@ class EventProcessor:
         # per event (O(N x events/sec)). See ``_schedule_overview_broadcast``.
         self._overview_flush_task: asyncio.Task[None] | None = None
         self._overview_flush_interval = 0.05  # 50 ms debounce window
+        # Single-flight restore claims, keyed by session id (values are plain
+        # completion futures; waiters only need to know the restore finished).
+        # The first pipeline call to see an uncached session plants a future
+        # here under ``_sessions_lock`` and runs the restore; concurrent calls
+        # for the same session await it instead of racing their own restore.
+        # See ``_restore_uncached_session``.
+        self._restores_in_progress: dict[str, asyncio.Future[None]] = {}
         # Single source of truth for post-broadcast async enrichment.
         #
         # The sync mutation of every event type runs through
@@ -218,7 +225,7 @@ class EventProcessor:
         # only one entry fires per event (events have a single type), so the
         # relative order of entries here is not behaviourally significant.
         self._post_broadcast_enrichers: dict[
-            EventType, Callable[[StateMachine, AnyEvent, str, str], Awaitable[None]]
+            EventType, Callable[[StateMachine, AnyEvent, str, str, str], Awaitable[None]]
         ] = {
             EventType.SUBAGENT_START: self._enrich_subagent_start,
             EventType.SUBAGENT_INFO: self._enrich_subagent_info,
@@ -422,11 +429,13 @@ class EventProcessor:
     # ``entry_id`` is the unique id built for this event's history entry (see
     # ``_entry_id``). Handlers that also append conversation entries derive
     # their ids from it, so a conversation entry and its history entry never
-    # disagree, and two events sharing a timestamp never collide.
+    # disagree, and two events sharing a timestamp never collide. ``summary``
+    # is the same string the history entry carries, so ``_enrich_pre_tool_use``
+    # does not recompute it.
     # ------------------------------------------------------------------
 
     async def _enrich_subagent_start(
-        self, sm: StateMachine, event: AnyEvent, agent_id: str, _entry_id: str
+        self, sm: StateMachine, event: AnyEvent, agent_id: str, _entry_id: str, _summary: str
     ) -> None:
         assert isinstance(event, AgentEvent), "dispatch routes SUBAGENT_START only"
         await handle_subagent_start(
@@ -437,55 +446,55 @@ class EventProcessor:
         )
 
     async def _enrich_subagent_info(
-        self, sm: StateMachine, event: AnyEvent, agent_id: str, _entry_id: str
+        self, sm: StateMachine, event: AnyEvent, agent_id: str, _entry_id: str, _summary: str
     ) -> None:
         assert isinstance(event, AgentEvent), "dispatch routes SUBAGENT_INFO only"
         await handle_subagent_info(sm, event, self._ensure_transcript_poller)
 
     async def _enrich_agent_update(
-        self, sm: StateMachine, event: AnyEvent, agent_id: str, _entry_id: str
+        self, sm: StateMachine, event: AnyEvent, agent_id: str, _entry_id: str, _summary: str
     ) -> None:
         assert isinstance(event, AgentEvent), "dispatch routes AGENT_UPDATE only"
         await handle_agent_update(sm, event)
 
     async def _enrich_subagent_stop(
-        self, sm: StateMachine, event: AnyEvent, agent_id: str, _entry_id: str
+        self, sm: StateMachine, event: AnyEvent, agent_id: str, _entry_id: str, _summary: str
     ) -> None:
         assert isinstance(event, AgentEvent), "dispatch routes SUBAGENT_STOP only"
         await handle_subagent_stop(sm, event, self._persist_synthetic_event)
 
     async def _enrich_stop(
-        self, sm: StateMachine, event: AnyEvent, agent_id: str, entry_id: str
+        self, sm: StateMachine, event: AnyEvent, agent_id: str, entry_id: str, _summary: str
     ) -> None:
         assert isinstance(event, LifecycleEvent), "dispatch routes STOP only"
         await handle_stop(sm, event, agent_id, entry_id)
 
     async def _enrich_user_prompt_submit(
-        self, sm: StateMachine, event: AnyEvent, agent_id: str, entry_id: str
+        self, sm: StateMachine, event: AnyEvent, agent_id: str, entry_id: str, _summary: str
     ) -> None:
         assert isinstance(event, PromptEvent), "dispatch routes USER_PROMPT_SUBMIT only"
         await handle_user_prompt_submit(sm, event, agent_id, entry_id)
 
     async def _enrich_pre_tool_use(
-        self, sm: StateMachine, event: AnyEvent, agent_id: str, entry_id: str
+        self, sm: StateMachine, event: AnyEvent, agent_id: str, entry_id: str, summary: str
     ) -> None:
         assert isinstance(event, ToolEvent), "dispatch routes PRE_TOOL_USE only"
-        await handle_pre_tool_use(sm, event, agent_id, self._get_event_summary(event), entry_id)
+        await handle_pre_tool_use(sm, event, agent_id, summary, entry_id)
 
     async def _enrich_task_created(
-        self, sm: StateMachine, event: AnyEvent, agent_id: str, _entry_id: str
+        self, sm: StateMachine, event: AnyEvent, agent_id: str, _entry_id: str, _summary: str
     ) -> None:
         assert isinstance(event, TaskEvent), "dispatch routes TASK_CREATED only"
         await handle_task_created(sm, event)
 
     async def _enrich_task_completed(
-        self, sm: StateMachine, event: AnyEvent, agent_id: str, _entry_id: str
+        self, sm: StateMachine, event: AnyEvent, agent_id: str, _entry_id: str, _summary: str
     ) -> None:
         assert isinstance(event, TaskEvent), "dispatch routes TASK_COMPLETED only"
         await handle_task_completed(sm, event)
 
     async def _enrich_teammate_idle(
-        self, sm: StateMachine, event: AnyEvent, agent_id: str, _entry_id: str
+        self, sm: StateMachine, event: AnyEvent, agent_id: str, _entry_id: str, _summary: str
     ) -> None:
         assert isinstance(event, LifecycleEvent), "dispatch routes TEAMMATE_IDLE only"
         await handle_teammate_idle(sm, event)
@@ -553,17 +562,24 @@ class EventProcessor:
         # across it stalls the debounced overview broadcast and /ws/overview
         # connects. Only the dict insertion below needs the lock.
         #
-        # ``event_row_id`` is excluded from the replay: the row was committed a
-        # moment ago for *this* event, and the live path below applies it (state
-        # transition, history entry, conversation entries) exactly once. Without
-        # the exclusion every first event of an uncached session was applied
-        # twice — a duplicated history entry and a doubled ``sm.transition``.
+        # Concurrent first events for one session previously each ran their own
+        # restore, and each restore contained the peer's just-committed row, so
+        # the loser of the insert race applied its event live a second time —
+        # duplicate history entry and doubled transition. Two mechanisms close
+        # that window:
+        #
+        # 1. Single-flight restore: the first caller to see the uncached
+        #    session claims the restore; the others await it
+        #    (``_restore_uncached_session``).
+        # 2. Exactly-once guard: the restored machine records which entry ids
+        #    it replayed (``StateMachine.applied_entry_ids``), and the live
+        #    path skips transition/history/enrichment for an event whose id is
+        #    already there. The check-and-record below is atomic with the
+        #    session lookup (same lock section).
         sm_preexisting = event.session_id in self.sessions
         restored: StateMachine | None = None
         if event.session_id not in self.sessions:
-            restored = await self._build_restored_state_machine(
-                event.session_id, exclude_row_id=event_row_id
-            )
+            restored = await self._restore_uncached_session(event.session_id, event_row_id)
 
         async with self._sessions_lock:
             if event.session_id not in self.sessions:
@@ -578,11 +594,21 @@ class EventProcessor:
             # Refresh idle-eviction watermark (ARC-015) under the same lock so
             # ``evict_idle_sessions`` sees a consistent timestamp for this slot.
             sm.last_event_at = datetime.now(UTC)
+            # Exactly-once guard, atomic with the lookup above: if the restore
+            # already replayed this event's row, the live path must not apply
+            # it a second time. Otherwise claim it now so a later restore of
+            # the same machine cannot replay it either.
+            entry_id = self._entry_id(event, event_row_id)
+            already_applied = entry_id in sm.applied_entry_ids
+            sm.applied_entry_ids.add(entry_id)
+            # A recovered session_start must not reset a live session's in-memory
+            # state (upgrade scenario: the DB already knows the session, only the
+            # event row was missing). Fresh/unknown sessions transition normally.
+            applied = not already_applied and not (
+                event.data.source == "recovered" and sm_preexisting
+            )
 
-        # A recovered session_start must not reset a live session's in-memory
-        # state (upgrade scenario: the DB already knows the session, only the
-        # event row was missing). Fresh/unknown sessions transition normally.
-        if not (event.data.source == "recovered" and sm_preexisting):
+        if applied:
             sm.transition(event)
 
         # Apply resolved floor/room to in-memory state machine.
@@ -620,16 +646,17 @@ class EventProcessor:
                 detail[dst] = val
 
         event_dict: HistoryEntry = {
-            "id": self._entry_id(event, event_row_id),
+            "id": entry_id,
             "type": str(event.event_type),
             "agentId": agent_id,
             "summary": self._get_event_summary(event),
             "timestamp": event.timestamp.isoformat(),
             "detail": detail,
         }
-        sm.history.append(event_dict)
-        if len(sm.history) > MAX_HISTORY_ENTRIES:
-            sm.history = sm.history[-MAX_HISTORY_ENTRIES:]
+        if not already_applied:
+            sm.history.append(event_dict)
+            if len(sm.history) > MAX_HISTORY_ENTRIES:
+                sm.history = sm.history[-MAX_HISTORY_ENTRIES:]
 
         # ------------------------------------------------------------------
         # SESSION_START – start task-file polling + beads polling
@@ -694,9 +721,12 @@ class EventProcessor:
         # The handlers themselves are unchanged -- this is purely table-driven
         # routing. Adding a new event type only requires a new table entry.
         # ------------------------------------------------------------------
+        # Skipped for an event the restore already applied: the restore
+        # rebuilt its conversation entries, and the enrichment handlers would
+        # append them a second time.
         enricher = self._post_broadcast_enrichers.get(event.event_type)
-        if enricher is not None:
-            await enricher(sm, event, agent_id, event_dict["id"])
+        if enricher is not None and not already_applied:
+            await enricher(sm, event, agent_id, event_dict["id"], event_dict["summary"])
 
         # ------------------------------------------------------------------
         # Cross-session overview broadcast (Command Center). Scheduled LAST so
@@ -794,6 +824,65 @@ class EventProcessor:
             db.add(event_rec)
             await db.commit()
 
+    async def _restore_uncached_session(
+        self, session_id: str, exclude_row_id: int | None
+    ) -> StateMachine | None:
+        """Restore an uncached session with a single-flight claim per session.
+
+        Concurrent first events for one session used to run overlapping
+        restores; each restore contained the peer's just-committed row, so the
+        peer's live path re-applied its event (duplicated history entry, doubled
+        transition). The first caller plants a future under ``_sessions_lock``
+        and runs the restore; later callers for the same session await that
+        future and let the claimant's machine (already published into
+        ``self.sessions`` under the lock) serve them. The exactly-once guard in
+        ``_process_event_internal`` decides, per event, whether the live path
+        still needs to apply it.
+
+        Args:
+            session_id: The session to restore.
+            exclude_row_id: Event row id to leave out of the replay — the row
+                the caller just committed for its own event, which its live
+                path applies.
+
+        Returns:
+            The machine to insert when the caller won the claim, else None
+            (session already cached, another call's restore completed, or no
+            persisted events). Insert-if-absent is the caller's job.
+        """
+        async with self._sessions_lock:
+            if session_id in self.sessions:
+                return None
+            fut = self._restores_in_progress.get(session_id)
+            claimant = fut is None
+            if claimant:
+                fut = asyncio.get_running_loop().create_future()
+                self._restores_in_progress[session_id] = fut
+
+        if not claimant:
+            # Completion signal only — the claimant publishes the machine.
+            await fut
+            return None
+
+        try:
+            restored = await self._build_restored_state_machine(
+                session_id, exclude_row_id=exclude_row_id
+            )
+        except BaseException:
+            # Release waiters (they fall back to a fresh StateMachine) and
+            # let the failure propagate to the caller's own error handling.
+            async with self._sessions_lock:
+                self._restores_in_progress.pop(session_id, None)
+            fut.set_result(None)
+            raise
+
+        async with self._sessions_lock:
+            self._restores_in_progress.pop(session_id, None)
+            if restored is not None and session_id not in self.sessions:
+                self.sessions[session_id] = restored
+        fut.set_result(None)
+        return restored
+
     async def _build_restored_state_machine(
         self, session_id: str, exclude_row_id: int | None = None
     ) -> StateMachine | None:
@@ -810,13 +899,19 @@ class EventProcessor:
             exclude_row_id: Event row id to leave out of the replay. The live
                 pipeline passes the row it just committed for the event being
                 processed, so that event is applied once (by the live path)
-                instead of twice.
+                instead of twice. Rows that *are* replayed record their entry
+                ids on ``StateMachine.applied_entry_ids``, which is what makes
+                the restore race-safe: a peer event replayed here is skipped by
+                its own live path (see ``_restore_uncached_session``).
         """
         async with AsyncSessionLocal() as db:
             result = await db.execute(
                 select(EventRecord)
                 .where(EventRecord.session_id == session_id)
-                .order_by(EventRecord.timestamp.asc())
+                # Row id tiebreak: producer timestamp collisions (the case this
+                # PR targets) must still replay deterministically, and SQLite
+                # orders equal timestamps arbitrarily without it.
+                .order_by(EventRecord.timestamp.asc(), EventRecord.id.asc())
             )
             events = result.scalars().all()
 
@@ -853,8 +948,11 @@ class EventProcessor:
 
                     agent_id = evt.data.agent_id or "main"
                     # Same id scheme as the live path, so a re-render after a
-                    # restore keeps the same React keys.
+                    # restore keeps the same React keys. Recorded in
+                    # ``applied_entry_ids`` so the live path skips this event
+                    # if it arrives while the restore is still fresh.
                     entry_id = self._entry_id(evt, rec.id)
+                    sm.applied_entry_ids.add(entry_id)
                     history_entry: HistoryEntry = {
                         "id": entry_id,
                         "type": str(evt.event_type),
@@ -1205,6 +1303,24 @@ class EventProcessor:
         """
         return self._get_event_summary(event)
 
+    def get_entry_id(self, event: AnyEvent, row_id: int, suffix: str = "") -> str:
+        """Build the unique history/conversation id for a persisted event row.
+
+        Public wrapper around :meth:`_entry_id`, mirroring
+        :meth:`get_event_summary`, so the ``/replay`` route emits the same
+        ``<ts>-<rowid>`` scheme as the live and restore paths instead of the
+        bare timestamp that collides when producer timestamps collide.
+
+        Args:
+            event: The validated event rebuilt from the persisted row.
+            row_id: Primary key of the persisted ``EventRecord`` row.
+            suffix: Optional role suffix (``_tool``, ``_thinking``).
+
+        Returns:
+            A string unique to this entry.
+        """
+        return self._entry_id(event, row_id, suffix)
+
     def _entry_id(self, event: AnyEvent, row_id: int, suffix: str = "") -> str:
         """Build a unique id for a history / conversation entry.
 
@@ -1217,10 +1333,11 @@ class EventProcessor:
         duplicated on re-render.
 
         Pairing the timestamp with the persisted ``EventRecord`` primary key
-        keeps ids unique while still sortable and human-readable. Live and
-        restore paths both build ids here from the same row id, so there is one
-        id scheme instead of two that can collide, and the tool / thinking
-        entries derive their ids from the event id plus a suffix.
+        keeps ids unique while still sortable and human-readable. Live,
+        restore, and the ``/replay`` route (via :meth:`get_entry_id`) all build
+        ids here from the same row id, so there is one id scheme instead of
+        several that can collide, and the tool / thinking entries derive their
+        ids from the event id plus a suffix.
 
         Args:
             event: The event the entry describes.
@@ -1230,7 +1347,17 @@ class EventProcessor:
         Returns:
             A string unique to this entry.
         """
-        return f"{event.timestamp.timestamp()}-{row_id}{suffix}"
+        ts = event.timestamp
+        if ts.tzinfo is None:
+            # SQLite round-trips datetimes without tzinfo, so restored /
+            # replayed events carry naive stamps. Interpreting those as local
+            # time would drift the id away from the one the live path built
+            # for the same row by the host's UTC offset (the stored strings
+            # are UTC), breaking id stability across a restore — and with it
+            # the exactly-once guard that matches live ids against restored
+            # ones.
+            ts = ts.replace(tzinfo=UTC)
+        return f"{ts.timestamp()}-{row_id}{suffix}"
 
     def _get_event_summary(self, event: AnyEvent) -> str:
         """Generate a human-readable one-line summary for the event log.

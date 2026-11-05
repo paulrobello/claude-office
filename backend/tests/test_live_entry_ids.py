@@ -14,17 +14,27 @@ enricher dispatch → ``tool_handler`` / ``conversation_handler`` — because th
 handler-only helper tests could not catch the original bug.
 """
 
+import asyncio
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete, event, select
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from app.core.event_processor import EventProcessor
-from app.db.database import AsyncSessionLocal
+from app.core.state_machine import StateMachine
+from app.db.database import (
+    AsyncSessionLocal,
+    Base,
+    get_engine,
+    override_engine,
+)
 from app.db.models import EventRecord, SessionRecord
 from app.models.events import (
+    AnyEvent,
     EventType,
     LifecycleEvent,
     LifecycleEventData,
@@ -40,6 +50,50 @@ from app.models.events import (
 # is exactly the collision case (hooks that only carry seconds, or a burst
 # replayed onto /api/v1/events).
 TS = datetime(2026, 10, 28, 15, 41, 3, tzinfo=UTC)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def concurrent_db_engine(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
+    """Run this module on a WAL-mode file database instead of ``:memory:``.
+
+    The default test engine (tests/conftest.py) is a ``:memory:`` database on
+    a StaticPool — every session shares ONE connection, so a read-only
+    session's exit rollback (``close()`` ends its transaction) destroys any
+    other session's uncommitted writes on that same connection. Concurrent
+    event processing — the subject of ``test_concurrent_first_events_apply_
+    exactly_once`` — therefore crashed in ``_persist_event`` before any
+    assertion could run. A file-backed engine gives concurrent sessions
+    independent transactions; the pragmas mirror the production setup in
+    ``app/db/database.py``.
+    """
+    db_path = tmp_path_factory.mktemp("entry-ids-db") / "test.db"
+    test_engine: AsyncEngine = create_async_engine(
+        f"sqlite+aiosqlite:///{db_path}",
+        echo=False,
+        connect_args={"check_same_thread": False, "timeout": 15},
+    )
+
+    @event.listens_for(test_engine.sync_engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection: Any, _connection_record: Any) -> None:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.close()
+
+    previous_engine = get_engine()
+    override_engine(test_engine)
+
+    async def _create_tables() -> None:
+        async with test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    async def _dispose() -> None:
+        await test_engine.dispose()
+
+    asyncio.run(_create_tables())
+    yield
+    asyncio.run(_dispose())
+    override_engine(previous_engine)
 
 
 async def _wipe(session_id: str) -> None:
@@ -249,13 +303,83 @@ async def test_restore_skips_the_row_persisted_for_the_current_event() -> None:
             row_ids = [row[0] for row in result.all()]
         current_row = max(row_ids)
 
-        full = await ep._build_restored_state_machine(sid)
+        full = await ep._build_restored_state_machine(sid)  # pyright: ignore[reportPrivateUsage]
         assert full is not None
-        excluded = await ep._build_restored_state_machine(sid, exclude_row_id=current_row)
+        excluded = await ep._build_restored_state_machine(  # pyright: ignore[reportPrivateUsage]
+            sid, exclude_row_id=current_row
+        )
         assert excluded is not None
         assert len(excluded.history) == len(full.history) - 1
         assert len(excluded.conversation) == len(full.conversation) - 1
         _assert_unique(_ids(full.history))
         _assert_unique(_ids(full.conversation))
+    finally:
+        await _wipe(sid)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_first_events_apply_exactly_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two events racing on an uncached session each apply exactly once.
+
+    F1 (restore race): both events commit, then both used to run their own
+    restore; each restore contained the peer's just-committed row, so the peer
+    was applied once by that restore and once more by its own live path — a
+    duplicated ``ts-rowid`` history id and a doubled transition. The pipeline
+    now single-flights the restore and skips live application for any event
+    whose entry id the restored machine already recorded.
+    """
+    ep = EventProcessor()
+    sid = "live-ids-race"
+    await _wipe(sid)
+
+    transitions: list[EventType] = []
+    original_transition = StateMachine.transition
+
+    def counting_transition(self: StateMachine, event: AnyEvent) -> None:
+        transitions.append(event.event_type)
+        original_transition(self, event)
+
+    monkeypatch.setattr(StateMachine, "transition", counting_transition)
+
+    # Widen the race window so both events are committed before either restore
+    # queries: without this the restores rarely overlap on a fast local DB and
+    # the bug this guards against does not reproduce.
+    original_restore = ep._build_restored_state_machine  # pyright: ignore[reportPrivateUsage]
+
+    async def delayed_restore(
+        session_id: str, exclude_row_id: int | None = None
+    ) -> StateMachine | None:
+        await asyncio.sleep(0.05)
+        return await original_restore(session_id, exclude_row_id=exclude_row_id)
+
+    monkeypatch.setattr(ep, "_build_restored_state_machine", delayed_restore)
+
+    try:
+        await asyncio.gather(
+            ep.process_event(_prompt(sid, "first")),
+            ep.process_event(_prompt(sid, "second")),
+        )
+
+        sm = ep.sessions[sid]
+        # One synthetic recovered session_start (neither prompt carries one)
+        # plus the two prompts: exactly three applications.
+        assert len(sm.history) == 3, [e["id"] for e in sm.history]
+        _assert_unique(_ids(sm.history))
+
+        start_transitions = transitions.count(EventType.SESSION_START)
+        prompt_transitions = transitions.count(EventType.USER_PROMPT_SUBMIT)
+        # The recovered session_start may legitimately skip its transition: it
+        # must not reset a session another racing event already brought live
+        # (pre-existing pipeline behavior). It is still recorded exactly once
+        # in history. The prompts must each transition exactly once — a
+        # restore/live double-apply would push this to 3.
+        assert start_transitions <= 1, f"session_start transitioned {start_transitions}x"
+        assert prompt_transitions == 2, f"prompts transitioned {prompt_transitions}x"
+
+        user_entries = [e for e in sm.conversation if e["role"] == "user"]
+        assert len(user_entries) == 2
+        _assert_unique(_ids(sm.conversation))
     finally:
         await _wipe(sid)

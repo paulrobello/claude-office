@@ -17,16 +17,16 @@ These tests pin the helper's contract; the handler-level collision cases live in
 from datetime import UTC, datetime
 
 from app.core.event_processor import EventProcessor
-from app.models.events import SessionEvent
+from app.models.events import EventType, SessionEvent, SessionEventData
 
 
 def _event(session_id: str = "session_1") -> SessionEvent:
     """Build a minimal event with a fixed, second-precision timestamp."""
     return SessionEvent(
-        event_type="session_start",
+        event_type=EventType.SESSION_START,
         session_id=session_id,
         timestamp=datetime(2026, 10, 28, 15, 41, 3, tzinfo=UTC),
-        data={},
+        data=SessionEventData(),
     )
 
 
@@ -34,14 +34,14 @@ def test_entry_id_unique_for_events_sharing_a_timestamp() -> None:
     """Ten events at the same timestamp must yield ten distinct entry ids."""
     processor = EventProcessor()
     event = _event()
-    ids = {processor._entry_id(event, row_id) for row_id in range(1, 11)}
+    ids = {processor.get_entry_id(event, row_id) for row_id in range(1, 11)}
     assert len(ids) == 10
 
 
 def test_entry_id_keeps_timestamp_prefix() -> None:
     """The timestamp stays in the id so ordering/debugging are unaffected."""
     processor = EventProcessor()
-    entry_id = processor._entry_id(_event(), 7)
+    entry_id = processor.get_entry_id(_event(), 7)
     assert entry_id.startswith("1793202063.0-")
     assert entry_id.endswith("-7")
 
@@ -55,9 +55,9 @@ def test_entry_id_suffix_stays_distinct() -> None:
     processor = EventProcessor()
     event = _event()
     ids = {
-        processor._entry_id(event, 3),
-        processor._entry_id(event, 3, suffix="_tool"),
-        processor._entry_id(event, 3, suffix="_thinking"),
+        processor.get_entry_id(event, 3),
+        processor.get_entry_id(event, 3, suffix="_tool"),
+        processor.get_entry_id(event, 3, suffix="_thinking"),
     }
     assert len(ids) == 3
 
@@ -69,8 +69,8 @@ def test_entry_id_depends_on_the_row_id_not_the_process() -> None:
     entries this particular ``EventProcessor`` happened to build before.
     """
     event = _event()
-    first = EventProcessor()._entry_id(event, 5)
+    first = EventProcessor().get_entry_id(event, 5)
     second = EventProcessor()
     for row_id in range(1, 6):
-        second._entry_id(event, row_id)
-    assert second._entry_id(event, 5) == first
+        second.get_entry_id(event, row_id)
+    assert second.get_entry_id(event, 5) == first
