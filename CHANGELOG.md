@@ -4,6 +4,17 @@ All notable changes to Claude Office Visualizer are documented here.
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-11-05
+
+### Fixed
+
+- **History entry ids are unique across same-timestamp events** ([PR #62](https://github.com/paulrobello/claude-office/pull/62), thanks [@tyler-y-liu](https://github.com/tyler-y-liu)). Live history and conversation entries are keyed by the persisted event row id (`ts-rowid`) instead of the timestamp alone, so two events arriving within the same second no longer collide. Follow-up hardening on the same PR: a single-flight restore claim plus an exactly-once guard closes a race where two concurrent first events for an uncached session could apply one event twice (reproducing the duplicate ids); restore and replay queries order same-timestamp rows deterministically by row id; the `/replay` endpoint emits the same `ts-rowid` scheme as live/restore history; and entry ids no longer drift across timezones when restore reads SQLite's naive datetimes back (now treated as UTC). A concurrency regression test pins the exactly-once behavior.
+- **Simulation scripts authenticate and fail loudly** ([PR #63](https://github.com/paulrobello/claude-office/pull/63), thanks [@tyler-y-liu](https://github.com/tyler-y-liu)). Every event-posting script now sends `X-API-Key` (resolved from `CLAUDE_OFFICE_API_KEY`) and exits non-zero when events are rejected instead of printing success over a wall of 401s — `make test-agent` included. Redirects are refused on purpose so the key can never be handed to a redirect target; the configured `CLAUDE_OFFICE_API_URL` must therefore be the exact canonical endpoint (no trailing slash), documented in the scripts' README and docstrings. The script-auth test suite now runs in the backend gate (`requests` added as a backend dev dependency) instead of skipping in every environment.
+
+### Changed
+
+- Full dependency refresh across all five projects plus GitHub Actions (notables: FastAPI 0.143.2 → 0.162.0, Next.js 16.4.2 → 16.4.5, lucide-react 1.58 → 1.69, vitest 5.0 → 5.1, pytest 9.1.1 → 9.2.0, `astral-sh/setup-uv` v10.3.0 → v10.3.3). The TypeScript ^6.0.3 and frontend-ESLint 9.x holds were re-verified and still stand.
+
 ## [0.25.0] - 2026-10-16
 
 ### Added

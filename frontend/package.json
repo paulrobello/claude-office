@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "0.25.0",
+  "version": "0.25.1",
   "//": [
     "Dependency policy (ARC-027, 2026-07): runtime `dependencies` are exact-pinned",
     "for reproducible builds; `devDependencies` use caret ranges so build tools",
