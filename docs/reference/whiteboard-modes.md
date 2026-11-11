@@ -197,7 +197,7 @@ Weather metaphor for session health based on success rate and activity.
 
 **Data Sources:**
 - Success rate: `recentSuccessCount / (recentSuccessCount + recentErrorCount)`
-- Activity level: `toolUsesSinceCompaction / 100` (normalized)
+- Activity level: `min(1.0, toolUsesSinceCompaction / 100)` (normalized)
 
 ---
 
@@ -257,7 +257,7 @@ Breaking news headlines about session events.
 
 | Category | Color | Triggers |
 |----------|-------|----------|
-| tool | Blue | Significant tool events |
+| tool | Blue | Defined in the frontend color map; no backend event currently emits it |
 | agent | Green | Agent joins/completes, background task updates |
 | session | Purple | Session start, job completion |
 | error | Red | Tool failures |
@@ -270,12 +270,13 @@ Breaking news headlines about session events.
 - Backend stores up to 20 news items; frontend displays up to 10
 
 **Example Headlines:**
-- "🆕 Explorer-47 joins the team!"
-- "✅ Code-reviewer completed their task!"
-- "🎉 Job completed! Great work everyone!"
-- "☕ Coffee break #3! Context compacted."
-- "⚠️ Bash failed: permission denied"
-- "✅ Task bg_task_a: Linting codebase..."
+- "New session started - ready for work!"
+- "Explorer-47 joins the team!"
+- "Code-reviewer completed their task!"
+- "Job completed! Great work everyone!"
+- "Coffee break #3! Context compacted."
+- "Warning: Bash failed: permission denied"
+- "Completed Task bg_task_a: Linting codebase..."
 
 ---
 
@@ -369,7 +370,7 @@ graph TD
 
 ## Backend Tracking Logic
 
-The `WhiteboardTracker` class (in `backend/app/core/whiteboard_tracker.py`) tracks all whiteboard data. The state machine's `transition()` method delegates to it.
+The `WhiteboardTracker` class (in `backend/app/core/whiteboard_tracker.py`) tracks all whiteboard data. The state machine's `transition()` method dispatches each event to a handler function, and those handlers delegate whiteboard updates to the tracker.
 
 ### Tool Categorization
 
@@ -395,25 +396,25 @@ TOOL_CATEGORIES = {
 
 | Event Type | Data Updated |
 |------------|--------------|
-| `POST_TOOL_USE` | Tool usage, success/error counts, file edits, code written |
+| `POST_TOOL_USE` | Tool usage, success/error counts, file edits, code written, task and bug counters |
 | `SUBAGENT_START` | Agent lifespans, news items |
 | `SUBAGENT_STOP` | Agent lifespans (end time), news items |
-| `CONTEXT_COMPACTION` | Coffee cups, news items |
+| `CONTEXT_COMPACTION` | Coffee cups, news items; resets the tool counter |
 | `SESSION_START` | News items, resets counters |
-| `SESSION_END` | Cleanup on session end |
+| `SESSION_END` | Marks the session phase ended; whiteboard data is not reset |
 | `STOP` | News items (job completion) |
 | `BACKGROUND_TASK_NOTIFICATION` | Background tasks list, news items |
 | `TASK_CREATED` | Kanban tasks (new task in pending status) |
 | `TASK_COMPLETED` | Kanban tasks (task marked completed) |
-| `TEAMMATE_IDLE` | Kanban tasks (in-progress inference) |
+| `TEAMMATE_IDLE` | Boss state (sets teammate idle); no kanban task changes |
 
 ### Success/Failure Tracking
 
 ```python
 if success is False or error_type:
     recent_error_count += 1
-    consecutive_successes = 0  # Reset safety counter
-    last_incident_time = datetime.now().isoformat()
+    consecutive_successes = 0
+    last_incident_time = datetime.now(UTC).isoformat()
 else:
     recent_success_count += 1
     consecutive_successes += 1
@@ -425,8 +426,8 @@ else:
 if tool_name in ("Edit", "Write"):
     code_written_count += 1
     file_path = tool_input.get("file_path", "")
-    if file_path:
-        file_name = file_path.split("/")[-1]
+    if isinstance(file_path, str) and file_path:
+        file_name = file_path.split("/")[-1] if "/" in file_path else file_path
         file_edits[file_name] = file_edits.get(file_name, 0) + 1
 ```
 

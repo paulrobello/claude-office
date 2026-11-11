@@ -181,10 +181,7 @@ graph LR
 | `components/game/DebugOverlays.tsx` | Development debug visualizations |
 | `components/game/LoadingScreen.tsx` | Loading state display |
 | `components/game/ZoomControls.tsx` | Canvas zoom controls |
-| `components/game/EventLog.tsx` | Event history display panel |
 | `components/game/EventDetailModal.tsx` | Modal for viewing event details |
-| `components/game/ConversationHistory.tsx` | Conversation history display |
-| `components/game/GitStatusPanel.tsx` | Git repository status display |
 | `components/game/AgentStatus.tsx` | Agent status indicators |
 | `components/game/city/buildingRenderer.ts` | City building rendering with lit windows |
 | `components/game/city/skyRenderer.ts` | Sky gradient and celestial body rendering |
@@ -199,6 +196,9 @@ graph LR
 | `components/layout/MobileDrawer.tsx` | Mobile-friendly drawer component |
 | `components/layout/MobileAgentActivity.tsx` | Mobile agent activity display |
 | `components/layout/StatusToast.tsx` | Toast notification component |
+| `components/layout/ConversationHistory.tsx` | Conversation history display |
+| `components/layout/EventLog.tsx` | Event history display panel |
+| `components/layout/GitStatusPanel.tsx` | Git repository status display |
 | `components/attention/CommandBar.tsx` | Fuzzy-search command bar for filtering events |
 | `components/attention/AttentionToasts.tsx` | Urgency-based toast notifications for agent events |
 | `components/attention/AgentPopup.tsx` | Popover for focused agent details and terminal access |
@@ -408,7 +408,7 @@ interface GameState {
 **Implementation:**
 - `backend/app/models/sessions.py` - GameState includes queue arrays
 - `backend/app/core/state_machine.py` - Manages queue membership
-- `frontend/src/hooks/useWebSocketEvents.ts` - Detects position on join
+- `frontend/src/systems/stateReconciler.ts` - Detects position on join when applying a snapshot (extracted from `useWebSocketEvents`)
 - `frontend/src/systems/queuePositions.ts` - Tracks occupied elevator positions
 
 ## Frontend State Management
@@ -855,14 +855,15 @@ All configuration is managed via environment variables or a `.env` file in the `
 |----------|---------|-------------|
 | `DATABASE_URL` | `sqlite+aiosqlite:///<backend dir>/visualizer.db` | Database connection string (absolute path; `docker-compose` overrides to `/app/data/visualizer.db`) |
 | `GIT_POLL_INTERVAL` | `5` | Git status polling interval in seconds |
-| `CLAUDE_CODE_OAUTH_TOKEN` | (empty) | OAuth token for AI summaries via Claude API |
+| `CLAUDE_CODE_OAUTH_TOKEN` | (empty) | Unused; retained for compatibility. AI summaries use `SUMMARY_BACKEND` |
 | `SUMMARY_ENABLED` | `True` | Enable or disable AI-powered summaries |
+| `SUMMARY_BACKEND` | `claude-cli` | Summary backend: `claude-cli`, `openai` (OpenAI-compatible endpoint), or `disabled` |
 | `SUMMARY_MODEL` | `claude-haiku-4-5-20251001` | Claude model used for summary generation |
 | `SUMMARY_MAX_TOKENS` | `1000` | Maximum tokens for summary API responses |
 | `CLAUDE_PATH_HOST` | (empty) | Host path prefix for Docker volume translation |
 | `CLAUDE_PATH_CONTAINER` | (empty) | Container path prefix for Docker volume translation |
 | `BEADS_POLL_INTERVAL` | `3.0` | Beads issue tracker polling interval in seconds |
-| `EVENT_RATE_LIMIT` | `300` | Max event POSTs accepted per 60 s window (global, shared across all sessions) |
+| `EVENT_RATE_LIMIT` | `1000` | Max events accepted per session per 60 s sliding window |
 | `ZOMBIE_SUBAGENT_TIMEOUT_SECONDS` | `90` | Seconds of transcript inactivity before a subagent is assumed crashed and a synthetic `SubagentStop` is emitted to clean it up |
 | `CLAUDE_OFFICE_API_KEY` | (empty — auto-generated per launch) | Explicit API key; when set, gates all state-changing endpoints via `X-API-Key` (see [Authentication](#authentication)) |
 | `SERVE_STATIC` | (unset) | Set to `1`/`true`/`yes` to serve the built frontend from `backend/static/` |
@@ -872,7 +873,7 @@ All configuration is managed via environment variables or a `.env` file in the `
 
 ### Authentication
 
-The backend has a two-mode API-key model. When `CLAUDE_OFFICE_API_KEY` is unset (the default), a random token is generated per launch and only the destructive global operations (`DELETE /api/v1/sessions`, `POST /api/v1/sessions/simulate`) require it. When `CLAUDE_OFFICE_API_KEY` is set explicitly, every endpoint except `/health`, `/docs`, `/redoc`, the OpenAPI schema, and CORS preflight requires the key in the `X-API-Key` header (compared with `hmac.compare_digest`). Browser WebSocket connections must originate from an allowed localhost origin; non-browser clients must send `X-API-Key` or the handshake closes with code 4003. See the [backend README](../../backend/README.md#authentication) for the full key sources, gated endpoints, and discovery flow.
+The backend has a two-mode API-key model. When `CLAUDE_OFFICE_API_KEY` is unset (the default), a random token is generated per launch and only the destructive global operations (`DELETE /api/v1/sessions`, `POST /api/v1/sessions/simulate`) and per-session terminal activation (`POST /api/v1/sessions/{session_id}/focus`) require it. When `CLAUDE_OFFICE_API_KEY` is set explicitly, every endpoint except `/health`, `/docs`, `/redoc`, the OpenAPI schema, and CORS preflight requires the key in the `X-API-Key` header (compared with `hmac.compare_digest`). Browser WebSocket connections must originate from an allowed localhost origin; non-browser clients must send `X-API-Key` or the handshake closes with code 4003. See the [backend README](../../backend/README.md#authentication) for the full key sources, gated endpoints, and discovery flow.
 
 ## Related Documentation
 

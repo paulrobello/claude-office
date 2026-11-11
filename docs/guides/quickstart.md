@@ -74,20 +74,19 @@ This single command:
 - Installs frontend dependencies (auto-detects bun or npm)
 - Registers Claude Code hooks and the OpenCode plugin
 
-### Step 3: (Optional) Enable AI Enhancements
+### Step 3: (Optional) AI Enhancements
 
-For AI-powered features like agent name generation and task summaries, create a `.env` file in the `backend/` folder with your Claude Code OAuth token:
+AI-powered agent names and task summaries are enabled by default: the backend runs `claude` CLI subprocesses authenticated by your logged-in Claude subscription, so no token or `.env` file is required.
+
+To use an OpenAI-compatible endpoint instead, set the following in a `backend/.env` file:
 
 ```bash
-# Set up a long-lived authentication token (requires Claude subscription)
-# This will prompt you to authenticate and display your token
-claude setup-token
-
-# Create the .env file with the token
-echo "CLAUDE_CODE_OAUTH_TOKEN=your-token-here" > backend/.env
+SUMMARY_BACKEND=openai
+SUMMARY_OPENAI_BASE_URL=https://api.openai.com/v1
+SUMMARY_OPENAI_MODEL=gpt-4o-mini
 ```
 
-> **Note:** Without this token, the visualizer works fully but displays raw agent IDs instead of generated names, and tool names instead of task summaries. The frontend displays AI status in the top right corner so you can verify if it's properly configured.
+> **Note:** When AI is unavailable, the visualizer works fully with deterministic fallback names and short task summaries. The header shows the AI status in the top right corner so you can confirm it is active.
 
 ### Step 4: Verify Hooks Installation
 
@@ -191,7 +190,7 @@ Now that the visualizer is running:
 
 | Task | Command/Action |
 |------|----------------|
-| Run simulation | Click the **Simulate** button in the frontend header |
+| Run simulation | Click **More** (⋯) in the frontend header, then **Simulate** |
 | Enable debug mode | Press `D` in the browser |
 | View hook logs | `make hooks-logs` |
 | Stop services | `make dev-tmux-kill` |

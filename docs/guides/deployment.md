@@ -107,7 +107,7 @@ graph TD
 
 ## Configuration
 
-For production or shared-host deployments, set an explicit `CLAUDE_OFFICE_API_KEY`. Once set, every state-changing endpoint (including `POST /api/v1/events` from the hooks) must send the key in the `X-API-Key` header. With the default auto-generated key, only the destructive global operations (`DELETE /api/v1/sessions`, `POST /api/v1/sessions/simulate`) require it. See the [backend README](../../backend/README.md#authentication) for the full model.
+For production or shared-host deployments, set an explicit `CLAUDE_OFFICE_API_KEY`. Once set, every state-changing endpoint (including `POST /api/v1/events` from the hooks) must send the key in the `X-API-Key` header. With the default auto-generated key, only the state-changing operations (`DELETE /api/v1/sessions`, `POST /api/v1/sessions/simulate`, `POST /api/v1/sessions/{id}/focus`) require it. See the [backend README](../../backend/README.md#authentication) for the full model.
 
 ### Environment Variables
 
@@ -116,9 +116,10 @@ For production or shared-host deployments, set an explicit `CLAUDE_OFFICE_API_KE
 | `CLAUDE_PATH_HOST` | No | `$HOME/.claude` (in `docker-compose.yml`) | Absolute path to `~/.claude` on host system |
 | `CLAUDE_PATH_CONTAINER` | No | `/claude-data` | Mount point inside container (hardcoded in compose) |
 | `CLAUDE_DATA_DIR` | No | `~/.claude` | Host directory to mount (used in volume mount only) |
-| `CLAUDE_CODE_OAUTH_TOKEN` | No | - | OAuth token for AI-powered summaries |
+| `SUMMARY_BACKEND` | No | `claude-cli` | AI summary backend: `claude-cli` (uses your logged-in Claude subscription), `openai` (any OpenAI-compatible endpoint), or `disabled`. Auth is handled by the chosen backend; no OAuth token is needed. |
+| `CLAUDE_CODE_OAUTH_TOKEN` | No | - | Deprecated. Accepted by the compose file for backwards compatibility but no longer used by the backend |
 | `SUMMARY_ENABLED` | No | `true` | Enable/disable AI summaries |
-| `DATABASE_URL` | No | `sqlite+aiosqlite:////app/data/visualizer.db` | Database connection string |
+| `DATABASE_URL` | No | `sqlite+aiosqlite:////app/data/visualizer.db` (set in `docker-compose.yml`) | Database connection string |
 | `SERVE_STATIC` | No | `1` (in `docker-compose.yml`) | Set to `1`/`true`/`yes` to serve the built frontend from `backend/static/`. The compose file sets this; a raw `docker run` must set it explicitly or the root URL serves no frontend. |
 | `LOCALHOST_ONLY` | No | `1` (code default; compose sets `0`) | Set to `0` to skip the in-app client-IP check. Required in Docker, where every request arrives from the bridge gateway; the host port binding (`127.0.0.1:8050`) is the loopback boundary there. Note: other containers on the same Docker network can then reach the API unauthenticated — keep the compose network private. |
 | `CLAUDE_OFFICE_API_KEY` | No | (auto-generated per launch) | Explicit API key; when set, all state-changing endpoints require the `X-API-Key` header |
@@ -132,8 +133,9 @@ For production or shared-host deployments, set an explicit `CLAUDE_OFFICE_API_KE
 # Set this to the full path of your .claude directory
 CLAUDE_PATH_HOST=/Users/yourusername/.claude
 
-# Optional: Enable AI summaries (requires Claude API access)
-# CLAUDE_CODE_OAUTH_TOKEN=your-oauth-token-here
+# Optional: AI summaries. The default backend (claude-cli) uses your
+# logged-in Claude subscription; no API token is required.
+# SUMMARY_BACKEND=claude-cli
 
 # Optional: Disable AI summaries
 # SUMMARY_ENABLED=false
@@ -267,12 +269,13 @@ docker compose down -v
 # Run directly
 docker run -d \
   --name claude-office \
-  -p 8000:8000 \
+  -p 127.0.0.1:8050:8000 \
   -v ~/.claude:/claude-data:ro \
   -v claude-office-db:/app/data \
   -e CLAUDE_PATH_HOST=/Users/yourusername/.claude \
   -e CLAUDE_PATH_CONTAINER=/claude-data \
   -e SERVE_STATIC=1 \
+  -e LOCALHOST_ONLY=0 \
   -e DATABASE_URL=sqlite+aiosqlite:////app/data/visualizer.db \
   claude-office:latest
 ```
@@ -303,7 +306,7 @@ docker compose logs claude-office
 Common causes:
 - Missing environment variables
 - Invalid `CLAUDE_PATH_HOST` path
-- Port 8000 already in use
+- Host port 8050 already in use
 
 ### Transcript Files Not Found
 
@@ -340,10 +343,11 @@ Common causes:
 
 2. Verify port binding:
    ```bash
-   curl http://localhost:8000/health
+   curl http://localhost:8050/health
    ```
 
-3. Check hook configuration points to `localhost:8000`
+3. Check hook configuration points to `localhost:8050`
+   (`make docker-config` writes `~/.claude/claude-office-config.env`)
 
 ### Database Permission Errors
 
@@ -366,7 +370,7 @@ docker compose up -d
 |-------|----------|
 | "No such file or directory" for transcripts | Verify `CLAUDE_PATH_HOST` is set correctly |
 | WebSocket connection fails | Check CORS settings and container networking |
-| AI summaries not working | Verify `CLAUDE_CODE_OAUTH_TOKEN` is set |
+| AI summaries not working | Check `SUMMARY_BACKEND` (default `claude-cli`) and its settings; see [AI Summary Service](../reference/ai-summary.md) |
 | Slow startup | First build downloads dependencies; subsequent starts are faster |
 
 ## Related Documentation

@@ -15,7 +15,7 @@ See [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) for s
 make install       # Install all dependencies
 make dev-tmux      # Run in tmux (recommended) - backend :8000, frontend :3000
 make dev-tmux-kill # Kill tmux session
-make checkall      # Lint, typecheck, test all components
+make checkall      # Format, lint, typecheck, test all components
 make simulate      # Run event simulation
 
 # Component-specific (run from backend/ or frontend/)
@@ -35,11 +35,11 @@ bun run typecheck  # Type check
 ## Development Workflow
 
 **Preferred:** Use `make dev-tmux` - creates separate windows for backend/frontend.
-- Read logs: `tmux capture-pane -t claude-office:backend -p`
+- Read logs: `tmux capture-pane -t claude-office-dev:backend -p`
 - Switch windows: `Ctrl-b n` / `Ctrl-b p`
 - Hot reload enabled on both servers
 
-**Debugging:** Hook logs at `~/.claude/claude-office-hooks.log` (enable with `CLAUDE_OFFICE_DEBUG=1`)
+**Debugging:** Hook logs at `~/.claude/claude-office-hooks.log` (set `CLAUDE_OFFICE_DEBUG=1` in `~/.claude/claude-office-config.env`, or run `make hooks-debug-on`)
 
 ## Project Skills
 

@@ -4,16 +4,25 @@ This document describes the AI-powered summary system used in Claude Office Visu
 
 ## Overview
 
-The `SummaryService` (`backend/app/core/summary_service.py`) provides AI-powered text summarization using Claude Haiku. When AI is unavailable, it falls back to simple text extraction methods. All handler references below are relative to `backend/app/core/handlers/`.
+The `SummaryService` (`backend/app/core/summary_service.py`) provides AI-powered text summarization via a pluggable backend (`SUMMARY_BACKEND`: `claude-cli`, `openai`, or `disabled`; default `claude-cli`). When AI is unavailable, it falls back to simple text extraction methods. All handler references below are relative to `backend/app/core/handlers/`.
 
 ## Configuration
 
 | Environment Variable | Purpose | Default |
 |---------------------|---------|---------|
-| `CLAUDE_CODE_OAUTH_TOKEN` | OAuth token for Claude API access | None (disables AI) |
+| `SUMMARY_BACKEND` | Summary backend: `claude-cli`, `openai`, or `disabled` | `claude-cli` |
 | `SUMMARY_ENABLED` | Enable/disable summary service | `True` |
-| `SUMMARY_MODEL` | Model to use for summaries | `claude-haiku-4-5-20251001` |
-| `SUMMARY_MAX_TOKENS` | Max tokens for summary responses | `1000` |
+| `SUMMARY_MODEL` | Model used by the `claude-cli` backend | `claude-haiku-4-5-20251001` |
+| `SUMMARY_MAX_TOKENS` | Max tokens for summary responses (`openai` backend only) | `1000` |
+| `SUMMARY_CONCURRENCY` | Shared cap on in-flight summary calls | `4` |
+| `SUMMARY_CLI_PATH` | `claude-cli` backend: CLI binary to invoke | `claude` |
+| `SUMMARY_CLI_TIMEOUT` | `claude-cli` backend: subprocess timeout (seconds) | `15.0` |
+| `SUMMARY_OPENAI_BASE_URL` | `openai` backend: endpoint base URL (e.g. `https://api.openai.com/v1`) | `""` |
+| `SUMMARY_OPENAI_API_KEY` | `openai` backend: Bearer token (omitted from headers when empty) | `""` |
+| `SUMMARY_OPENAI_MODEL` | `openai` backend: model (e.g. `gpt-4o-mini`) | `""` |
+| `SUMMARY_OPENAI_TIMEOUT` | `openai` backend: request timeout (seconds) | `15.0` |
+
+The `claude-cli` backend is active when the configured CLI is found on `PATH`; the `openai` backend is active only when both `SUMMARY_OPENAI_BASE_URL` and `SUMMARY_OPENAI_MODEL` are set. Otherwise the service disables AI and uses fallbacks.
 
 ## API Methods
 
@@ -24,7 +33,7 @@ Generates a short summary of a subagent's task.
 **Prompt:**
 ```
 In 10 words or less, summarize this task:
-{task_description}
+<data>{task_description}</data>
 ```
 
 **Input Truncation:** 1000 characters max
@@ -42,7 +51,7 @@ Generates a summary of the user's prompt for display in the scrolling marquee.
 **Prompt:**
 ```
 In one sentence, summarize what this request asks for:
-{prompt}
+<data>{prompt}</data>
 ```
 
 **Input Truncation:** 1500 characters max
@@ -61,7 +70,7 @@ Generates a fun, creative nickname for an agent based on its task. Deduplicates 
 
 **Prompt:**
 ```
-Create a 1-3 word nickname that DIRECTLY relates to the task below. Extract the KEY ACTION or SUBJECT from the task and build the name around it. Examples: 'migrate YAML config' -> YAML Yoda or Config King; 'write unit tests' -> Test Pilot; 'fix database queries' -> Query Queen; 'update documentation' -> Doc Holiday; 'debug auth issue' -> Bug Bounty. The name MUST reference the main subject (YAML, tests, database, docs, etc). Use puns, pop culture, or alliteration. Max 15 chars. Task: {description}
+Create a 1-3 word nickname that DIRECTLY relates to the task below. Extract the KEY ACTION or SUBJECT from the task and build the name around it. Examples: 'migrate YAML config' → YAML Yoda or Config King; 'write unit tests' → Test Pilot; 'fix database queries' → Query Queen; 'update documentation' → Doc Holiday; 'debug auth issue' → Bug Bounty. The name MUST reference the main subject (YAML, tests, database, docs, etc). Use puns, pop culture, or alliteration. Max 15 chars. Task: <data>{description}</data>
 Names already taken (DO NOT use these): {existing_names}
 Nickname:
 ```
@@ -71,6 +80,8 @@ Nickname:
 - `existing_names` — `set[str] | None` of names already in use; passed to fallback and used for dedup
 
 **Input Truncation:** 500 characters max
+
+**Agent-type short-circuit:** If `agent_type` matches one of the curated slugs in the table below, the AI namer is skipped entirely and the fallback name is returned.
 
 **Post-processing:**
 1. Remove quotes, punctuation, and extra whitespace
@@ -83,7 +94,7 @@ Nickname:
 **Fallback Logic (`generate_agent_name_fallback`):**
 Generates fun, creative names by matching task keywords to themed name lists. First checks for exact `agent_type` matches, then falls through to keyword-based categories. All selections avoid names in `existing_names`.
 
-**Agent Type Names (exact match on description):**
+**Agent Type Names (exact match on `agent_type`; a description that literally begins with a slug also matches):**
 
 | Agent Type | Example Names |
 |------------|---------------|
@@ -132,7 +143,7 @@ Names are randomly selected from each category, excluding those in `existing_nam
 
 **Called From:**
 - `enrich_agent_with_summaries()` in `agent_handler.py` when a subagent spawns
-- `_create_agent()` in `state_machine.py` uses `generate_agent_name_fallback` directly for immediate short name generation
+- `_create_agent()` in `backend/app/core/state_machine.py` uses `generate_agent_name_fallback` directly for immediate short name generation
 
 ---
 
@@ -143,7 +154,7 @@ Generates a short summary of Claude's response for speech bubbles.
 **Prompt:**
 ```
 In 15 words or less, summarize this response:
-{response_text}
+<data>{response_text}</data>
 ```
 
 **Input Truncation:** 2000 characters max
@@ -163,7 +174,7 @@ Detects if the user's prompt requests a report or document to be created.
 **Prompt:**
 ```
 Does this request ask for a report, document, or documentation to be created? Reply with ONLY 'yes' or 'no':
-{prompt}
+<data>{prompt}</data>
 ```
 
 **Input Truncation:** 1000 characters max
@@ -179,58 +190,60 @@ Does this request ask for a report, document, or documentation to be created? Re
 ## API Call Details
 
 ### Model Configuration
-- **Model:** Configurable via `SUMMARY_MODEL` setting
-- **Max Tokens:** Configurable via `SUMMARY_MAX_TOKENS` setting (default: 1000)
+- **Model:** The `claude-cli` backend uses `SUMMARY_MODEL`; the `openai` backend uses `SUMMARY_OPENAI_MODEL`
+- **Max Tokens:** `SUMMARY_MAX_TOKENS` (default: 1000) applies to the `openai` backend only; the CLI backend imposes no token cap
 - **Retries:** 1 retry on failure, then fallback
 
+### Prompt Framing
+Every request is sent with a shared system prompt that frames the summarizer's task and treats text between `<data>`/`</data>` tags as untrusted data (prompt-injection hardening). Any pre-existing `<data>`/`</data>` tags in user content are stripped before a prompt is built.
+
 ### Authentication
-Uses `CLAUDE_CODE_OAUTH_TOKEN` as bearer auth for Claude Code Max subscription access.
+Authentication depends on the backend:
+- `claude-cli` (default): subprocess calls to the `claude` CLI authenticate via the user's logged-in Claude subscription — no token required.
+- `openai`: sends `SUMMARY_OPENAI_API_KEY` as a Bearer token when set; the header is omitted when empty (keyless local servers such as Ollama or LM Studio).
 
 ### Console Output
-When summaries are enabled, the service logs a clear banner at startup:
+When summaries are enabled, the service logs a banner at startup. With the default `claude-cli` backend:
 ```
 ==================================================
-AI SUMMARIES ENABLED
-  Model: claude-haiku-4-5-20251001
-  Max tokens: 1000
+AI SUMMARIES ENABLED (claude-cli backend)
+  CLI: claude  Model: claude-haiku-4-5-20251001
+==================================================
+```
+With the `openai` backend:
+```
+==================================================
+AI SUMMARIES ENABLED (openai-compatible backend)
+  Base URL: https://api.openai.com/v1
+  Model: gpt-4o-mini
 ==================================================
 ```
 
 ### Error Handling
 The service gracefully falls back to text extraction when:
-- API call fails (after 1 retry)
+- backend call fails (after 1 retry)
 - AI returns an empty response
 - AI response has no content
 
 ```python
 async def _call_with_retry(self, prompt: str, max_retries: int = 1) -> str | None:
-    if not self.client:
+    """Call the configured backend with retry on error, returning None on failure."""
+    if not self.enabled:
         return None
-    settings = get_settings()
+
+    runner = self._run_openai if self._backend == "openai" else self._run_cli
+
     for attempt in range(max_retries + 1):
         try:
-            response = await self.client.messages.create(
-                model=self.model,
-                max_tokens=settings.SUMMARY_MAX_TOKENS,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            content = response.content
-            if content and len(content) > 0:
-                first_block = content[0]
-                if hasattr(first_block, "text"):
-                    text = str(first_block.text).strip()
-                    if text:
-                        return text
-                    logger.debug("AI returned empty response, using fallback")
-                    return None
-            logger.debug("AI response had no content, using fallback")
-            return None
+            return await runner(prompt)
         except Exception as e:
+            detail = f"{type(e).__name__}: {e}"
             if attempt < max_retries:
-                logger.warning(f"Summary API error, retrying: {e}")
+                logger.warning(f"Summary backend error, retrying: {detail}")
             else:
-                logger.debug(f"Summary API failed after retry, using fallback: {e}")
+                logger.debug(f"Summary backend failed after retry, using fallback: {detail}")
                 return None
+
     return None
 ```
 
@@ -266,10 +279,10 @@ Extracts first sentence for fallback summaries:
 ```mermaid
 graph TD
     Event[Event Received]
-    Check{CLAUDE_CODE_OAUTH<br/>TOKEN set?}
-    AI[AI Summary<br/>Claude Haiku]
+    Check{AI enabled and<br/>backend available?}
+    AI[AI Summary<br/>configured backend]
     Fallback[Fallback Logic<br/>text extraction]
-    Response[Response Text<br/>≤1000 tokens max]
+    Response[Response Text]
     Empty{Empty response?}
     Display[Display in UI<br/>bubble/label]
 

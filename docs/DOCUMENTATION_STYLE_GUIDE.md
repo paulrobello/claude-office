@@ -556,6 +556,8 @@ Use whichever tools fit the project:
 - Mermaid rendering validation
 - API reference generation or schema validation
 
+When the project defines a documentation link checker (for example a `doc-links-check` make target built on lychee), run it after every documentation edit and keep it green; treat its failures like test failures.
+
 ## Review Checklist
 
 ### Structure

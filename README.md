@@ -45,6 +45,11 @@ The application was built with [Next.js](https://nextjs.org/), [PixiJS](https://
 
 ## What's New
 
+### v0.25.1 (November 2026)
+
+- **Bug fixes**: live history and conversation entries are keyed by the persisted event row id, so two events arriving within the same second no longer collide ([PR #62](https://github.com/paulrobello/claude-office/pull/62)). Simulation scripts now send `X-API-Key` and exit non-zero when events are rejected ([PR #63](https://github.com/paulrobello/claude-office/pull/63)).
+- **Dependency refresh** across all five projects plus GitHub Actions; TypeScript stays held at ^6.0.3 and frontend ESLint at 9.x.
+
 ### v0.25.0 (October 2026)
 
 - **Docker deployment works end to end** — the compose stack now serves the UI at [http://localhost:8050](http://localhost:8050) with no port configuration: the frontend derives its API/WebSocket origin from the page itself, transcript path translation defaults on, and `make docker-config` points the hooks and the OpenCode plugin at :8050. Thanks [@tcsenpai](https://github.com/tcsenpai) ([PR #61](https://github.com/paulrobello/claude-office/pull/61)).
@@ -179,18 +184,20 @@ make hooks-install
 
 ### Enable AI Enhancements (Optional)
 
-For AI-powered features like agent name generation and task summaries, create a `.env` file in the `backend/` folder with your Claude Code OAuth token:
+AI-powered features like agent name generation and task summaries work out of the box with the default `SUMMARY_BACKEND=claude-cli`, which uses your logged-in Claude subscription via the `claude` CLI (no token required). To use an OpenAI-compatible endpoint instead, or to disable AI summaries, create a `.env` file in the `backend/` folder:
 
 ```bash
-# Set up a long-lived authentication token (requires Claude subscription)
-# This will prompt you to authenticate and display your token
-claude setup-token
+# Use any OpenAI-compatible endpoint (OpenAI, OpenRouter, Ollama, LM Studio, ...)
+SUMMARY_BACKEND=openai
+SUMMARY_OPENAI_BASE_URL=https://api.openai.com/v1
+SUMMARY_OPENAI_API_KEY=your-key-here   # leave empty for keyless local servers
+SUMMARY_OPENAI_MODEL=gpt-4o-mini
 
-# Create the .env file with the token
-echo "CLAUDE_CODE_OAUTH_TOKEN=your-token-here" > backend/.env
+# Or disable AI summaries entirely
+# SUMMARY_BACKEND=disabled
 ```
 
-Without this token, the visualizer works fully but displays raw agent IDs instead of friendly generated names, and tool names instead of summarized tasks. The frontend displays AI status in the top right corner so you can verify if it's properly configured.
+Without AI, the visualizer works fully but displays raw agent IDs instead of friendly generated names, and tool names instead of summarized tasks. The frontend displays AI status in the top right corner so you can verify if it's properly configured. See [AI Summary](docs/reference/ai-summary.md) for all settings.
 
 ## Development
 
