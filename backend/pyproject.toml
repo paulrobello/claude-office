@@ -5,7 +5,7 @@ description = "Real-time pixel art visualization of Claude Code operations"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi>=0.162.0",
+    "fastapi>=0.162.4",
     "uvicorn[standard]>=0.54.0",
     "websockets>=17.4",
     "sqlalchemy>=2.1.8",
@@ -23,7 +23,7 @@ dev = [
     "pytest>=9.2.0",
     "pytest-asyncio>=1.4.1.post1",
     "pytest-cov>=7.1.0",
-    "ruff>=0.17.3",
+    "ruff>=0.17.4",
     "pyright>=1.1.414",
     "pre-commit>=4.7.0",
 ]
@@ -77,7 +77,7 @@ dev = [
     "pytest-asyncio>=1.4.1.post1",
     "pytest-cov>=7.1.0",
     "pytest-timeout>=2.4.0",
-    "ruff>=0.17.3",
+    "ruff>=0.17.4",
     "pre-commit>=4.7.0",
     # ARC-010: contract test imports hooks' event_mapper, which depends on
     # defusedxml for <task-notification> parsing. Test-only; not a runtime dep.
